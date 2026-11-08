@@ -37,6 +37,7 @@ Every rule applies to every control on every screen. The rules are listed in
 | `vector-icons` | An icon is a font character (`+`, `⚙`, `×`) | Text content of icon-only controls |
 | `in-viewport` | A control is cut off by the screen edge | Box against the viewport (scroll containers excepted) |
 | `target-size` | A target is under 24×24 px and crowded (WCAG 2.2 2.5.8) | Hit area and spacing |
+| `solid-panels` | A dialog, sheet or peek panel paints its background less than 85% opaque, so the page shows through its text (for example a CSS class the build does not know, like an opacity step of `/98`) | Computed background colour and gradient stops of each panel |
 | `scroll-room` | An area that scrolls its content shows less than 120 px of it (pinned headers on a phone held sideways) | On-screen height of scrolling areas |
 | `no-horizontal-scroll` | The page, or an area that scrolls up and down, also scrolls sideways (deliberate sideways strips such as tabs are fine) | Document and scroll-area widths |
 

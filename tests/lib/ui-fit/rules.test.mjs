@@ -55,6 +55,12 @@ test('a scroll area showing only a sliver of its content is reported', () => {
   assert.deepEqual(findings.map(f => [f.rule, f.key]), [['scroll-room', 'area:div.p-4']]);
 });
 
+test('a see-through dialog panel is reported by name', () => {
+  const findings = evaluate({ controls: [], page, seeThroughPanels: [{ name: 'New task', alpha: 0 }] }, { touch: true });
+  assert.deepEqual(findings.map(f => [f.rule, f.key]), [['solid-panels', 'panel:New task']]);
+  assert.match(findings[0].message, /see-through \(background 0% opaque\)/);
+});
+
 test('a vertical scroll area that also scrolls sideways is reported by name', () => {
   const findings = evaluate({ controls: [], page, sidewaysScrollers: [{ name: 'main.flex-1', overflow: 64 }] }, { touch: true });
   assert.deepEqual(findings.map(f => [f.rule, f.key]), [['no-horizontal-scroll', 'area:main.flex-1']]);

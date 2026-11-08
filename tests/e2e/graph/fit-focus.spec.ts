@@ -45,7 +45,7 @@ for (const { width, height, title, detail } of [
     await expect(card).toHaveCount(1);
     await expect.poll(() => page.evaluate(() => (window as any).__layoutMetrics?.()?.cameraReady)).toBe(true);
 
-    await page.getByRole('button', { name: 'Zoom to fit — frame all nodes' }).click();
+    await page.getByTestId('graph-zoom-extents').click();
     await expect(card).toHaveAttribute('data-detail', detail);
     // Framing retries refit every 250ms while the layout settles: the camera
     // and the card's detail must not alternate between them.

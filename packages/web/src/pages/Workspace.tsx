@@ -5,11 +5,12 @@ import { WorkspaceViewTabs } from '../components/WorkspaceViewTabs';
 import { AgentConnection } from '../components/AgentConnection';
 import type { WorkItem } from '../types/graph';
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Share2, Users, Network, Orbit, Database, AlertTriangle, Map, X, Minimize2, Maximize2, Edit3, Trash2, FolderPlus, ChevronLeft, ChevronRight, Lock, Unlock } from 'lucide-react';
+import { Plus, Share2, Users, Network, Orbit, Database, AlertTriangle, Map, X, Minimize2, Maximize2, Edit3, Trash2, FolderPlus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useQuery } from '@apollo/client';
 import { SafeGraphVisualization } from '../components/SafeGraphVisualization';
 import { NodeInspector } from '../components/NodeInspector';
+import { PhoneGraphControls } from '../components/PhoneGraphControls';
 import { GraphSelector } from '../components/GraphSelector';
 import { MiniMap } from '../components/MiniMap';
 import { CreateWorkItemModal } from '../components/CreateWorkItemModal';
@@ -352,7 +353,9 @@ export function Workspace() {
           </div>
         ) : viewMode === 'graph' ? (
           <div className="relative h-full">
-           <div className="relative w-full h-full">
+           {/* data-peek-open: on a phone the card's peek sheet takes the bottom
+               of the screen, so the graph's bottom bar steps aside (index.css). */}
+           <div className="relative w-full h-full" data-peek-open={isMobile && inspectorNode ? 'true' : undefined}>
             {/* Connection warning — fires only when the GraphQL data layer itself is
                 unreachable, not when an optional store (Neo4j) is simply unused. */}
             {!offlineEnabled && !healthLoading && !isGraphServiceAvailable(health) && (
@@ -377,48 +380,45 @@ export function Workspace() {
             )}
             <SafeGraphVisualization onNodeSelected={setInspectorNode} interactionLocked={isMobile && graphLocked} quickEditRequest={quickEditRequest} onQuickEditRequestHandled={() => setQuickEditRequest(null)} undoStack={undoStack} />
            </div>
-           {/* Lock toggle (compact layouts): when locked, touch pans the canvas and never
-               drags a node or edge label; unlock to rearrange/edit. */}
-           {isMobile && (
-             <button
-               data-testid="graph-lock-toggle"
-               data-graph-fit-obstacle="true"
-               onClick={() => setGraphLocked((v) => !v)}
-               className={`absolute top-3 right-3 z-40 flex min-h-11 items-center gap-1.5 px-3 py-2 rounded-full shadow-lg backdrop-blur-sm border text-xs font-medium transition-colors ${
-                 graphLocked
-                   ? 'bg-gray-900/90 border-gray-600 text-gray-200'
-                   : 'bg-green-600/90 border-green-400 text-white'
-               }`}
-               title={graphLocked ? 'Locked — tap to edit' : 'Editing — tap to lock'}
-             >
-               {graphLocked ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
-               {graphLocked ? 'Locked' : 'Editing'}
-             </button>
+           {/* Phone: Fit, Lock and View in one column, bottom right. Hidden
+               while a card's peek sheet is open (it closes back to them). */}
+           {isMobile && !inspectorNode && (
+             <PhoneGraphControls
+               locked={graphLocked}
+               onToggleLock={() => setGraphLocked((v) => !v)}
+               connectionCount={actualEdgeCount}
+               canOrganize={!!currentGraph && canEditGraph(currentGraph.id)}
+               overview={actualNodeCount >= 40}
+             />
            )}
-           {/* Zoom-extents: frame every node, independent of the camera-restore
-               state. Sits under the lock toggle in compact layouts; top-left on desktop,
-               where the right corner is taken by the docked inspector. */}
+           {/* Desktop: zoom-extents frames every node, independent of the
+               camera-restore state; top-left, where the right corner is taken
+               by the docked inspector. */}
+           {!isMobile && (
            <button
              data-testid="graph-zoom-extents"
              data-graph-fit-obstacle="true"
              onClick={() => (window as any).triggerZoomToFit?.()}
-             className="absolute top-16 right-3 md:top-3 md:left-3 md:right-auto z-40 flex items-center justify-center w-11 h-11 rounded-full shadow-lg backdrop-blur-sm border border-gray-600 bg-gray-900/90 text-gray-200 hover:text-white hover:border-green-400 transition-colors"
+             className="absolute top-3 left-3 z-40 flex items-center justify-center w-11 h-11 rounded-full shadow-lg backdrop-blur-sm border border-gray-600 bg-gray-900/90 text-gray-200 hover:text-white hover:border-green-400 transition-colors"
              title="Zoom to fit — frame all nodes"
              aria-label="Zoom to fit — frame all nodes"
            >
              <Maximize2 className="h-4 w-4" />
            </button>
+           )}
+           {!isMobile && (
            <button
              data-testid="graph-organize"
              data-graph-fit-obstacle="true"
              disabled={!currentGraph || !canEditGraph(currentGraph.id)}
              onClick={() => (window as any).__organizeGraph?.()}
-             className="absolute top-28 right-3 md:left-3 md:right-auto z-40 flex items-center justify-center w-11 h-11 rounded-full shadow-lg backdrop-blur-sm border border-teal-500/60 bg-gray-900/90 text-teal-200 hover:text-white hover:border-teal-300 transition-colors"
+             className="absolute top-28 left-3 z-40 flex items-center justify-center w-11 h-11 rounded-full shadow-lg backdrop-blur-sm border border-teal-500/60 bg-gray-900/90 text-teal-200 hover:text-white hover:border-teal-300 transition-colors"
              title="Organize around connections — place hubs centrally"
              aria-label="Organize around connections"
            >
              <Orbit className="h-5 w-5" />
            </button>
+           )}
            {/* Layout mode (desktop): force (organic) vs hierarchical (dependency
                layers). Lives in the graph control cluster under zoom-extents, so
                it never overlaps the left sidebar's console toggle. */}

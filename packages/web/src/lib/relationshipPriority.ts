@@ -18,6 +18,14 @@ const tiers: Readonly<Record<string, number>> = {
   SATISFIES: 1,
 };
 
+// Fired on window with the new level as `detail` when a control outside the
+// graph (the phone View sheet) changes it.
+export const RELATIONSHIP_PRIORITY_EVENT = 'graphdone:relationship-priority';
+export const RELATIONSHIP_PRIORITY_STORAGE_KEY = 'graphdone:relationship-priority';
+// Fired on window when a panel over the graph opens or closes, so connection
+// labels hidden under it are placed again.
+export const GRAPH_OBSTACLES_EVENT = 'graphdone:graph-obstacles';
+
 export const relationshipPriorityTier = (type: string) =>
   Object.prototype.hasOwnProperty.call(tiers, type) ? tiers[type] : 2;
 

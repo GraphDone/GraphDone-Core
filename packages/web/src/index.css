@@ -912,6 +912,7 @@ html:not([data-theme="contrast"]) .workspace-surface .graph-container .node-titl
   [data-graph-status-dock="true"] {
     left: 0; right: 0; bottom: 0; max-width: none; align-items: stretch; gap: 0;
   }
+  [data-peek-open="true"] [data-graph-status-dock="true"] { display: none; }
   [data-graph-status-dock="true"] > button,
   [data-graph-status-dock="true"] > div {
     width: 100%; border-radius: 0; border-left: 0; border-right: 0; border-bottom: 0; box-shadow: none;

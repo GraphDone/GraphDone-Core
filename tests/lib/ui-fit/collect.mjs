@@ -307,11 +307,52 @@ export function collectControls() {
     });
   }
 
+  // Dialogs, sheets and peek panels must paint their own background: a class
+  // the CSS build does not know (an opacity step like /98) leaves none, and
+  // the page shows through the text. Opacity is the weakest alpha among the
+  // background colour and every gradient stop; a full-screen dialog wrapper is
+  // judged by the panel inside it that covers most of it.
+  const alphaOf = color => {
+    if (!color || color === 'transparent') return 0;
+    const m = color.match(/rgba?\(([^)]+)\)/);
+    if (!m) return 1;
+    const parts = m[1].split(/[\s,/]+/).filter(Boolean);
+    return parts.length > 3 ? Number(parts[3]) : 1;
+  };
+  const surfaceAlpha = el => {
+    const style = getComputedStyle(el);
+    const stops = (style.backgroundImage || '').match(/rgba?\([^)]+\)/g);
+    const fromGradient = stops ? Math.min(...stops.map(alphaOf)) : 0;
+    return Math.max(alphaOf(style.backgroundColor), fromGradient);
+  };
+  const seeThroughPanels = [];
+  for (const panel of document.querySelectorAll('[data-modal-panel], [role="dialog"], [role="alertdialog"], [data-testid="node-inspector"]')) {
+    if (panel.closest('#ui-fit-overlay') || isHidden(panel)) continue;
+    const r = panel.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1 || r.bottom <= 0 || r.top >= vh) continue;
+    if (panel.querySelector('[data-modal-panel]')) continue; // judged by its panel
+    let alpha = surfaceAlpha(panel);
+    if (alpha < 0.85) {
+      // A wrapper whose first child paints the panel (covers 90% of it).
+      for (const child of panel.children) {
+        const c = child.getBoundingClientRect();
+        if (c.width * c.height >= 0.9 * r.width * r.height) alpha = Math.max(alpha, surfaceAlpha(child));
+      }
+    }
+    if (alpha >= 0.85) continue;
+    const label = panel.getAttribute('aria-label')
+      || (panel.getAttribute('aria-labelledby') && document.getElementById(panel.getAttribute('aria-labelledby'))?.textContent?.trim())
+      || panel.querySelector('h1, h2, h3')?.textContent?.trim()
+      || panel.getAttribute('data-testid') || panel.tagName.toLowerCase();
+    seeThroughPanels.push({ name: label.slice(0, 60), alpha: Math.round(alpha * 100) / 100 });
+  }
+
   return {
     controls,
     clickables,
     sidewaysScrollers,
     crampedScrollers,
+    seeThroughPanels,
     page: { scrollWidth: document.documentElement.scrollWidth, innerWidth: vw, innerHeight: vh, dpr: window.devicePixelRatio },
   };
 }

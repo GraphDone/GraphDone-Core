@@ -256,7 +256,7 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
             {currentGraph.name}
           </div>
           <div className="flex items-center gap-2 text-xs text-gray-400">
-            <span className="block truncate">{actualNodeCount} node{actualNodeCount !== 1 ? 's' : ''}, {actualEdgeCount} connection{actualEdgeCount !== 1 ? 's' : ''}</span>
+            <span className="block truncate">{actualNodeCount} item{actualNodeCount !== 1 ? 's' : ''}, {actualEdgeCount} connection{actualEdgeCount !== 1 ? 's' : ''}</span>
           </div>
         </div>
         
@@ -360,15 +360,15 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
                               </div>
                               <div className="flex-1 min-w-0">
                                 <div className="text-sm font-medium truncate">{graph.name}</div>
-                                <div className="text-xs text-gray-400 flex items-center space-x-1.5">
+                                <div className="text-xs text-gray-400 flex flex-wrap items-center gap-x-1.5">
                                   <span className="flex items-center">
                                     <span className="font-normal">{graph.id === currentGraph?.id ? actualNodeCount : (graph.nodeCount || 0)}</span>
-                                    <span className="ml-0.5">nodes</span>
+                                    <span className="ml-0.5">items</span>
                                   </span>
                                   <span>•</span>
                                   <span className="flex items-center">
                                     <span className="font-normal">{graph.id === currentGraph?.id ? actualEdgeCount : (graph.edgeCount || 0)}</span>
-                                    <span className="ml-0.5">edges</span>
+                                    <span className="ml-0.5">connections</span>
                                   </span>
                                 </div>
                               </div>
@@ -466,7 +466,7 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
                                   </div>
                                   <div className="flex-1 min-w-0">
                                     <div className="text-xs font-medium truncate">{child.name}</div>
-                                    <div className="text-xs text-gray-400">{child.nodeCount || 0} nodes • {child.edgeCount || 0} edges</div>
+                                    <div className="text-xs text-gray-400">{child.nodeCount || 0} items • {child.edgeCount || 0} connections</div>
                                   </div>
                                 </button>
                               ))}
@@ -505,7 +505,6 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
             <div className="shrink-0 border-t border-gray-600 p-3 bg-gray-700/50">
               <div className="flex items-center justify-between text-xs font-normal text-gray-400">
                 <span>Total: {graphHierarchy.length} Graph{graphHierarchy.length !== 1 ? 's' : ''}</span>
-                <span>Organized by: Team, Personal</span>
               </div>
             </div>
           )}

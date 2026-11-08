@@ -39,10 +39,10 @@ for(const [width,height] of [[390,844],[844,390],[1440,900]]) {
    await expect(node).toBeVisible();
    const lock = page.getByTestId('graph-lock-toggle');
    if (await lock.isVisible()) {
-     if ((await lock.textContent())?.trim() === 'Locked') await lock.click();
-     await expect(lock).toHaveText('Editing');
+     if ((await lock.getAttribute('aria-pressed')) === 'false') await lock.click();
+     await expect(lock).toHaveAttribute('aria-pressed', 'true');
    }
-   await page.getByRole('button',{name:'Zoom to fit — frame all nodes'}).click();
+   await page.getByTestId('graph-zoom-extents').click();
    await expect.poll(()=>page.evaluate(()=>(window as any).__layoutMetrics?.()?.atRest)).toBe(true);
    const translation = () => node.evaluate(element => { const matrix = (element as SVGGraphicsElement).getScreenCTM(); return { x: matrix!.e, y: matrix!.f }; });
    await expect(async()=>{const a=await translation();await page.waitForTimeout(120);const b=await translation();expect(Math.abs(a.x-b.x)+Math.abs(a.y-b.y)).toBeLessThan(0.1);}).toPass({timeout:3000});
