@@ -1,10 +1,11 @@
+import { COMPACT_WORKSPACE_QUERY, useCompactWorkspace } from '../hooks/useCompactWorkspace';
 import { skipBackgroundPoll } from '../lib/hostedUsage';
 import { QuickEditSurface } from './QuickEditSurface';
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { SemanticGraphOverview } from './SemanticGraphOverview';
 import { SemanticRelationshipBrowser } from './SemanticRelationshipBrowser';
 import { RelationshipPriorityControl } from './RelationshipPriorityControl';
-import { projectRelationshipPriority, relationshipPriorityLevel, relationshipPriorityTier, type RelationshipPriorityLevel } from '../lib/relationshipPriority';
+import { GRAPH_OBSTACLES_EVENT, projectRelationshipPriority, RELATIONSHIP_PRIORITY_EVENT, relationshipPriorityLevel, relationshipPriorityTier, type RelationshipPriorityLevel } from '../lib/relationshipPriority';
 import { indexSemanticRelationships, type RelationshipScope } from '../lib/semanticRelationships';
 import { LayoutSaveStatus } from './LayoutSaveStatus';
 import { GraphStatusDock } from './GraphStatusDock';
@@ -59,6 +60,7 @@ import type { ObstacleBox } from '../lib/edgeLabelLayout';
 import { createParallelEdgeRoute, edgeRouteLabel, edgeRouteArrowBounds, edgeSegmentHitsBox, projectEdgeRoutePointer, type EdgeRouteGeometry, type EdgeRouteLabel } from '../lib/edgeRouteGeometry';
 import { PerfMeter, DriftMeter } from '../lib/perfMeter';
 import { computeGraphFit } from '../lib/graphFit';
+import { appendNodeControlGlyph, nodeControlGlyphTransform } from '../lib/nodeControlIcons';
 import { graphItemLayout, itemTitleScale, measureGraphText, edgeLabelDimensions, GRAPH_FONT_FAMILY, ITEM_TITLE_SIZE, ITEM_TITLE_LINE, ITEM_HEADER_HEIGHT, EDGE_LABEL_SIZE, ITEM_WIRE_WIDTH } from '../lib/graphSymbolLayout';
 import { placeItemLabels } from '../lib/edgeLabelPlacement';
 import { separateCards } from '../lib/separateCards';
@@ -75,6 +77,7 @@ import { usePositionSaveQueue } from '../hooks/usePositionSaveQueue';
 import { spawnCelebration } from '../lib/celebration';
 import { buildNeighborhood } from '../lib/graphAdjacency';
 import { UndoStack } from '../lib/undoStack';
+import { createSerialQueue } from '../lib/serialQueue';
 
 // Level-of-detail zoom thresholds (single source of truth): below each scale the
 // matching per-node detail is hidden, for legibility and paint cost. (Values are
@@ -103,6 +106,10 @@ const SIMPLIFY_SCALE = 0.45;
 // (edges are ~half of what's left after simplify), which is the only lever that
 // helps the paint-bound whole-graph pan/zoom. Edges return when you zoom past it.
 const DOT_SCALE = 0.2;
+
+// The smallest zoom a phone frames the graph at: small cards still show their
+// title (kept at 14 px on screen) and status stripe.
+const PHONE_READABLE_SCALE = 0.5;
 
 // Utility functions
 const getSmoothedOpacity = (scale: number, threshold: number, fadeRange: number = 0.2) => {
@@ -133,7 +140,13 @@ function renderItemTitle(element: SVGGElement, item: WorkItem, layout: ReturnTyp
 
 function renderItemMetadata(element: SVGGElement, item: WorkItem, layout: ReturnType<typeof graphItemLayout>) {
   const group = d3.select(element);
-  group.selectAll('.node-meta').remove();
+  group.selectAll('.node-meta, .node-compact-status').remove();
+  // A small card keeps only its title, so a stripe down its left edge carries
+  // the status colour; it stays a few pixels wide at any zoom.
+  if (layout.compact) group.append('rect').attr('class', 'node-compact-status').attr('aria-hidden', 'true')
+    .attr('x', -layout.width / 2 + 4).attr('y', -layout.height / 2 + 6)
+    .attr('width', Math.min(9, 5 * layout.titleScale)).attr('height', Math.max(0, layout.height - 12)).attr('rx', Math.min(4.5, 2.5 * layout.titleScale))
+    .attr('fill', getStatusConfig(item.status as WorkItemStatus).hexColor).style('pointer-events', 'none');
   const meta = group.append('g').attr('class', 'node-meta').style('pointer-events', 'none').style('display', () => layout.compact ? 'none' : null);
   const status = getStatusConfig(item.status as WorkItemStatus);
   const priority = Math.round((item.priority || 0) * 100);
@@ -513,7 +526,12 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     setItemRelationshipScope(null);
     requestAnimationFrame(() => {
       if (document.activeElement && document.activeElement !== document.body) return;
-      if (trigger?.isConnected) trigger.focus({preventScroll:true});
+      // Return to whatever opened the list. A connection label counts only
+      // while it still opens that pair's list (with nothing summarized it
+      // becomes the connection's edit button); otherwise focus goes to
+      // "Browse all relationships".
+      const staleLabel = trigger?.classList.contains('edge-label-group') && trigger.dataset.pairBrowser !== 'true';
+      if (trigger?.isConnected && !staleLabel) trigger.focus({preventScroll:true});
       if (document.activeElement !== trigger) itemRelationshipTriggerRef.current?.focus({preventScroll:true});
     });
   }, []);
@@ -536,6 +554,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   // PR #87: quick in-context node editor (double-click a node) — edits every
   // field without the heavy details modal. Holds the work item being edited.
   const [quickEditNode, setQuickEditNode] = useState<any | null>(null);
+  const [quickEditWrites] = useState(createSerialQueue);
   const quickEditNodeId = quickEditNode?.id ?? null;
   const quickEditReturnFocusIdRef = useRef<string | null>(null);
   const closeQuickEdit = useCallback(() => {
@@ -1172,6 +1191,21 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     }
   }, [isConnecting, connectionSource, selectedRelationType]);
 
+  // A tap on a touch screen selects just that card. The host shows the
+  // selected card's inspector as a peek sheet (title, status, contents and
+  // Edit), so looking at an item never jumps straight into editing it.
+  const selectNodeFromTap = (node: WorkItem) => {
+    setInlineEdit(null);
+    setExpandedNode(null);
+    setQuickEditNode(null);
+    setSelectedNodes(new Set([node.id]));
+    setSelectedNode(node);
+    setEditingEdge(null);
+    applyNodeGlowImmediately(node);
+  };
+  const selectNodeFromTapRef = useRef(selectNodeFromTap);
+  selectNodeFromTapRef.current = selectNodeFromTap;
+
   // Remove unused handleEdgeClick to fix TypeScript warning
 
   const layoutRecoveryReady = !currentUser || !currentGraph || !!positionSaveQueue.state?.recovered || !!positionSaveQueue.error;
@@ -1273,6 +1307,13 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     try { localStorage.setItem('graphdone:relationship-priority', relationshipLevel); }
     catch { return; }
   }, [relationshipLevel]);
+  // On a phone the choice lives in the workspace's View sheet, which announces it.
+  useEffect(() => {
+    const update = (event: Event) => setRelationshipLevel(relationshipPriorityLevel((event as CustomEvent<string>).detail));
+    window.addEventListener(RELATIONSHIP_PRIORITY_EVENT, update);
+    return () => window.removeEventListener(RELATIONSHIP_PRIORITY_EVENT, update);
+  }, []);
+  const compactWorkspace = useCompactWorkspace();
   const priorityProjection = useMemo(() => projectRelationshipPriority(workItems, workItemEdges, relationshipLevel), [workItems, workItemEdges, relationshipLevel]);
   const relationshipPriorityRef = useRef(priorityProjection);
   relationshipPriorityRef.current = priorityProjection;
@@ -2157,14 +2198,20 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
     // Debug: Log edge visibility
 
-    const openEdgeEditor = (event: MouseEvent, edge: WorkItemEdge) => {
+    const openEdgeEditor = (event: MouseEvent | KeyboardEvent, edge: WorkItemEdge) => {
       event.stopPropagation();
       event.preventDefault();
+      // A keyboard opens the editor beside the focused label.
+      const box = event instanceof MouseEvent ? null : (event.currentTarget as Element | null)?.getBoundingClientRect();
+      const position = box ? { x: box.left + box.width / 2, y: box.top + box.height / 2 } : { x: (event as MouseEvent).clientX, y: (event as MouseEvent).clientY };
       setSelectedEdge(edge);
       setShowRelationshipWindow(true);
-      setEditingEdge({ edge, position: { x: event.clientX, y: event.clientY } });
+      setEditingEdge({ edge, position });
       setDragOffset({ x: 0, y: 0 });
     };
+    const edgeEndTitle = (end: unknown) => (typeof end === 'object' && end ? (end as { title?: string }).title : undefined) ?? 'an item';
+    const editEdgeLabel = (edge: WorkItemEdge) =>
+      `Edit connection: ${edgeEndTitle(edge.source)} ${getRelationshipConfig(edge.type as RelationshipType).label.toLowerCase()} ${edgeEndTitle(edge.target)}`;
     const openPriorityPair = (event: MouseEvent | KeyboardEvent, edge: WorkItemEdge) => {
       const pair = relationshipPriorityRef.current.byEdge.get(edge.id);
       if (!pair || pair.primary.id !== edge.id || !pair.summarized.length) return false;
@@ -2701,18 +2748,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .attr('stroke', 'rgba(255, 255, 255, 0.8)')
       .attr('stroke-width', 1);
     
-    // Simple gear using text (emoji) - proper size
-    editIcons.append('text')
-      .attr('class', 'edit-gear')
-      .attr('x', 0)
-      .attr('y', 0)
-      .attr('text-anchor', 'middle')
-      .attr('dominant-baseline', 'central')
-      .style('font-size', `${iconSize * 1.1}px`)
-      .style('fill', '#ffffff')
-      .style('pointer-events', 'none')
-      .text('⚙');
-    
+    // Vector icons, centred exactly on every device (see lib/nodeControlIcons).
+    appendNodeControlGlyph(editIcons, 'settings', iconSize, 'edit-gear');
+
     // Hover effects for the entire edit icon group
     editIcons
       .on('mouseenter', function() {
@@ -2731,10 +2769,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           .attr('stroke', '#3b82f6')
           .attr('stroke-width', 2);
         
-        // Scale up text slightly
+        // Enlarge the icon slightly around its centre
         icon.select('.edit-gear')
           .transition().duration(200)
-          .style('font-size', `${iconSize * 1.3}px`);
+          .attr('transform', nodeControlGlyphTransform(iconSize, 1.18));
       })
       .on('mouseleave', function() {
         const icon = d3.select(this);
@@ -2745,10 +2783,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           .attr('stroke', 'rgba(255, 255, 255, 0.8)')
           .attr('stroke-width', 1);
         
-        // Scale text back to normal
+        // Icon back to normal size
         icon.select('.edit-gear')
           .transition().duration(200)
-          .style('font-size', `${iconSize * 1.1}px`);
+          .attr('transform', nodeControlGlyphTransform(iconSize));
       });
     
     const openQuickEdit = (event: MouseEvent | KeyboardEvent, d: WorkItem) => {
@@ -2785,6 +2823,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // Relationship creation icon in title bar (centered vertically, right side) - mirrors edit icon
     const relationshipIcons = nodeElements.append('g')
       .attr('class', 'node-relationship-icon')
+      .attr('role', 'button')
+      .attr('tabindex', 0)
+      .attr('aria-label', (d: WorkItem) => `Add a connection from ${d.title}`)
+      .attr('data-node-id', (d: WorkItem) => d.id)
       .attr('transform', (d: WorkItem) => {
         const x = getNodeDimensions(d).width / 2 - iconSize / 2 - 12; // Right side, mirrored from edit icon
         const y = -getNodeDimensions(d).height / 2 + 2 + titleBarHeight / 2;
@@ -2807,19 +2849,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .attr('stroke', 'rgba(255, 255, 255, 0.8)')
       .attr('stroke-width', 1);
     
-    // Plus sign using text - matching the gear styling
-    relationshipIcons.append('text')
-      .attr('class', 'relationship-plus')
-      .attr('x', 0)
-      .attr('y', 0)
-      .attr('text-anchor', 'middle')
-      .attr('dominant-baseline', 'central')
-      .style('font-size', `${iconSize * 1.2}px`) // Slightly bigger than gear for visual balance
-      .style('font-weight', 'bold')
-      .style('fill', '#ffffff')
-      .style('pointer-events', 'none')
-      .text('+');
-    
+    appendNodeControlGlyph(relationshipIcons, 'plus', iconSize, 'relationship-plus');
+
     // Hover effects for relationship icon - mirroring edit icon
     relationshipIcons
       .on('mouseenter', function() {
@@ -2835,10 +2866,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           .attr('fill', 'rgba(34, 197, 94, 0.9)') // Green color for relationship creation
           .attr('stroke', 'rgba(255, 255, 255, 1.0)');
         
-        // Scale up text slightly
+        // Enlarge the icon with its background
         icon.select('.relationship-plus')
           .transition().duration(200)
-          .style('font-size', `${iconSize * 1.4}px`);
+          .attr('transform', nodeControlGlyphTransform(iconSize, 1.2));
       })
       .on('mouseleave', function() {
         const icon = d3.select(this);
@@ -2853,27 +2884,43 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           .attr('fill', 'rgba(0, 0, 0, 0.7)')
           .attr('stroke', 'rgba(255, 255, 255, 0.8)');
         
-        // Scale text back to normal
+        // Icon back to normal size
         icon.select('.relationship-plus')
           .transition().duration(200)
-          .style('font-size', `${iconSize * 1.2}px`);
+          .attr('transform', nodeControlGlyphTransform(iconSize));
       });
 
-    // Relationship icon click handler - just opens relationship window
-    relationshipIcons.on('click', (event: MouseEvent, d: WorkItem) => {
+    // "+" means GROW: enter grow mode wired to this node. Click empty
+    // space → new connected item right there; click another node →
+    // connect to it; Esc / right-click / clicking this node → cancel.
+    // No modals, no instructions-as-UI (interaction-model W3).
+    const startGrow = (event: MouseEvent | KeyboardEvent, d: WorkItem) => {
       event.stopPropagation();
       event.preventDefault();
-
-      // "+" means GROW: enter grow mode wired to this node. Click empty
-      // space → new connected item right there; click another node →
-      // connect to it; Esc / right-click / clicking this node → cancel.
-      // No modals, no instructions-as-UI (interaction-model W3).
       setNodeMenu({ node: null, position: { x: 0, y: 0 }, visible: false });
       setEditingEdge(null);
       setShowRelationshipWindow(false);
       setConnectionSource(d.id);
       setIsConnecting(true);
-    });
+    };
+    // Like the gear and expand controls, "+" is a real keyboard action.
+    relationshipIcons
+      .on('click', startGrow)
+      .on('keydown', (event: KeyboardEvent, d: WorkItem) => {
+        if (event.key === 'Enter' || event.key === ' ') startGrow(event, d);
+      })
+      .on('focus', function() {
+        d3.select(this).select('.relationship-bg')
+          .attr('fill', 'rgba(34, 197, 94, 0.95)')
+          .attr('stroke', '#fbbf24')
+          .attr('stroke-width', 3);
+      })
+      .on('blur', function() {
+        d3.select(this).select('.relationship-bg')
+          .attr('fill', 'rgba(0, 0, 0, 0.7)')
+          .attr('stroke', 'rgba(255, 255, 255, 0.8)')
+          .attr('stroke-width', 1);
+      });
 
     // Expand-in-place icon (title bar, inboard of the + icon): opens a readable
     // peek panel anchored to the node (Card/Contents/Diagram at full size) so you
@@ -2905,17 +2952,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .attr('fill', 'rgba(0, 0, 0, 0.7)')
       .attr('stroke', 'rgba(255, 255, 255, 0.8)')
       .attr('stroke-width', 1);
-    expandIcons.append('text')
-      .attr('class', 'expand-glyph')
-      .attr('x', 0)
-      .attr('y', 0)
-      .attr('text-anchor', 'middle')
-      .attr('dominant-baseline', 'central')
-      .style('font-size', `${iconSize * 0.95}px`)
-      .style('font-weight', 'bold')
-      .style('fill', '#ffffff')
-      .style('pointer-events', 'none')
-      .text('⛶');
+    appendNodeControlGlyph(expandIcons, 'maximize', iconSize, 'expand-glyph');
     const toggleExpanded = (event: MouseEvent | KeyboardEvent, d: WorkItem) => {
       event.stopPropagation();
       event.preventDefault();
@@ -2959,6 +2996,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
     const descendIcon = sheetNodes.append('g')
       .attr('class', 'node-descend-icon')
+      .attr('role', 'button')
+      .attr('tabindex', 0)
+      .attr('aria-label', (d: WorkItem) => `Open the graph inside ${d.title}`)
+      .attr('data-node-id', (d: WorkItem) => d.id)
       .attr('transform', (d: WorkItem) => {
         const x = getNodeDimensions(d).width / 2 - iconSize / 2 - 8;
         const y = getNodeDimensions(d).height / 2 - iconSize / 2 - 6;
@@ -2977,16 +3018,12 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .attr('fill', 'rgba(99, 102, 241, 0.9)')
       .attr('stroke', 'rgba(255, 255, 255, 0.85)')
       .attr('stroke-width', 1);
-    descendIcon.append('text')
-      .attr('x', 0)
-      .attr('y', 0)
-      .attr('text-anchor', 'middle')
-      .attr('dominant-baseline', 'central')
-      .style('font-size', `${iconSize * 0.95}px`)
-      .style('font-weight', 'bold')
-      .style('fill', '#ffffff')
-      .style('pointer-events', 'none')
-      .text('⤢');
+    appendNodeControlGlyph(descendIcon, 'maximize2', iconSize, 'descend-glyph');
+    const descend = (event: MouseEvent | KeyboardEvent, d: WorkItem) => {
+      event.stopPropagation();
+      event.preventDefault();
+      if (d.subgraphId) descendIntoRef.current(d.subgraphId);
+    };
     descendIcon
       .on('mouseenter', function() {
         d3.select(this).select('.descend-bg').transition().duration(150)
@@ -2996,10 +3033,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         d3.select(this).select('.descend-bg').transition().duration(150)
           .attr('fill', 'rgba(99, 102, 241, 0.9)');
       })
-      .on('click', (event: MouseEvent, d: WorkItem) => {
-        event.stopPropagation();
-        event.preventDefault();
-        if (d.subgraphId) descendIntoRef.current(d.subgraphId);
+      .on('click', descend)
+      .on('keydown', (event: KeyboardEvent, d: WorkItem) => {
+        if (event.key === 'Enter' || event.key === ' ') descend(event, d);
       });
 
     // 44px touch targets (#29): the header icon buttons draw at iconSize (16-24px),
@@ -3096,6 +3132,12 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .append('g')
       .attr('class', 'edge-label-group')
       .attr('data-edge-id', (d: WorkItemEdge) => d.id)
+      // Every connection label is a button: it opens the connection editor
+      // (or, for a summarized pair, the list of its relationships).
+      .attr('role', 'button')
+      .attr('tabindex', liveScale >= 0.6 ? 0 : -1)
+      .attr('aria-hidden', liveScale >= 0.6 ? null : 'true')
+      .attr('aria-label', (d: WorkItemEdge) => editEdgeLabel(d))
       .style('opacity', (d: any) => (liveScale >= 0.6 ? 1 : 0))
       .style('pointer-events', (d: any) => (liveScale >= 0.6 ? 1 : 0) > 0 ? 'all' : 'none')
       .style('cursor', 'pointer')
@@ -3103,7 +3145,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         if (!openPriorityPair(event, edge)) openEdgeEditor(event, edge);
       })
       .on('keydown.priority', (event: KeyboardEvent, edge: WorkItemEdge) => {
-        if (event.key === 'Enter' || event.key === ' ') openPriorityPair(event, edge);
+        if (event.key === 'Enter' || event.key === ' ') {
+          if (!openPriorityPair(event, edge)) openEdgeEditor(event, edge);
+        }
       });
     edgeLabelGroups.append('title').attr('class', 'edge-priority-description');
 
@@ -3341,9 +3385,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       const pointer = event as MouseEvent & { pointerType?: string; sourceCapabilities?: { firesTouchEvents?: boolean } };
       if ((pointer.pointerType === 'touch' || pointer.sourceCapabilities?.firesTouchEvents) && !isConnectingRef.current && !mousedownNodeRef.current) {
         event.stopPropagation();
-        setInlineEdit(null);
-        setExpandedNode(null);
-        setQuickEditNode(d);
+        selectNodeFromTapRef.current(d);
         return;
       }
       // Regular mouse selection.
@@ -3506,9 +3548,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           } else if (isConnectingRef.current) {
             handleNodeClick(event as unknown as MouseEvent, d);
           } else {
-            setInlineEdit(null);
-            setExpandedNode(null);
-            setQuickEditNode(d);
+            selectNodeFromTapRef.current(d);
           }
         }
         delete (element.node() as any).__touchData;
@@ -3640,8 +3680,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
             group.select('.edge-label-bg').attr('width', edge._labelDims.width).attr('height', edge._labelDims.height).attr('x', -edge._labelDims.width / 2).attr('y', -edge._labelDims.height / 2);
             group.select('.edge-label-icon').attr('x', -edge._labelDims.width / 2 + 8);
           }
-          group.attr('role', more ? 'button' : null).attr('tabindex', more ? 0 : null)
-            .attr('aria-label', more ? `Browse ${pair!.original.length} relationships for this connection` : null);
+          group.attr('aria-label', more ? `Browse ${pair!.original.length} relationships for this connection` : editEdgeLabel(edge))
+            .attr('data-pair-browser', more ? 'true' : null);
           group.select('.edge-priority-description').text(pair
             ? `${edge.type}. ${pair.fallback ? 'Highest available types retained for this pair.' : `Priority: ${priority.level}.`} ${pair.original.length} original relationships; ${pair.summarized.length} summarized.${more ? ' Open to inspect every original.' : ''}`
             : edge.type);
@@ -3926,7 +3966,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       // Edge labels + arrows follow the edge LOD module (zoom-aware, crowd-aware).
       if (labelsShownAtScale !== (scale >= 0.6)) {
         labelsShownAtScale = scale >= 0.6;
-        edgeLabelGroups.style('opacity', labelsShownAtScale ? 1 : 0).style('pointer-events', labelsShownAtScale ? 'all' : 'none');
+        edgeLabelGroups.style('opacity', labelsShownAtScale ? 1 : 0).style('pointer-events', labelsShownAtScale ? 'all' : 'none')
+          .attr('tabindex', labelsShownAtScale ? 0 : -1).attr('aria-hidden', labelsShownAtScale ? null : 'true');
       }
       arrowElements.filter((d: any) => edgeDisplay(d) !== 'none')
         .style('opacity', (d: any) =>
@@ -4094,6 +4135,11 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const layoutStartRef = useRef<number | null>(null);
   const lastSettleMsRef = useRef<number | null>(null);
   const runLabelAvoidanceRef = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    const replace = () => requestAnimationFrame(() => runLabelAvoidanceRef.current?.());
+    window.addEventListener(GRAPH_OBSTACLES_EVENT, replace);
+    return () => window.removeEventListener(GRAPH_OBSTACLES_EVENT, replace);
+  }, []);
   const cameraViewportRef = useRef<{ w: number; h: number } | null>(null);
   const cameraResizeFrameRef = useRef<number | null>(null);
 
@@ -4204,6 +4250,14 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     });
     if (!fit) return false; // No valid positions yet
     let { scale, translateX, translateY } = fit;
+    // On a phone, fitting every card can shrink them to blank boxes. Hold a
+    // scale where each card shows its title and status stripe, centred on the
+    // most important item; the rest is a pan away.
+    // (Graphs of 40+ items open as a group overview, and a focused item has
+    // its own camera; both zoom out on purpose and are left alone.)
+    const phoneFloor = window.matchMedia(COMPACT_WORKSPACE_QUERY).matches && cards.length < 40 && !localItemActiveRef.current
+      && PHONE_READABLE_SCALE > Math.max(scale, minimumScale);
+    if (phoneFloor) minimumScale = PHONE_READABLE_SCALE;
     if (minimumScale > scale) {
       // A freshly organized graph keeps a readable floor instead of shrinking
       // every card to fit: stay centred on the same cards at that scale.
@@ -4213,7 +4267,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       translateX = fit.region.x + fit.region.width / 2 - centerX * scale;
       translateY = fit.region.y + fit.region.height / 2 - centerY * scale;
     }
-    const focus = organizationFocusRef.current && cards.find(node => node.id === organizationFocusRef.current);
+    const focus = (organizationFocusRef.current && cards.find(node => node.id === organizationFocusRef.current))
+      || (phoneFloor ? [...cards].sort((a, b) => ((b as WorkItem).priority ?? 0) - ((a as WorkItem).priority ?? 0))[0] : undefined);
     if (minimumScale > 0 && focus) {
       const at = frameOrganizedNeighborhood(
         cards.map(node => ({ id: node.id, x: node.x, y: node.y, ...getNodeDimensionsAt(node, scale) })),
@@ -5335,16 +5390,23 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     <div ref={containerRef} className="graph-container relative w-full h-full overflow-hidden select-none" data-overview={semanticOverviewActive || localItemActive || undefined} data-local-item-lod={localItemActive || undefined} data-quality={qualityTier} data-dense={isDenseGraph ? 'true' : undefined} data-simplify={isSimplified ? 'true' : undefined} data-dots={isDotMode ? 'true' : undefined}
       data-relationship-priority={relationshipLevel} data-relationship-total={workItemEdges.length}
       data-priority-summarized={priorityProjection.summarized.length} data-priority-represented={priorityProjection.represented.length} data-priority-pending={priorityProjection.pending.length}>
-      {workItems.length < 40 && <div data-graph-fit-obstacle="true" className="absolute left-3 right-16 top-16 md:left-16 md:right-40 md:top-3 z-20 flex flex-wrap gap-3">{priorityControl}{localItemControls}</div>}
+      {workItems.length < 40 && (!compactWorkspace || localItemControls) && <div data-graph-fit-obstacle="true" className="absolute left-3 right-16 top-3 md:left-16 md:right-40 z-20 flex flex-wrap gap-3">{!compactWorkspace && priorityControl}{localItemControls}</div>}
       {!semanticOverviewActive && <GraphStatusDock>
+      {/* Phone: the grow hint joins the bottom bar (a top banner would sit on
+          the card being grown) and offers Cancel, since there is no Esc key. */}
+      {isConnecting && compactWorkspace && <div role="status" data-testid="grow-hint" className="flex items-center gap-3 rounded-lg border border-emerald-500/40 bg-gray-900 px-3 py-1 text-sm text-emerald-100">
+        <Link2 aria-hidden="true" className="h-4 w-4 shrink-0 text-emerald-400" />
+        <span className="min-w-0 flex-1">Tap empty space for a new item, or a card to connect it</span>
+        <button type="button" onClick={() => { setIsConnecting(false); setConnectionSource(null); }} className="min-h-11 shrink-0 rounded-lg px-3 font-medium text-white hover:bg-gray-800">Cancel</button>
+      </div>}
       <LayoutSaveStatus queue={positionSaveQueue} />
-      {localItemActive ? localItemFooter : workItemEdges.length > 0 && <button
+      {localItemActive ? localItemFooter : workItemEdges.length > 0 && !(compactWorkspace && isConnecting) && <button
         ref={itemRelationshipTriggerRef}
         data-graph-fit-obstacle="true"
         className="max-w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 shadow-lg"
         onClick={() => { itemPairTriggerRef.current = null; setItemRelationshipScope({ kind: 'all' }); }}
         aria-label={`${workItemEdges.length} relationships, ${itemLabelCount} labels shown, ${priorityProjection.summarized.length} summarized by priority. Browse all relationships`}
-      ><span className="block">{workItemEdges.length} connections · Browse</span><span className="block text-slate-300">{priorityProjection.summarized.length} summarized · {itemLabelCount} labels</span></button>}
+      ><span className="block">{workItemEdges.length} connections · Browse</span>{!compactWorkspace && <span className="block text-slate-300">{priorityProjection.summarized.length} summarized · {itemLabelCount} labels</span>}</button>}
       </GraphStatusDock>}
       {itemRelationshipScope && !semanticOverviewActive && <SemanticRelationshipBrowser
         index={itemRelationshipIndex}
@@ -5481,7 +5543,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
       {/* Grow mode: one friendly hint, no instructions-as-UI, no dropdown.
           The edge type can be retyped later by clicking its label. */}
-      {isConnecting && (
+      {isConnecting && !compactWorkspace && (
         <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-gray-900/90 backdrop-blur-sm border border-emerald-500/40 text-emerald-100 px-4 py-2 rounded-xl shadow-lg pointer-events-none">
           <div className="flex items-center space-x-2 text-sm">
             <Link2 className="h-4 w-4 text-emerald-400" />
@@ -5553,13 +5615,17 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         const frame = containerRef.current?.getBoundingClientRect();
         const left = projected ? projected.left + projected.width / 2 - (frame?.left ?? 0) : gx * currentTransform.scale + currentTransform.x;
         const top = projected ? projected.top + projected.height / 2 - (frame?.top ?? 0) : gy * currentTransform.scale + currentTransform.y;
+        // One item's saves go out in order, so a quick second change is not
+        // overwritten by the first one landing late (createSerialQueue).
+        const save = (update: QuickEditCommit['update']) => quickEditWrites(quickEditNode.id, () =>
+          updateWorkItemMutation({ variables: { where: { id: quickEditNode.id }, update } }));
         const onCommit = (c: QuickEditCommit) => {
-          updateWorkItemMutation({ variables: { where: { id: quickEditNode.id }, update: c.update } })
+          save(c.update)
             .then(() => {
               undoStack.push({
                 label: c.label,
                 undo: async () => {
-                  await updateWorkItemMutation({ variables: { where: { id: quickEditNode.id }, update: c.prev } });
+                  await save(c.prev);
                 },
               });
             })

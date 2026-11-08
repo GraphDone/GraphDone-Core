@@ -42,8 +42,19 @@ graph TD
 
 ## Responsive tiers (boundary: Tailwind `md`, 768px)
 
-- **Phone (`<md`)** — `MobileBottomNav` (List / Graph / More) is the primary nav;
-  slim chrome; the sidebar/desktop header are hidden.
+- **Phone (`<md`, or a phone held sideways)** — `MobileBottomNav` (List / Graph / More) is the primary nav;
+  slim chrome; the sidebar/desktop header are hidden. On the graph:
+  - Controls are one column in the bottom-right corner (`PhoneGraphControls`):
+    View, Recentre, and Lock ("Move cards", off by default so a drag pans).
+    View holds which connections to draw and Organize, and appears only when
+    the graph has connections. A large graph's group overview puts the column
+    top-right instead, where its own panels leave room.
+  - A tap selects a card and shows a peek sheet (title, status, priority,
+    contents, Edit); editing is one more tap.
+  - The graph opens at a zoom where every card shows its title and a status
+    stripe (`PHONE_READABLE_SCALE`), centred on the highest-priority item;
+    the rest is a pan away.
+  - Grow mode's hint sits in the bottom bar with Cancel.
 - **Tablet & desktop (`≥md`)** — sidebar rail + full top view-strip + all filters.
 
 ## Quality gate

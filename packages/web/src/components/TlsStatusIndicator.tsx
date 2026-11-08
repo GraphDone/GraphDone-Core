@@ -40,8 +40,29 @@ export function InsecureConnectionBanner({ fixed = false, onDismiss, className =
     () => typeof sessionStorage !== 'undefined' && sessionStorage.getItem(DISMISS_KEY) === '1'
   );
 
+  const stripRef = React.useRef<HTMLDivElement>(null);
+  const showing = !isSecure && !dismissed;
+
+  // A pinned strip floats over the page, and on a phone its text wraps to two
+  // lines. Push the page down by the strip's real height (tracked as it
+  // wraps) so it never covers the content beneath it.
+  React.useLayoutEffect(() => {
+    const strip = stripRef.current;
+    if (!fixed || !showing || !strip) return;
+    const { body } = document;
+    const previous = body.style.paddingTop;
+    const reserve = () => { body.style.paddingTop = `${strip.offsetHeight}px`; };
+    reserve();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(reserve);
+    observer?.observe(strip);
+    return () => {
+      observer?.disconnect();
+      body.style.paddingTop = previous;
+    };
+  }, [fixed, showing]);
+
   // Nothing to warn about on HTTPS, or once the user has dismissed it.
-  if (isSecure || dismissed) return null;
+  if (!showing) return null;
 
   const dismiss = () => {
     try {
@@ -60,12 +81,17 @@ export function InsecureConnectionBanner({ fixed = false, onDismiss, className =
 
   const strip = (
     <div
+      ref={stripRef}
       role="status"
       data-testid="insecure-connection-banner"
       className={`${position} flex items-center justify-center gap-2 border-b px-4 py-1.5 text-xs sm:text-sm backdrop-blur-sm ${tone} ${className}`}
     >
       {isLocalhost ? <AlertTriangle size={14} className="flex-shrink-0" /> : <ShieldOff size={14} className="flex-shrink-0" />}
-      <span className="text-center">
+      {/* One line on a phone; the full sentence where there is room. */}
+      <span className="text-center sm:hidden">
+        {isLocalhost ? 'Development mode — not encrypted (HTTP)' : 'Insecure connection (HTTP, not HTTPS)'}
+      </span>
+      <span className="hidden text-center sm:inline">
         {isLocalhost
           ? 'Development mode — this connection is not encrypted (HTTP).'
           : 'Insecure connection — this site is served over HTTP, not HTTPS.'}

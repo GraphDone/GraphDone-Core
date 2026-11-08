@@ -1,0 +1,7 @@
+{
+  "_comment": "UI fit findings that are right by design. Key: \"<rule>|<control key>\" from test-artifacts/ui-fit/<device>/<screen>.json. Every entry needs a reason a reviewer can check. Known bugs never go here: fix them.",
+  "exemptions": {
+    "clickable-is-control|clickable:svg[mini-map] \"\"": "The desktop mini-map is a pointer shortcut for panning. Keyboard users move around the graph with card focus and Zoom to fit, so it is not a separate control.",
+    "clickable-is-control|clickable:path.edge-clickable \"\"": "A connection line's wide invisible hit area is a pointer shortcut to the connection editor. Keyboard and screen reader users reach every connection through the graph's \"connections · Browse\" button (each row has Edit), and labelled connections are buttons themselves."
+  }
+}

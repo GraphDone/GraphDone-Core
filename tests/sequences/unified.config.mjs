@@ -28,6 +28,9 @@ export const SEQUENCES = {
     'tests/e2e/quality/graph-motion.spec.ts',
     'tests/e2e/quality/graph-resize.spec.ts',
     'tests/e2e/quality/graph-details.spec.ts',
+    'tests/e2e/graph/quick-edit-write-order.spec.ts',
+    'tests/e2e/quality/graph-controls.spec.ts',
+    'tests/e2e/quality/visual-style.spec.ts',
     `--project=${PW}`, '--headed', '--workers=1', '--retries=0', '--trace=retain-on-failure',
   ], blocking: true },
   'agent-connection': { adapter: 'playwright', title: 'Agent connection and handoff acceptance', args: [
@@ -60,6 +63,7 @@ export const SEQUENCES = {
   'e2e-auth': { adapter: 'playwright', title: 'Auth e2e — passwordless focus', args: ['tests/e2e/auth/passwordless-focus.spec.ts', `--project=${PW}`], blocking: true },
   'e2e-graph': { adapter: 'playwright', title: 'Graph e2e — camera', args: ['tests/e2e/graph/camera.spec.ts', `--project=${PW}`], blocking: true },
   'mobile': { adapter: 'playwright', title: 'Mobile audit', args: ['--grep', '@mobile|@audit', `--project=${PW}`, '--workers=1', '--retries=0', '--trace=retain-on-failure'], blocking: true },
+  'devices': { adapter: 'playwright', title: 'UI fit — every screen on iPhone, iPad and desktop Chrome/Safari', args: ['--project=ui-fit:*', '--workers=4', '--retries=0', '--trace=retain-on-failure'], blocking: true },
   'perf-budgets': { adapter: 'playwright', title: 'Perf budgets (ADAPT-8)', args: ['tests/perf/graph-perf.spec.ts', '--project=perf', '--workers=1', '--retries=0', '--trace=retain-on-failure'], blocking: true },
   // Capture-heavy, report-only (own Playwright projects; specs under tests/e2e/reports/)
   'diagnostics': { adapter: 'playwright', title: 'Graph-geometry diagnostics', args: ['--project=geometry'], blocking: false },
@@ -78,8 +82,8 @@ export const SEQUENCES = {
 
 export const PROFILES = {
   smoke: ['unit-web', 'smoke', 'e2e-auth'],
-  pr: ['unit-web', 'smoke', 'e2e-auth', 'e2e-graph', 'agent-connection', 'inspector-readability', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'perf-budgets'],
-  full: ['unit-web', 'smoke', 'e2e-auth', 'e2e-graph', 'agent-connection', 'inspector-readability', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'perf-budgets', 'diagnostics', 'showcase', 'matrix', 'vlm', 'perf-scale', 'cloud-audit'],
+  pr: ['unit-web', 'smoke', 'e2e-auth', 'e2e-graph', 'agent-connection', 'inspector-readability', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'devices', 'perf-budgets'],
+  full: ['unit-web', 'smoke', 'e2e-auth', 'e2e-graph', 'agent-connection', 'inspector-readability', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'devices', 'perf-budgets', 'diagnostics', 'showcase', 'matrix', 'vlm', 'perf-scale', 'cloud-audit'],
   report: ['diagnostics', 'showcase', 'matrix', 'vlm', 'perf-scale', 'cloud-audit'],
   live: ['live-journey'],
 };

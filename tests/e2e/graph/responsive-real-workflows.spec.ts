@@ -42,6 +42,10 @@ for (const [width, height] of [[320,568], [390,844], [844,390], [768,1024], [102
       if (width < 900) {
           const box = await node.boundingBox();
           await page.touchscreen.tap(box!.x + box!.width / 2, box!.y + box!.height / 2);
+          // A tap previews the card; its Edit button opens the editor.
+          const peek = page.getByTestId('node-inspector');
+          await expect(peek).toContainText('Ship the first idea', { timeout: 5000 });
+          await peek.getByRole('button', { name: 'Edit', exact: true }).tap();
         } else {
           await node.locator('.node-edit-icon').click();
         }

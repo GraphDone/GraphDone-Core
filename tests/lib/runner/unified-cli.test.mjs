@@ -15,6 +15,9 @@ test('required performance and mobile gates select their bounded suites without 
   assert.equal(SEQUENCES['perf-budgets'].blocking, true);
   assert.deepEqual(SEQUENCES.mobile.args, ['--grep', '@mobile|@audit', '--project=GraphDone-Core/dev-neo4j/chromium', '--workers=1', '--retries=0', '--trace=retain-on-failure']);
   assert.equal(SEQUENCES.mobile.blocking, true);
+  assert.deepEqual(SEQUENCES.devices.args, ['--project=ui-fit:*', '--workers=4', '--retries=0', '--trace=retain-on-failure']);
+  assert.equal(SEQUENCES.devices.blocking, true);
+  assert.ok(PROFILES.pr.includes('devices') && PROFILES.full.includes('devices'));
 });
 function fixture(t) {
   const dir = mkdtempSync(join(tmpdir(), 'graphdone-unified-cli-'));
@@ -46,7 +49,7 @@ test('disposable Git fixture commits do not spawn background maintenance', t => 
   assert.deepEqual(events.filter(event => event.event === 'child_start' && event.argv?.includes('maintenance')), []);
 });
 
-for (const sequence of ['new-user', 'agent-connection', 'inspector-readability', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'perf-budgets']) {
+for (const sequence of ['new-user', 'agent-connection', 'inspector-readability', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'devices', 'perf-budgets']) {
   test(`CLI forwards failure-only tracing without retries for ${sequence}`, t => {
     const { dir, run } = fixture(t);
     const report = { suites: [{ specs: [{ title: 'fixture', ok: true,
@@ -103,7 +106,9 @@ for (const sequence of ['new-user', 'agent-connection', 'inspector-readability',
     }
     assert.deepEqual(args.filter(arg => arg.startsWith('--trace=')), ['--trace=retain-on-failure']);
     assert.deepEqual(args.filter(arg => arg.startsWith('--retries=')), ['--retries=0']);
-    assert.deepEqual(args.filter(arg => arg.startsWith('--workers=')), ['--workers=1']);
+    // The device matrix only reads (it opens screens and dialogs, never saves),
+    // so its 120+ independent cases may share the stack four at a time.
+    assert.deepEqual(args.filter(arg => arg.startsWith('--workers=')), [sequence === 'devices' ? '--workers=4' : '--workers=1']);
   });
 }
 
@@ -240,7 +245,7 @@ test('CLI explicitly optional absent audit remains skipped without a fabricated 
   assert.equal(report.rollup.totals.passed, 0);
 });
 
-for (const sequence of ['perf-budgets', 'mobile']) {
+for (const sequence of ['perf-budgets', 'mobile', 'devices']) {
   test(`CLI rejects a successful process with skipped required ${sequence} cases`, t => {
     const { dir, run } = fixture(t);
     const report = { suites: [{ specs: Array.from({ length: 3 }, (_, i) => ({

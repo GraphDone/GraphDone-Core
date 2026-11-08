@@ -55,9 +55,10 @@ export const McpHealthIndicator: React.FC<McpHealthIndicatorProps> = ({
         onClick={handleRefresh}
         className={`flex items-center space-x-1 hover:opacity-80 transition-opacity ${className}`}
         title={`MCP Server: ${mcpHealth?.status || 'unknown'}\nClick to refresh`}
+        aria-label={`MCP server ${mcpHealth?.status || 'unknown'} — refresh`}
       >
         <span className={`text-lg ${statusColor}`}>{statusIcon}</span>
-        <span className="text-xs text-gray-500">MCP</span>
+        <span className="text-xs text-gray-400">MCP</span>
       </button>
     );
   }

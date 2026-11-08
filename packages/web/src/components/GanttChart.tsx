@@ -258,6 +258,8 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
           <div className="flex items-center space-x-2">
             <button
               onClick={handleZoomOut}
+              aria-label="Zoom out"
+              title="Zoom out"
               className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
               disabled={zoomLevel <= 0.5}
             >
@@ -266,6 +268,8 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
             <span className="text-sm text-gray-300 px-2">{Math.round(zoomLevel * 100)}%</span>
             <button
               onClick={handleZoomIn}
+              aria-label="Zoom in"
+              title="Zoom in"
               className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
               disabled={zoomLevel >= 3}
             >

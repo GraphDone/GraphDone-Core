@@ -112,16 +112,34 @@ for (const width of [1440, 390]) {
     }, seeded.graphId);
     await page.goto('/');
     const graph = page.locator('.graph-container');
+    // Desktop draws the choice as a select on the canvas; a phone keeps it in
+    // the View sheet behind the bottom-right controls.
     const priority = page.getByRole('combobox', {
       name: 'Relationship priority',
     });
+    const phone = width === 390;
+    const viewSheet = page.getByTestId('graph-view-sheet');
+    const level = () => graph.getAttribute('data-relationship-priority');
+    const chooseOnPhone = async (value: 'essential' | 'dependencies' | 'all') => {
+      await page.getByRole('button', { name: 'View options', exact: true }).click();
+      await expect(viewSheet).toBeVisible();
+      const name = { essential: /^Essential/, dependencies: /^Dependencies/, all: /^All/ }[value];
+      await viewSheet.getByRole('button', { name }).click();
+      await expect(viewSheet.getByRole('button', { name })).toHaveAttribute('aria-pressed', 'true');
+      await page.keyboard.press('Escape');
+      await expect(viewSheet).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'View options', exact: true })).toBeFocused();
+    };
     await expect(graph.locator('.node')).toHaveCount(4);
     await expect
       .poll(() =>
         page.evaluate(() => (window as any).__layoutMetrics?.()?.cameraReady)
       )
       .toBe(true);
-    await expect(priority).toHaveValue('essential');
+    if (phone) {
+      await expect(priority).toHaveCount(0);
+      await expect.poll(level).toBe('essential');
+    } else await expect(priority).toHaveValue('essential');
     const graphSelector = page
       .locator(
         '[data-testid="graph-selector"]:visible, [data-testid="graph-selector-mobile"]:visible, [data-testid="graph-selector-sidebar"]:visible'
@@ -132,7 +150,7 @@ for (const width of [1440, 390]) {
       .getByRole('button', { name: /Browse all relationships/ })
       .locator('span')
       .first();
-    await expect(summary).toContainText('4 nodes, 5 connections');
+    await expect(summary).toContainText('4 items, 5 connections');
     const typographySamples = [
       {
         name: 'graph title',
@@ -155,13 +173,13 @@ for (const width of [1440, 390]) {
         minWeight: 500,
         requireVisible: true,
       },
-      {
+      ...(phone ? [] : [{
         name: 'relationship priority',
         element: priority,
         minSize: 16,
         minWeight: 600,
         requireVisible: true,
-      },
+      }]),
     ];
     const readTypography = () =>
       Promise.all(
@@ -266,14 +284,21 @@ for (const width of [1440, 390]) {
     ).toEqual(pairIds);
     await expect(browser).toContainText('All 3 originals are listed below.');
     if (width === 390) {
-      await priority.selectOption('all');
+      // The open relationship list covers the graph; its View sheet sits
+      // behind it, so leave the list, change the level and come back.
+      await page.keyboard.press('Escape');
+      await expect(browser).toHaveCount(0);
+      await chooseOnPhone('all');
       await expect(graph).toHaveAttribute('data-relationship-priority', 'all');
-      await priority.selectOption('essential');
+      await chooseOnPhone('essential');
       await expect(graph).toHaveAttribute(
         'data-relationship-priority',
         'essential'
       );
-      await expect(label).toBeHidden();
+      // Reopen this pair's list from its label for the checks below.
+      await label.focus();
+      await page.keyboard.press('Enter');
+      await expect(browser).toBeVisible();
       await browser.getByRole('button').first().focus();
     }
     await page.keyboard.press('Escape');
@@ -283,10 +308,20 @@ for (const width of [1440, 390]) {
     expect(await camera()).toEqual(savedCamera);
     await page.keyboard.press('Enter');
     await expect(browser).toBeVisible();
-    await priority.focus();
-    await page.keyboard.press('End');
-    await expect(priority).toHaveValue('all');
-    await expect(label).not.toHaveAttribute('tabindex');
+    if (phone) {
+      await page.keyboard.press('Escape');
+      await expect(browser).toHaveCount(0);
+      await chooseOnPhone('all');
+      await graph.getByRole('button', { name: /Browse all relationships/ }).click();
+      await expect(browser).toBeVisible();
+    } else {
+      await priority.focus();
+      await page.keyboard.press('End');
+      await expect(priority).toHaveValue('all');
+    }
+    // With nothing summarized the label stops browsing the pair and is the
+    // plain connection button again (it opens this connection's editor).
+    await expect(label).toHaveAttribute('aria-label', /^Edit connection: /);
     await browser
       .getByRole('button', { name: 'Back to graph', exact: true })
       .focus();
@@ -302,10 +337,13 @@ for (const width of [1440, 390]) {
       ['all', 5],
       ['essential', 3],
     ] as const) {
-      await priority.focus();
-      await page.keyboard.press(level === 'all' ? 'End' : 'Home');
-      if (level === 'dependencies') await page.keyboard.press('ArrowDown');
-      await expect(priority).toHaveValue(level);
+      if (phone) await chooseOnPhone(level);
+      else {
+        await priority.focus();
+        await page.keyboard.press(level === 'all' ? 'End' : 'Home');
+        if (level === 'dependencies') await page.keyboard.press('ArrowDown');
+        await expect(priority).toHaveValue(level);
+      }
       await expect(graph).toHaveAttribute('data-relationship-priority', level);
       await expect.poll(async () => (await represented()).length).toBe(count);
       expect(await camera()).toEqual(savedCamera);
@@ -321,22 +359,29 @@ for (const width of [1440, 390]) {
     const inspector = page.getByTestId('node-inspector');
     await expect(inspector).toContainText('Gateway');
     const inspectionCamera = await camera();
-    await priority.click();
-    await page.keyboard.press('End');
-    await page.keyboard.press('Enter');
-    await expect(priority).toHaveValue('all');
-    await expect(inspector).toContainText('Gateway');
-    expect(await camera()).toEqual(inspectionCamera);
-    await priority.click();
-    await page.keyboard.press('Home');
-    await page.keyboard.press('Enter');
-    await expect(priority).toHaveValue('essential');
+    if (phone) {
+      // A card's peek sheet takes the bottom of a phone screen; the graph
+      // controls step aside until it closes.
+      await expect(page.getByTestId('phone-graph-controls')).toHaveCount(0);
+    } else {
+      await priority.click();
+      await page.keyboard.press('End');
+      await page.keyboard.press('Enter');
+      await expect(priority).toHaveValue('all');
+      await expect(inspector).toContainText('Gateway');
+      expect(await camera()).toEqual(inspectionCamera);
+      await priority.click();
+      await page.keyboard.press('Home');
+      await page.keyboard.press('Enter');
+      await expect(priority).toHaveValue('essential');
+    }
     await expect(inspector).toContainText('Gateway');
     await inspector.getByRole('button', { name: 'Close', exact: true }).click();
     expect(await snapshot()).toEqual(before);
     expect(writes).toEqual([]);
     await page.reload();
-    await expect(priority).toHaveValue('essential');
+    if (phone) await expect.poll(level).toBe('essential');
+    else await expect(priority).toHaveValue('essential');
     await expect.poll(represented).toEqual(primaryIds);
     await expect
       .poll(() =>
@@ -454,7 +499,7 @@ for (const width of [1440, 390]) {
     );
     const geometry = await inspectItemSymbols(page, info, 'priority-fallback');
     expect(geometry.labels.some(item => item.id === dependency.id)).toBe(true);
-    await expect(summary).toContainText('4 nodes, 4 connections');
+    await expect(summary).toContainText('4 items, 4 connections');
     await expect(dockCount).toHaveText('4 connections · Browse');
     const finalTypography = await readTypography();
     expect(typographyViolations(finalTypography)).toEqual([]);

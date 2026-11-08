@@ -39,6 +39,14 @@ export default {
   ],
   theme: {
     extend: {
+      screens: {
+        // Wide AND tall enough for side-by-side lanes that scroll on their
+        // own (a phone held sideways is wide but too short for that).
+        board: { raw: '(min-width: 640px) and (min-height: 600px)' },
+        // A phone held sideways: pinned page headers would leave too little
+        // room, so short screens scroll the whole page instead.
+        short: { raw: '(max-height: 500px)' },
+      },
       fontSize: { xs: ['0.875rem', { lineHeight: '1.25rem' }] },
       fontWeight: { normal: '500', medium: '600' },
       fontFamily: {

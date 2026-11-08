@@ -95,9 +95,14 @@ export const RelationshipEditorWindow: React.FC<RelationshipEditorWindowProps> =
 
   // Initialize position and auto-calculate height based on content
   useEffect(() => {
-    const width = isExpanded ? 450 : 350;
-    const contentHeight = calculateContentHeight();
-    const margin = 24;
+    // Fit the screen: on a phone the window spans the width (8px margins),
+    // starts below any fixed top banner (the body is padded by its height)
+    // and scrolls its content when taller than the screen.
+    const narrow = window.innerWidth < 640;
+    const margin = narrow ? 8 : 24;
+    const width = Math.min(isExpanded ? 450 : 350, window.innerWidth - 2 * margin);
+    const top = (parseFloat(getComputedStyle(document.body).paddingTop) || 0) + margin;
+    const contentHeight = Math.min(calculateContentHeight(), window.innerHeight - top - margin);
 
     // Never obstruct the edge being edited: the window opens on whichever
     // side of the click point (≈ the edge) has more horizontal room, and
@@ -105,15 +110,17 @@ export const RelationshipEditorWindow: React.FC<RelationshipEditorWindowProps> =
     const click = editingEdge?.position;
     if (click) {
       const placeRight = click.x < window.innerWidth / 2;
-      const x = placeRight
-        ? Math.min(click.x + 120, window.innerWidth - width - margin)
-        : Math.max(margin, click.x - 120 - width);
-      const y = Math.max(margin, Math.min(click.y - contentHeight / 2, window.innerHeight - contentHeight - margin));
+      const x = narrow
+        ? (window.innerWidth - width) / 2
+        : placeRight
+          ? Math.min(click.x + 120, window.innerWidth - width - margin)
+          : Math.max(margin, click.x - 120 - width);
+      const y = Math.max(top, Math.min(click.y - contentHeight / 2, window.innerHeight - contentHeight - margin));
       setPosition({ x, y });
     } else {
       const sidebarWidth = getComputedStyle(document.documentElement).getPropertyValue('--sidebar-width') || '16rem';
       const sidebarPixels = sidebarWidth === '4rem' ? 64 : 256;
-      setPosition({ x: sidebarPixels + 16, y: 180 });
+      setPosition(narrow ? { x: (window.innerWidth - width) / 2, y: top } : { x: sidebarPixels + 16, y: Math.max(top, 180) });
     }
 
     setSize({ width, height: contentHeight });
@@ -293,7 +300,7 @@ export const RelationshipEditorWindow: React.FC<RelationshipEditorWindowProps> =
       ref={windowRef}
       role="dialog"
       aria-label={isEditingMode ? 'Edit relationship' : 'Create relationship'}
-      className="fixed bg-white/5 backdrop-blur-xl border border-white/20 rounded-xl shadow-lg overflow-hidden z-50"
+      className="fixed flex flex-col bg-slate-900/95 backdrop-blur-xl border border-white/20 rounded-xl shadow-lg overflow-hidden z-50"
       style={{
         left: `${position.x}px`,
         top: `${position.y}px`,
@@ -306,7 +313,7 @@ export const RelationshipEditorWindow: React.FC<RelationshipEditorWindowProps> =
     >
       {/* Header */}
       <div 
-        className="flex items-center justify-between p-3 bg-white/10 border-b border-white/10 cursor-move select-none"
+        className="flex shrink-0 items-center justify-between p-3 bg-white/10 border-b border-white/10 cursor-move select-none"
         onMouseDown={handleDragStart}
       >
         <div className="flex items-center space-x-2">
@@ -335,7 +342,7 @@ export const RelationshipEditorWindow: React.FC<RelationshipEditorWindowProps> =
 
       {/* Content */}
       {isExpanded && (
-        <div className="p-4 space-y-4">
+        <div className="p-4 space-y-4 min-h-0 flex-1 overflow-y-auto overscroll-contain">
           {/* Status indicator */}
           <div className="text-center">
             {!canEdit && (

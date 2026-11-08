@@ -278,7 +278,7 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
           onClick={onClose}
         />
 
-        <div ref={panelRef} data-modal-panel data-task-create className="inline-block w-full max-w-lg p-0 my-8 overflow-hidden text-left align-middle transition-all transform bg-gradient-to-br from-gray-800/98 via-gray-850/98 to-gray-900/98 backdrop-blur-2xl shadow-2xl rounded-2xl border border-gray-600/30 focus-within:ring-2 focus-within:ring-blue-500/50 animate-in slide-in-from-bottom-4 duration-300 relative" onClick={(e) => e.stopPropagation()}>
+        <div ref={panelRef} data-modal-panel data-task-create className="inline-block w-full max-w-lg p-0 my-8 overflow-hidden text-left align-middle transition-all transform bg-gradient-to-br from-gray-800 to-gray-900 backdrop-blur-2xl shadow-2xl rounded-2xl border border-gray-600/30 focus-within:ring-2 focus-within:ring-blue-500/50 animate-in slide-in-from-bottom-4 duration-300 relative" onClick={(e) => e.stopPropagation()}>
           <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-green-500/20 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-purple-500 via-pink-500 to-green-500"></div>
 
@@ -647,6 +647,7 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
               <div>
                 <input
                   type="range"
+                  aria-label="Priority"
                   min="0"
                   max="1"
                   step="0.1"

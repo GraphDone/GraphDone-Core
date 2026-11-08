@@ -475,9 +475,10 @@ export function Backend() {
     <div className="h-full flex flex-col">
       {/* Header */}
       <div className="bg-gray-900/30 backdrop-blur-md border-b border-gray-700/30 px-3 py-3 sm:px-6 sm:py-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center space-x-3">
+        {/* Title and actions wrap onto separate rows on narrow screens. */}
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <h1 className="text-2xl font-bold text-gray-100">Backend Status</h1>
               <span className="text-xs bg-gray-800/50 text-gray-400 px-2 py-1 rounded">
                 v{APP_VERSION}
@@ -488,7 +489,7 @@ export function Backend() {
             </p>
           </div>
           
-          <div className="flex items-center space-x-3">
+          <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center space-x-2">
               <div className={`flex items-center space-x-1 ${getStatusColor(systemHealth.overall)}`}>
                 {getStatusIcon(systemHealth.overall)}
@@ -496,7 +497,7 @@ export function Backend() {
               </div>
             </div>
             
-            <div className="flex space-x-2">
+            <div className="flex flex-wrap gap-2">
               <button
                 type="button"
                 className="btn btn-secondary"

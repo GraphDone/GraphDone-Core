@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import { uiFitProjects } from './tests/lib/ui-fit/devices.mjs';
 
 /**
  * @see https://playwright.dev/docs/test-configuration
@@ -138,6 +139,11 @@ export default defineConfig({
       testDir: './tests/diagnostics',
       use: { ...devices['Desktop Chrome'], screenshot: 'on' },
     },
+
+    /* UI fit gate: every screen in tests/devices/screens.ts on iPhone, iPad and
+     * desktop Chrome/Safari (WebKit for Apple devices), checking every control's
+     * name, size, centring and fit. Run via `npm run test:devices`. */
+    ...uiFitProjects(),
 
     // Commented out until browsers installed with system dependencies
     // {

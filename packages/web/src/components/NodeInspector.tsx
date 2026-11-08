@@ -52,7 +52,7 @@ export function NodeInspector({ node, onClose, onEdit, compact = false, rootTest
     <div
       data-testid={rootTestId}
       style={{ maxHeight }}
-      className={`flex flex-col bg-gray-900/95 backdrop-blur-md border border-gray-700/60 rounded-xl shadow-2xl overflow-y-auto ${
+      className={`flex flex-col bg-gray-900 border border-gray-700/60 rounded-xl shadow-2xl overflow-y-auto ${
         compact ? 'w-full max-h-[60vh]' : 'w-full sm:w-72 max-h-[60vh] sm:max-h-[70vh]'
       }`}
     >
@@ -61,6 +61,10 @@ export function NodeInspector({ node, onClose, onEdit, compact = false, rootTest
         <div className="flex-1 min-w-0">
           <div className="text-xs uppercase tracking-wide" style={{ color: typeCfg.hexColor }}>{typeCfg.label}</div>
           <div className="max-h-24 overflow-y-auto text-base font-semibold text-white [overflow-wrap:anywhere]" tabIndex={0} title={node.title}>{node.title}</div>
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-200">
+            <span className="inline-flex items-center gap-1.5"><span aria-hidden="true" className="h-2 w-2 rounded-full" style={{ background: statusCfg?.hexColor }} />{statusCfg?.label ?? node.status}</span>
+            {typeof node.priority === 'number' && <span>Priority {Math.round(node.priority * 100)}%</span>}
+          </div>
           <div className="mt-0.5"><CopyableId id={node.id} /></div>
         </div>
         {onEdit && <button onClick={onEdit} className="min-h-[44px] px-3 rounded-lg text-emerald-300 hover:bg-gray-800">Edit</button>}

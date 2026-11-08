@@ -1,6 +1,6 @@
 {
   "name": "graphdone",
-  "version": "0.4.1-alpha",
+  "version": "0.4.2-alpha",
   "description": "Management for teams who think differently",
   "private": true,
   "workspaces": [
@@ -53,6 +53,7 @@
     "report:perf": "node tests/lib/reporting/generate-perf-report.mjs",
     "test:vlm": "playwright test --project=vlm --reporter=line && node tests/lib/reporting/generate-vlm-report.mjs",
     "test:geometry": "playwright test --project=geometry --reporter=line",
+    "test:devices": "playwright test --project='ui-fit:*' --reporter=line; status=$?; node tests/lib/ui-fit/report.mjs; exit $status",
     "report:vlm": "node tests/lib/reporting/generate-vlm-report.mjs",
     "perf:bundle": "node tests/perf/check-bundle-size.mjs",
     "qc:modes": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line tests/e2e/quality/new-user-modes.spec.ts",
