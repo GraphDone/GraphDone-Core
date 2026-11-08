@@ -36,7 +36,7 @@ services:
 
   graphdone-api:
     container_name: graphdone-api-prod
-    image: gd-core-api:0.4.1-alpha
+    image: gd-core-api:0.4.2-alpha
     build:
       context: ..
       dockerfile: packages/server/Dockerfile
@@ -79,7 +79,7 @@ services:
 
   graphdone-web:
     container_name: graphdone-web-prod
-    image: gd-core-web:0.4.1-alpha
+    image: gd-core-web:0.4.2-alpha
     build:
       context: ..
       dockerfile: packages/web/Dockerfile
