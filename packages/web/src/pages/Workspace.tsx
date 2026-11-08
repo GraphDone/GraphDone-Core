@@ -353,7 +353,9 @@ export function Workspace() {
           </div>
         ) : viewMode === 'graph' ? (
           <div className="relative h-full">
-           <div className="relative w-full h-full">
+           {/* data-peek-open: on a phone the card's peek sheet takes the bottom
+               of the screen, so the graph's bottom bar steps aside (index.css). */}
+           <div className="relative w-full h-full" data-peek-open={isMobile && inspectorNode ? 'true' : undefined}>
             {/* Connection warning — fires only when the GraphQL data layer itself is
                 unreachable, not when an optional store (Neo4j) is simply unused. */}
             {!offlineEnabled && !healthLoading && !isGraphServiceAvailable(health) && (

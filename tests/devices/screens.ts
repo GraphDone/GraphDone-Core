@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { expect, type Page } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { UI_FIT_FIXTURE } from '../lib/ui-fit/devices.mjs';
 
 // Every screen the device matrix checks. Each entry opens one state of the UI;
@@ -48,8 +48,8 @@ async function zoomToFirstCard(page: Page) {
 }
 
 /** Activate a graph card header control with the keyboard (they are buttons). */
-async function useCardControl(page: Page, selector: string) {
-  await openView(page, 'graph');
+async function useCardControl(page: Page, selector: string, graphId?: string) {
+  await openView(page, 'graph', graphId);
   await zoomToFirstCard(page);
   const control = page.locator(`.graph-container svg g.node ${selector}`).first();
   await control.focus();
@@ -136,9 +136,16 @@ export const UI_FIT_SCREENS: UiFitScreen[] = [
     // a phone, the docked inspector elsewhere. Editing is one more tap.
     id: 'graph-card-peek',
     async open(page) {
-      await openView(page, 'graph');
-      const card = page.locator('.graph-container svg g.node .node-bg').first();
-      if (await page.evaluate(() => navigator.maxTouchPoints > 0)) await card.tap();
+      // On the connected graph, so the bottom bar's connections button is there too.
+      await openView(page, 'graph', connectedGraph());
+      // A card wholly on screen (phones open zoomed in, so some are off it).
+      const index = await page.locator('.graph-container svg g.node .node-bg').evaluateAll(cards => cards.findIndex(card => {
+        const r = card.getBoundingClientRect();
+        return r.width > 0 && r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight;
+      }));
+      expect(index, 'a card is on screen').toBeGreaterThanOrEqual(0);
+      const card = page.locator('.graph-container svg g.node .node-bg').nth(index);
+      if ((test.info().project.metadata.device as { touch?: boolean }).touch) await card.tap();
       else await card.click();
       await expect(page.getByTestId('node-inspector')).toBeVisible();
       await settle(page, 800);
@@ -161,7 +168,7 @@ export const UI_FIT_SCREENS: UiFitScreen[] = [
   {
     id: 'graph-grow',
     async open(page) {
-      await useCardControl(page, '.node-relationship-icon');
+      await useCardControl(page, '.node-relationship-icon', connectedGraph());
       await expect(page.getByText(/Click empty space to grow|Tap empty space for a new item/i)).toBeVisible();
       await settle(page, 800);
     },

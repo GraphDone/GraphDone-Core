@@ -5398,7 +5398,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         <button type="button" onClick={() => { setIsConnecting(false); setConnectionSource(null); }} className="min-h-11 shrink-0 rounded-lg px-3 font-medium text-white hover:bg-gray-800">Cancel</button>
       </div>}
       <LayoutSaveStatus queue={positionSaveQueue} />
-      {localItemActive ? localItemFooter : workItemEdges.length > 0 && <button
+      {localItemActive ? localItemFooter : workItemEdges.length > 0 && !(compactWorkspace && isConnecting) && <button
         ref={itemRelationshipTriggerRef}
         data-graph-fit-obstacle="true"
         className="max-w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 shadow-lg"
