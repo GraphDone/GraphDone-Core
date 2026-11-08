@@ -514,9 +514,12 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     setItemRelationshipScope(null);
     requestAnimationFrame(() => {
       if (document.activeElement && document.activeElement !== document.body) return;
-      // Return to the label that opened this pair's list only while it still
-      // opens that list; otherwise to "Browse all relationships".
-      if (trigger?.isConnected && trigger.dataset.pairBrowser === 'true') trigger.focus({preventScroll:true});
+      // Return to whatever opened the list. A connection label counts only
+      // while it still opens that pair's list (with nothing summarized it
+      // becomes the connection's edit button); otherwise focus goes to
+      // "Browse all relationships".
+      const staleLabel = trigger?.classList.contains('edge-label-group') && trigger.dataset.pairBrowser !== 'true';
+      if (trigger?.isConnected && !staleLabel) trigger.focus({preventScroll:true});
       if (document.activeElement !== trigger) itemRelationshipTriggerRef.current?.focus({preventScroll:true});
     });
   }, []);
