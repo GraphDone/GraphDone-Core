@@ -31,7 +31,7 @@ import {
 const server = new Server(
   {
     name: 'graphdone-mcp-server',
-    version: '0.4.0-alpha',
+    version: '0.4.1-alpha',
   },
   {
     capabilities: {

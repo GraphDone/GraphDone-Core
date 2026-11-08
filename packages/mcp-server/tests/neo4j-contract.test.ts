@@ -317,7 +317,7 @@ describe.skipIf(!configured)('MCP GraphService — real Neo4j contract', () => {
     try {
       await client.connect(transport, { timeout: 5000, maxTotalTimeout: 5000 });
       pid = transport.pid;
-      expect(client.getServerVersion()).toEqual({ name: 'graphdone-mcp-server', version: '0.4.0-alpha' });
+      expect(client.getServerVersion()).toEqual({ name: 'graphdone-mcp-server', version: '0.4.1-alpha' });
       expect(client.getServerCapabilities()).toEqual({ tools: {} });
       const listed = await client.listTools(undefined, options);
       expect(listed.tools.find(tool => tool.name === 'create_node')?.inputSchema.required).toEqual(['title', 'type']);
