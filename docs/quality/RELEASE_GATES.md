@@ -9,7 +9,10 @@ that job; their other required jobs must still pass.
 ## Publishing a release
 
 Docker Build Validation builds the web, API and Neo4j images for amd64 and arm64
-on main-target PRs without registry writes.
+on main-target PRs without registry writes. Each architecture builds natively on
+its own runner (`ubuntu-24.04`, `ubuntu-24.04-arm`); QEMU emulation is not used
+because emulated arm64 `npm ci` crashed with "Illegal instruction" in the
+v0.4.0-alpha release run.
 
 A release is published only by pushing a version tag on a validated main commit:
 
@@ -33,9 +36,10 @@ closed unless:
   runs test a merge ref, so they never count.
 
 Only then do write-scoped jobs build `ghcr.io/graphdone/graphdone-{web,api,neo4j}`
-from the verified SHA for amd64 and arm64 (SBOM and provenance, the same web
-build arguments as the validated stack) and push the version tag. After every
-image is published, the final job decides from the published releases whether
+from the verified SHA, natively per architecture (SBOM and provenance, the same
+web build arguments as the validated stack), push each platform image by digest,
+and join the amd64 and arm64 digests into the version tag, refusing an index
+that lacks either architecture. After every image is published, the final job decides from the published releases whether
 this version is the highest — a pre-release never outranks a stable release —
 moves `:latest` on all three images together if so, and creates the GitHub
 release with the image digests. Each tag runs in its own concurrency group and a
