@@ -91,9 +91,21 @@ export function collectControls() {
     return [r, g, b, a];
   };
   // A horizontally scrolling ancestor makes partly hidden controls normal scroll content.
+  // A deliberate sideways strip (tabs, a table's columns, a board) overflows
+  // on the x axis only. An area that scrolls up and down and has also become
+  // wider than the screen is an accident: it is reported (sidewaysScrollers
+  // below), and controls pushed out of view inside it still count as cut off.
+  // (CSS computes overflow-y: auto whenever overflow-x scrolls, so the test is
+  // what actually overflows, not the declared overflow.)
+  const scrolls = v => /(auto|scroll)/.test(v);
+  const overflowsX = node => scrolls(getComputedStyle(node).overflowX) && node.scrollWidth > node.clientWidth + 1;
+  const overflowsY = node => scrolls(getComputedStyle(node).overflowY) && node.scrollHeight > node.clientHeight + 1;
   const inHorizontalScroller = el => {
+    // The graph is a pan-and-zoom surface: cards panned past its edge are
+    // reached by panning, like a sideways strip.
+    if (el.closest('.graph-container svg')) return true;
     for (let node = el.parentElement; node && node !== document.body; node = node.parentElement) {
-      if (/(auto|scroll)/.test(getComputedStyle(node).overflowX) && node.scrollWidth > node.clientWidth + 1) return true;
+      if (overflowsX(node) && !overflowsY(node)) return true;
     }
     return false;
   };
@@ -268,9 +280,38 @@ export function collectControls() {
     });
   }
 
+  // Areas that scroll their content up and down but show only a sliver of it
+  // (MIN_SCROLL_ROOM in rules.mjs).
+  const crampedScrollers = [];
+  for (const node of document.body.querySelectorAll('*')) {
+    if (node.closest('#ui-fit-overlay, select, textarea') || !overflowsY(node)) continue;
+    const r = node.getBoundingClientRect();
+    if (r.width < 1 || r.bottom <= 0 || r.top >= vh || isHidden(node)) continue;
+    const shown = Math.min(r.bottom, vh) - Math.max(r.top, 0);
+    if (shown >= 120) continue;
+    const cls = (node.getAttribute('class') || '').trim().split(/\s+/)[0];
+    crampedScrollers.push({ name: `${node.tagName.toLowerCase()}${cls ? `.${cls}` : ''}`, height: Math.round(shown) });
+  }
+
+  const sidewaysScrollers = [];
+  for (const node of document.body.querySelectorAll('*')) {
+    if (node.closest('#ui-fit-overlay')) continue;
+    if (!overflowsX(node) || !overflowsY(node)) continue;
+    const r = node.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1 || isHidden(node)) continue;
+    const cls = (node.getAttribute('class') || '').trim().split(/\s+/)[0];
+    const testId = node.getAttribute('data-testid');
+    sidewaysScrollers.push({
+      name: `${node.tagName.toLowerCase()}${testId ? `[${testId}]` : cls ? `.${cls}` : ''}`,
+      overflow: node.scrollWidth - node.clientWidth,
+    });
+  }
+
   return {
     controls,
     clickables,
+    sidewaysScrollers,
+    crampedScrollers,
     page: { scrollWidth: document.documentElement.scrollWidth, innerWidth: vw, innerHeight: vh, dpr: window.devicePixelRatio },
   };
 }

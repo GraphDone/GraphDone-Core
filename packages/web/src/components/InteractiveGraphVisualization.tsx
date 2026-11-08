@@ -514,7 +514,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     setItemRelationshipScope(null);
     requestAnimationFrame(() => {
       if (document.activeElement && document.activeElement !== document.body) return;
-      if (trigger?.isConnected) trigger.focus({preventScroll:true});
+      // Return to the label that opened this pair's list only while it still
+      // opens that list; otherwise to "Browse all relationships".
+      if (trigger?.isConnected && trigger.dataset.pairBrowser === 'true') trigger.focus({preventScroll:true});
       if (document.activeElement !== trigger) itemRelationshipTriggerRef.current?.focus({preventScroll:true});
     });
   }, []);
@@ -3644,7 +3646,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
             group.select('.edge-label-bg').attr('width', edge._labelDims.width).attr('height', edge._labelDims.height).attr('x', -edge._labelDims.width / 2).attr('y', -edge._labelDims.height / 2);
             group.select('.edge-label-icon').attr('x', -edge._labelDims.width / 2 + 8);
           }
-          group.attr('aria-label', more ? `Browse ${pair!.original.length} relationships for this connection` : editEdgeLabel(edge));
+          group.attr('aria-label', more ? `Browse ${pair!.original.length} relationships for this connection` : editEdgeLabel(edge))
+            .attr('data-pair-browser', more ? 'true' : null);
           group.select('.edge-priority-description').text(pair
             ? `${edge.type}. ${pair.fallback ? 'Highest available types retained for this pair.' : `Priority: ${priority.level}.`} ${pair.original.length} original relationships; ${pair.summarized.length} summarized.${more ? ' Open to inspect every original.' : ''}`
             : edge.type);

@@ -37,7 +37,8 @@ Every rule applies to every control on every screen. The rules are listed in
 | `vector-icons` | An icon is a font character (`+`, `⚙`, `×`) | Text content of icon-only controls |
 | `in-viewport` | A control is cut off by the screen edge | Box against the viewport (scroll containers excepted) |
 | `target-size` | A target is under 24×24 px and crowded (WCAG 2.2 2.5.8) | Hit area and spacing |
-| `no-horizontal-scroll` | The page scrolls sideways | Document width |
+| `scroll-room` | An area that scrolls its content shows less than 120 px of it (pinned headers on a phone held sideways) | On-screen height of scrolling areas |
+| `no-horizontal-scroll` | The page, or an area that scrolls up and down, also scrolls sideways (deliberate sideways strips such as tabs are fine) | Document and scroll-area widths |
 
 Touch targets under 44 px are counted on touch devices and shown in the
 gallery. They are reported, not gated.

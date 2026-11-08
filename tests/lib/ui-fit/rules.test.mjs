@@ -50,6 +50,23 @@ test('sideways page scroll is a page-level finding', () => {
   assert.deepEqual(findings.map(f => [f.rule, f.key]), [['no-horizontal-scroll', 'page']]);
 });
 
+test('a scroll area showing only a sliver of its content is reported', () => {
+  const findings = evaluate({ controls: [], page, crampedScrollers: [{ name: 'div.p-4', height: 20 }] }, { touch: true });
+  assert.deepEqual(findings.map(f => [f.rule, f.key]), [['scroll-room', 'area:div.p-4']]);
+});
+
+test('a vertical scroll area that also scrolls sideways is reported by name', () => {
+  const findings = evaluate({ controls: [], page, sidewaysScrollers: [{ name: 'main.flex-1', overflow: 64 }] }, { touch: true });
+  assert.deepEqual(findings.map(f => [f.rule, f.key]), [['no-horizontal-scroll', 'area:main.flex-1']]);
+});
+
+test('a control mostly pushed past the screen edge still fails in-viewport', () => {
+  const pushed = control({ name: 'Force Debug', rect: box(370, 80, 120, 40), visibleFraction: 0.2, clippedX: 97 });
+  assert.deepEqual(rules([pushed]), ['in-viewport']);
+  const scrolledAway = control({ name: 'Below', rect: box(0, 2000, 44, 44), visibleFraction: 0, clippedX: 0 });
+  assert.deepEqual(rules([scrolledAway]), []);
+});
+
 test('controls behind an open dialog or scrolled out of view are not judged', () => {
   assert.deepEqual(rules([control({ name: '', behindOverlay: true })]), []);
   assert.deepEqual(rules([control({ name: '', visibleFraction: 0.3 })]), []);

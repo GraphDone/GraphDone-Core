@@ -56,8 +56,8 @@ export function Admin() {
   };
 
   return (
-    <div className="h-full min-h-0 flex flex-col">
-      {/* Header */}
+    <div className="h-full min-h-0 flex flex-col short:overflow-y-auto">
+      {/* Header (scrolls away with the page on short screens) */}
       <div className="bg-gray-900/30 backdrop-blur-md border-b border-gray-700/30 px-3 py-3 sm:px-6 sm:py-4">
         <div className="flex items-center justify-between">
           <div>
@@ -104,7 +104,7 @@ export function Admin() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto short:flex-none short:overflow-visible">
         {renderTabContent()}
       </div>
     </div>

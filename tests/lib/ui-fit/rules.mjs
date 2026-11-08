@@ -15,6 +15,8 @@ export const TOUCH_TARGET = 44;
 export const ICON_CENTER_TOLERANCE = 0.75;
 /** Icon-only controls larger than this are panels, not icon buttons; ink is not measured. */
 export const MAX_ICON_BUTTON = 64;
+/** Smallest on-screen height (CSS px) of an area that scrolls its content. */
+export const MIN_SCROLL_ROOM = 120;
 /** Minimum contrast between a control's label and the background actually drawn behind it. */
 export const MIN_LABEL_CONTRAST = 3;
 
@@ -28,7 +30,8 @@ export const RULES = {
   'icon-centered': `An icon-only button's artwork is centred in its box within ${ICON_CENTER_TOLERANCE} px on both axes, measured from rendered pixels.`,
   'label-contrast': `A control's label has at least ${MIN_LABEL_CONTRAST}:1 contrast with the background the browser actually draws (catches native Safari styling that ignores our CSS).`,
   'vector-icons': 'Icons are drawn as SVG, not as font characters such as "+", "⚙" or "×" whose position depends on the device\'s fonts.',
-  'no-horizontal-scroll': 'The page never scrolls sideways.',
+  'scroll-room': `An area that scrolls its content up and down shows at least ${MIN_SCROLL_ROOM}px of it on screen.`,
+  'no-horizontal-scroll': 'Neither the page nor any area that scrolls up and down also scrolls sideways (deliberate sideways strips such as tabs are fine).',
 };
 
 /** Rules measured and reported but not (yet) gated. */
@@ -89,11 +92,28 @@ export function evaluate(snapshot, device) {
 
   const overflow = snapshot.page.scrollWidth - snapshot.page.innerWidth;
   if (overflow > 1) add('no-horizontal-scroll', null, `page is ${overflow}px wider than the screen`, { overflow });
+  for (const area of snapshot.crampedScrollers || []) {
+    findings.push({ rule: 'scroll-room', key: `area:${area.name}`, message: `${area.name} scrolls its content but only ${area.height}px of it is on screen`, measured: { height: area.height } });
+  }
+  for (const area of snapshot.sidewaysScrollers || []) {
+    findings.push({ rule: 'no-horizontal-scroll', key: `area:${area.name}`, message: `${area.name} scrolls up and down but its content is ${area.overflow}px too wide, so it also scrolls sideways`, measured: { overflow: area.overflow } });
+  }
 
   // Only controls that are actually on screen are judged; content scrolled out
   // of view (or clipped inside a scroll container) is measured when visible.
   for (const clickable of snapshot.clickables || []) {
     findings.push({ rule: 'clickable-is-control', key: `clickable:${clickable.name}`, message: `${clickable.tag} looks clickable but is not a button or link`, measured: {} });
+  }
+
+  // A control cut off by the left or right edge of the screen is a fault
+  // however much of it still shows (scrolled-away content is judged by its
+  // vertical position; deliberate sideways strips report clippedX 0).
+  const innerHeight = snapshot.page.innerHeight ?? Infinity;
+  for (const c of snapshot.controls) {
+    const verticallyInView = c.rect.y < innerHeight && c.rect.y + c.rect.height > 0;
+    if (c.clippedX > 1 && verticallyInView && !c.behindOverlay && c.visibleFraction < 0.5) {
+      add('in-viewport', c, `${round(c.clippedX)}px is off the edge of the screen`, { clipped: round(c.clippedX) });
+    }
   }
 
   // Controls under an open dialog, menu or backdrop are not usable by design.
