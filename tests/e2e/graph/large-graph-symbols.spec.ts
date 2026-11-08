@@ -69,7 +69,12 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
   page,
   largeGraph,
 }, info) => {
-  test.setTimeout(240000);
+  // Overall safety limit only; the performance budgets are the assertions
+  // below (load < 45 s, each zoom settles < 5 s, bounded layout work). CI
+  // runners vary: the same commit took 153 s on one and ran out of 240 s on
+  // another that was ~1.8x slower throughout (load 27.7 s vs 15.3 s) while
+  // still meeting every budget.
+  test.setTimeout(420000);
   const snapshot = async () => {
     const data = await gql(
       page,
