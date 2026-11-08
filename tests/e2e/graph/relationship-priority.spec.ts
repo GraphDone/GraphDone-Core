@@ -150,7 +150,7 @@ for (const width of [1440, 390]) {
       .getByRole('button', { name: /Browse all relationships/ })
       .locator('span')
       .first();
-    await expect(summary).toContainText('4 nodes, 5 connections');
+    await expect(summary).toContainText('4 items, 5 connections');
     const typographySamples = [
       {
         name: 'graph title',
@@ -499,7 +499,7 @@ for (const width of [1440, 390]) {
     );
     const geometry = await inspectItemSymbols(page, info, 'priority-fallback');
     expect(geometry.labels.some(item => item.id === dependency.id)).toBe(true);
-    await expect(summary).toContainText('4 nodes, 4 connections');
+    await expect(summary).toContainText('4 items, 4 connections');
     await expect(dockCount).toHaveText('4 connections · Browse');
     const finalTypography = await readTypography();
     expect(typographyViolations(finalTypography)).toEqual([]);

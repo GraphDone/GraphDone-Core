@@ -17,6 +17,7 @@ export const ICON_CENTER_TOLERANCE = 0.75;
 export const MAX_ICON_BUTTON = 64;
 /** Smallest on-screen height (CSS px) of an area that scrolls its content. */
 export const MIN_SCROLL_ROOM = 120;
+export const MIN_PANEL_ALPHA = 0.85;
 /** Minimum contrast between a control's label and the background actually drawn behind it. */
 export const MIN_LABEL_CONTRAST = 3;
 
@@ -31,6 +32,7 @@ export const RULES = {
   'label-contrast': `A control's label has at least ${MIN_LABEL_CONTRAST}:1 contrast with the background the browser actually draws (catches native Safari styling that ignores our CSS).`,
   'vector-icons': 'Icons are drawn as SVG, not as font characters such as "+", "⚙" or "×" whose position depends on the device\'s fonts.',
   'scroll-room': `An area that scrolls its content up and down shows at least ${MIN_SCROLL_ROOM}px of it on screen.`,
+  'solid-panels': `A dialog, sheet or peek panel paints a background at least ${Math.round(MIN_PANEL_ALPHA * 100)}% opaque, so the page behind does not show through its text.`,
   'no-horizontal-scroll': 'Neither the page nor any area that scrolls up and down also scrolls sideways (deliberate sideways strips such as tabs are fine).',
 };
 
@@ -92,6 +94,9 @@ export function evaluate(snapshot, device) {
 
   const overflow = snapshot.page.scrollWidth - snapshot.page.innerWidth;
   if (overflow > 1) add('no-horizontal-scroll', null, `page is ${overflow}px wider than the screen`, { overflow });
+  for (const panel of snapshot.seeThroughPanels || []) {
+    findings.push({ rule: 'solid-panels', key: `panel:${panel.name}`, message: `"${panel.name}" is see-through (background ${Math.round(panel.alpha * 100)}% opaque)`, measured: { alpha: panel.alpha } });
+  }
   for (const area of snapshot.crampedScrollers || []) {
     findings.push({ rule: 'scroll-room', key: `area:${area.name}`, message: `${area.name} scrolls its content but only ${area.height}px of it is on screen`, measured: { height: area.height } });
   }

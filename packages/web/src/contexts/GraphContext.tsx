@@ -289,7 +289,7 @@ export function GraphProvider({ children }: GraphProviderProps) {
             },
             {
               title: 'Create your first work item',
-              description: 'Click the "+" button or right-click on empty space to create a new work item. Try it now!',
+              description: 'Use the + button at the top to create a new work item. Try it now!',
               type: 'TASK',
               status: 'COMPLETED',
               priority: 0.7,
