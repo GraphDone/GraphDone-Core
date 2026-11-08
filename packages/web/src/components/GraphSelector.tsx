@@ -360,7 +360,7 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
                               </div>
                               <div className="flex-1 min-w-0">
                                 <div className="text-sm font-medium truncate">{graph.name}</div>
-                                <div className="text-xs text-gray-400 flex items-center space-x-1.5">
+                                <div className="text-xs text-gray-400 flex flex-wrap items-center gap-x-1.5">
                                   <span className="flex items-center">
                                     <span className="font-normal">{graph.id === currentGraph?.id ? actualNodeCount : (graph.nodeCount || 0)}</span>
                                     <span className="ml-0.5">items</span>
