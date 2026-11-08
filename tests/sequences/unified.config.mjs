@@ -28,6 +28,9 @@ export const SEQUENCES = {
     'tests/e2e/quality/graph-motion.spec.ts',
     'tests/e2e/quality/graph-resize.spec.ts',
     'tests/e2e/quality/graph-details.spec.ts',
+    'tests/e2e/graph/quick-edit-write-order.spec.ts',
+    'tests/e2e/quality/graph-controls.spec.ts',
+    'tests/e2e/quality/visual-style.spec.ts',
     `--project=${PW}`, '--headed', '--workers=1', '--retries=0', '--trace=retain-on-failure',
   ], blocking: true },
   'agent-connection': { adapter: 'playwright', title: 'Agent connection and handoff acceptance', args: [

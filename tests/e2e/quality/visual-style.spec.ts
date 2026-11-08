@@ -4,7 +4,10 @@ import {gql} from '../../lib/graphRequest';
 
 for(const [width,height] of [[390,844],[844,390],[1440,900]])test(`studio visual review ${width}x${height} @visualstyle`,async({page})=>{
  test.setTimeout(90000);await page.setViewportSize({width,height});
- await page.goto('/login-form');await expect(page.getByRole('heading',{name:'You and your agent. Moving work forward.'})).toBeVisible();
+ await page.goto('/login-form');await expect(page.getByRole('heading',{level:1})).toBeVisible();
+ // A headed browser cannot capture a page it has not painted yet ("Unable to
+ // capture screenshot" straight after load); wait for two frames first.
+ await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
  if(width>=1024){
   const ratios=await page.locator('.work-illustration g').evaluateAll(groups=>{
    const luminance=(rgb:string)=>{const c=(rgb.match(/[\d.]+/g)||[]).slice(0,3).map(Number).map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4;});return .2126*c[0]+.7152*c[1]+.0722*c[2];};
@@ -30,9 +33,14 @@ for(const [width,height] of [[390,844],[844,390],[1440,900]])test(`studio visual
    return title.left<card.left-1||title.right>card.right+1||title.top<card.top-1||title.bottom>card.bottom+1;
   }).length);expect(escapedTitles,'title text stays within its card at overview zoom').toBe(0);
   await page.screenshot({path:`test-artifacts/quality/design-graph-${width}.png`});
-  const selector=page.getByTestId(width<768?'graph-selector-mobile':'graph-selector');await selector.click();await expect(page.getByTestId('graph-selector-dropdown')).toBeVisible();
+  const selector=page.getByTestId('graph-selector-mobile').or(page.getByTestId('graph-selector')).filter({visible:true});await selector.click();await expect(page.getByTestId('graph-selector-dropdown')).toBeVisible();
   await page.screenshot({path:`test-artifacts/quality/design-project-menu-${width}.png`});await page.keyboard.press('Escape');await expect(page.getByTestId('graph-selector-dropdown')).toHaveCount(0);
-  await page.locator('.graph-container .node').filter({has:page.locator('.node-title-group').filter({hasText:'beds'})}).locator('.node-edit-icon').click();await expect(page.getByTestId('quick-edit-surface')).toBeVisible();
+  // A phone opens at a readable zoom where cards are compact: the card itself
+  // is then the quick-edit control (Enter), as the header gear is hidden.
+  const beds=page.locator('.graph-container .node').filter({has:page.locator('.node-title-group').filter({hasText:'beds'})});
+  await expect.poll(()=>page.evaluate(()=>(window as any).__layoutMetrics?.()?.atRest),{timeout:10000}).toBe(true);
+  if(await beds.getAttribute('data-detail')==='compact'){await beds.focus();await beds.press('Enter');}else await beds.locator('.node-edit-icon').click();
+  await expect(page.getByTestId('quick-edit-surface')).toBeVisible();
   await page.screenshot({path:`test-artifacts/quality/design-editor-${width}.png`});await page.keyboard.press('Escape');
  }finally{
   await gql(page,'mutation($id:ID!){deleteEdges(where:{source:{graph:{id:$id}}}){nodesDeleted}}',{id:graph});

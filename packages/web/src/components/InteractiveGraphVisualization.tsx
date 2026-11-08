@@ -77,6 +77,7 @@ import { usePositionSaveQueue } from '../hooks/usePositionSaveQueue';
 import { spawnCelebration } from '../lib/celebration';
 import { buildNeighborhood } from '../lib/graphAdjacency';
 import { UndoStack } from '../lib/undoStack';
+import { createSerialQueue } from '../lib/serialQueue';
 
 // Level-of-detail zoom thresholds (single source of truth): below each scale the
 // matching per-node detail is hidden, for legibility and paint cost. (Values are
@@ -553,6 +554,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   // PR #87: quick in-context node editor (double-click a node) — edits every
   // field without the heavy details modal. Holds the work item being edited.
   const [quickEditNode, setQuickEditNode] = useState<any | null>(null);
+  const [quickEditWrites] = useState(createSerialQueue);
   const quickEditNodeId = quickEditNode?.id ?? null;
   const quickEditReturnFocusIdRef = useRef<string | null>(null);
   const closeQuickEdit = useCallback(() => {
@@ -5613,13 +5615,17 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         const frame = containerRef.current?.getBoundingClientRect();
         const left = projected ? projected.left + projected.width / 2 - (frame?.left ?? 0) : gx * currentTransform.scale + currentTransform.x;
         const top = projected ? projected.top + projected.height / 2 - (frame?.top ?? 0) : gy * currentTransform.scale + currentTransform.y;
+        // One item's saves go out in order, so a quick second change is not
+        // overwritten by the first one landing late (createSerialQueue).
+        const save = (update: QuickEditCommit['update']) => quickEditWrites(quickEditNode.id, () =>
+          updateWorkItemMutation({ variables: { where: { id: quickEditNode.id }, update } }));
         const onCommit = (c: QuickEditCommit) => {
-          updateWorkItemMutation({ variables: { where: { id: quickEditNode.id }, update: c.update } })
+          save(c.update)
             .then(() => {
               undoStack.push({
                 label: c.label,
                 undo: async () => {
-                  await updateWorkItemMutation({ variables: { where: { id: quickEditNode.id }, update: c.prev } });
+                  await save(c.prev);
                 },
               });
             })
