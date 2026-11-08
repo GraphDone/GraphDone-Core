@@ -2,6 +2,7 @@ import { expect, type Locator, type TestInfo } from '@playwright/test';
 import { writeFileSync } from 'node:fs';
 import {
   measureSchematicClutter,
+  measureSchematicClearance,
   schematicSegments,
 } from '../../packages/web/src/lib/schematicRouting';
 
@@ -117,6 +118,19 @@ export async function inspectSchematicOverview(
         controls,
         routes,
         accounting,
+        coverage: {
+          external: Number(host.getAttribute('data-external-relationships')),
+          eligiblePairs: Number(host.getAttribute('data-external-pairs')),
+          drawnPairs: Number(host.getAttribute('data-drawn-external-pairs')),
+          deferred: Number(host.getAttribute('data-geometry-deferred')),
+          summarized: Number(host.getAttribute('data-priority-summarized')),
+          internal: Number(host.getAttribute('data-internal-relationships')),
+          pending: Number(host.getAttribute('data-pending-relationships')),
+          connectedDrawnGroups: new Set(
+            routes.flatMap(route => [route.from, route.to])
+          ).size,
+          visibleGroups: cards.length,
+        },
         bounds: {
           left: Math.max(0, bounds.left),
           right: Math.min(innerWidth, bounds.right),
@@ -160,6 +174,22 @@ export async function inspectSchematicOverview(
     expect(card.x + card.width).toBeLessThanOrEqual(geometry.bounds.right);
     expect(card.y).toBeGreaterThanOrEqual(geometry.bounds.top);
     expect(card.y + card.height).toBeLessThanOrEqual(geometry.bounds.bottom);
+    for (const other of geometry.cards.filter(other => other.id !== card.id)) {
+      const dx = Math.max(
+        0,
+        Math.max(card.x, other.x) -
+          Math.min(card.x + card.width, other.x + other.width)
+      );
+      const dy = Math.max(
+        0,
+        Math.max(card.y, other.y) -
+          Math.min(card.y + card.height, other.y + other.height)
+      );
+      expect(
+        Math.hypot(dx, dy),
+        'Cards need readable gutters'
+      ).toBeGreaterThanOrEqual(63.9);
+    }
   }
   for (const route of geometry.routes) {
     expect(route.painted, 'Schematic wire must be painted').toBe(true);
@@ -204,6 +234,28 @@ export async function inspectSchematicOverview(
   expect(metrics.unrelatedOverlaps).toBe(0);
   expect(metrics.diagonalSegments).toBe(0);
   expect(metrics.maxBusesPerCell).toBeLessThanOrEqual(4);
+  const clearance = measureSchematicClearance(
+    [...geometry.cards, ...geometry.controls],
+    geometry.routes.map((route, index) => ({
+      id: String(index),
+      bus: route.source,
+      source: route.from!,
+      target: route.to!,
+      edgeIds: [],
+      connections: [],
+      points: route.points,
+    }))
+  );
+  if (clearance.minCardClearance !== null)
+    expect(
+      clearance.minCardClearance,
+      'Wires need room around cards and controls'
+    ).toBeGreaterThanOrEqual(19.9);
+  if (clearance.minUnrelatedWireClearance !== null)
+    expect(
+      clearance.minUnrelatedWireClearance,
+      'Unrelated wires need distinct lanes'
+    ).toBeGreaterThanOrEqual(15.9);
   const accounting = geometry.accounting?.match(
     /^(\d+) relationships, (\d+) not drawn:/
   );
@@ -213,8 +265,27 @@ export async function inspectSchematicOverview(
     geometry.routes.reduce((sum, route) => sum + route.count, 0) +
       Number(accounting![2])
   ).toBe(relationships);
+  const drawn = geometry.routes.reduce((sum, route) => sum + route.count, 0);
+  expect(
+    drawn + geometry.coverage.deferred + geometry.coverage.summarized
+  ).toBe(geometry.coverage.external);
+  expect(
+    geometry.coverage.external +
+      geometry.coverage.internal +
+      geometry.coverage.pending
+  ).toBe(relationships);
+  expect(geometry.coverage.drawnPairs).toBeGreaterThan(0);
+  expect(geometry.coverage.drawnPairs).toBeLessThanOrEqual(
+    geometry.coverage.eligiblePairs
+  );
+  expect(geometry.coverage.connectedDrawnGroups).toBeGreaterThanOrEqual(
+    Math.min(2, expectedCards)
+  );
   const geometryPath = info.outputPath(`${stage}-geometry.json`);
-  writeFileSync(geometryPath, JSON.stringify({ ...geometry, metrics }));
+  writeFileSync(
+    geometryPath,
+    JSON.stringify({ ...geometry, metrics, clearance })
+  );
   await info.attach(`${stage}-geometry.json`, {
     path: geometryPath,
     contentType: 'application/json',
@@ -225,4 +296,5 @@ export async function inspectSchematicOverview(
     path: screenshotPath,
     contentType: 'image/png',
   });
+  return { ...geometry, metrics, clearance };
 }

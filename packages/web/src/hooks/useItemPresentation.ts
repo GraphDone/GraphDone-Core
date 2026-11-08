@@ -6,8 +6,10 @@ export interface ItemPresentationRenderer {
   presentOverview: () => void;
 }
 
-export function useItemPresentation(overviewActive: boolean) {
+export function useItemPresentation(overviewActive: boolean, zooming?: () => boolean) {
   const renderer = useRef<ItemPresentationRenderer | null>(null);
+  const zoomingRef = useRef(zooming);
+  zoomingRef.current = zooming;
   const frame = useRef<number | null>(null);
   const overview = useRef(overviewActive);
   const hidden = useRef(false);
@@ -46,6 +48,10 @@ export function useItemPresentation(overviewActive: boolean) {
   }, [cancel, refresh]);
   useLayoutEffect(() => {
     overview.current = overviewActive;
+    // Leaving the overview while a programmatic zoom is still moving: an item pass now
+    // would render every card at an intermediate scale and then again when the
+    // zoom ends. The zoom's terminal schedule() renders them once instead.
+    if (!overviewActive && zoomingRef.current?.()) return;
     refresh();
   }, [overviewActive, refresh]);
   useLayoutEffect(() => clear, [clear]);

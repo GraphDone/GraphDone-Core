@@ -62,6 +62,9 @@ import { computeGraphFit } from '../lib/graphFit';
 import { graphItemLayout, itemTitleScale, measureGraphText, edgeLabelDimensions, GRAPH_FONT_FAMILY, ITEM_TITLE_SIZE, ITEM_TITLE_LINE, ITEM_HEADER_HEIGHT, EDGE_LABEL_SIZE, ITEM_WIRE_WIDTH } from '../lib/graphSymbolLayout';
 import { placeItemLabels } from '../lib/edgeLabelPlacement';
 import { separateCards } from '../lib/separateCards';
+import { organizeTopology } from '../lib/topologyOrganization';
+import { LocalItemNeighborhood } from './LocalItemNeighborhood';
+import { frameOrganizedNeighborhood } from '../lib/organizationCamera';
 import { DEFAULT_PHYSICS, collisionRadius, linkDistance, linkMaxDistance, linkStrength } from '../lib/physicsConfig';
 import { computeCompactLayout, isHierarchicalLayout, parseLayoutMode, LAYOUT_MODE_STORAGE_KEY, type LayoutMode } from '../lib/layoutAlgorithms';
 import { edgeBorderEndpoints, minEdgeLength, clampToMinNeighbors } from '../lib/edgeGeometry';
@@ -468,7 +471,42 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const [itemLabelCount, setItemLabelCount] = useState(0);
   const [itemRelationshipScope, setItemRelationshipScope] = useState<RelationshipScope | null>(null);
   const itemRelationshipTriggerRef = useRef<HTMLButtonElement>(null);
-  const itemPairTriggerRef = useRef<SVGGElement | null>(null);
+  const itemPairTriggerRef = useRef<HTMLElement | SVGElement | null>(null);
+  const [localItemActive, setLocalItemActive] = useState(false);
+  const [localFocusRequest, setLocalFocusRequest] = useState<{id:string;sequence:number;scope:string|null}>();
+  const localFocusSequenceRef = useRef(0);
+  const requestLocalFocus = useCallback((id:string)=>setLocalFocusRequest({id,sequence:++localFocusSequenceRef.current,scope:activeLayoutScopeRef.current}),[]);
+  const acknowledgeLocalFocus = useCallback((sequence:number)=>setLocalFocusRequest(previous=>previous?.sequence===sequence?undefined:previous),[]);
+  const localItemActiveRef = useRef(false);
+  const handleLocalActive = useCallback((active: boolean) => {localItemActiveRef.current=active;setLocalItemActive(active);},[]);
+  const localItemBoardRef = useRef(false);
+  const handleLocalBoard = useCallback((active: boolean) => { localItemBoardRef.current = active; }, []);
+  const [localItemControls, setLocalItemControls] = useState<React.ReactNode>(null);
+  const [localItemFooter, setLocalItemFooter] = useState<React.ReactNode>(null);
+  const browseLocalRelationships = useCallback((scope: RelationshipScope, trigger: HTMLElement | SVGElement) => {
+    itemPairTriggerRef.current = trigger;
+    setItemRelationshipScope(scope);
+  }, []);
+  const inspectLocalItem = useCallback((id: string) => {
+    const item = simulationRef.current?.nodes().find(node => node.id === id);
+    if (!item) return;
+    const focusId = containerRef.current?.querySelector<HTMLElement>('[data-local-focus]')?.dataset.localFocus;
+    const triggers = Array.from(containerRef.current?.querySelectorAll<HTMLButtonElement>('[data-local-open]') ?? []);
+    (triggers.find(button => button.dataset.localOpen === id) ?? triggers.find(button => button.dataset.localOpen === focusId))?.focus({preventScroll:true});
+    setSelectedNode({ ...item });
+    setSelectedNodes(new Set([id]));
+    setEditingEdge(null);
+  }, []);
+  const navigateLocalItem = useCallback((id: string, saved?: {x:number;y:number;scale:number}) => {
+    const item = simulationRef.current?.nodes().find(node => node.id === id);
+    const svg = svgRef.current, container = containerRef.current, zoom = zoomBehaviorRef.current;
+    if (!item || !svg || !container || !zoom) return;
+    cameraManuallyPositionedRef.current = true;
+    if (currentGraphIdRef.current) fittedGraphsRef.current.add(currentGraphIdRef.current);
+    const k = saved?.scale ?? Math.max(0.65, d3.zoomTransform(svg).k);
+    const transform = d3.zoomIdentity.translate(saved?.x ?? container.clientWidth / 2 - item.x * k, saved?.y ?? container.clientHeight / 2 - item.y * k).scale(k);
+    d3.select(svg).interrupt().transition().duration(450).call(zoom.transform, transform);
+  }, []);
   const closeItemRelationships = useCallback(() => {
     const trigger = itemPairTriggerRef.current;
     itemPairTriggerRef.current = null;
@@ -508,6 +546,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     requestAnimationFrame(() => {
       const active = document.activeElement;
       if (active && active !== document.body) return;
+      const focusId = containerRef.current?.querySelector<HTMLElement>('[data-local-focus]')?.dataset.localFocus;
+      const projected = Array.from(containerRef.current?.querySelectorAll<HTMLButtonElement>('[data-local-open]') ?? []);
+      const localTrigger = projected.find(button => button.dataset.localOpen === returnFocusId) ?? projected.find(button => button.dataset.localOpen === focusId);
+      if (localTrigger) {localTrigger.focus({preventScroll:true});return;}
       focusNodeControl(returnFocusId, '.node-edit-icon');
     });
   }, [focusNodeControl]);
@@ -515,6 +557,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     if (!quickEditRequest) return;
     setInlineEdit(null);
     setExpandedNode(null);
+    quickEditReturnFocusIdRef.current = quickEditRequest.id;
     setQuickEditNode(quickEditRequest);
     onQuickEditRequestHandled?.();
   }, [quickEditRequest, onQuickEditRequestHandled]);
@@ -800,6 +843,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const layoutScope = currentUser && currentGraph ? JSON.stringify([currentUser.id, currentGraph.id]) : null;
   const activeLayoutScopeRef = useRef(layoutScope);
   activeLayoutScopeRef.current = layoutScope;
+  useLayoutEffect(() => setLocalFocusRequest(undefined), [layoutScope]);
   const simulationLayoutScopeRef = useRef<string | null>(null);
   const positionSaveQueueRef = useRef(positionSaveQueue);
   positionSaveQueueRef.current = positionSaveQueue;
@@ -1387,7 +1431,13 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   // A graph owns one simulation. Detached simulations otherwise keep mutating
   // shared node objects after a rebuild and can fight the visible simulation.
   const [semanticOverviewActive, setSemanticOverviewActive] = useState(false);
-  const itemPresentation = useItemPresentation(semanticOverviewActive);
+  // True between a programmatic zoom transition's start and end, so leaving
+  // the overview mid-transition can leave item presentation to the zoom's
+  // single terminal pass. User gestures (wheel, pinch, drag) never set it: a
+  // held pinch must re-render cards as soon as it crosses the threshold.
+  const zoomingRef = useRef(false);
+  const isZooming = useCallback(() => zoomingRef.current, []);
+  const itemPresentation = useItemPresentation(semanticOverviewActive || localItemActive, isZooming);
   const stopActiveSimulation = useCallback(() => {
     itemPresentation.clear();
     simulationRef.current?.on('tick', null).on('end.persist', null).alphaTarget(0).stop();
@@ -1433,7 +1483,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     
     // Create zoom behavior for empty canvas with reversed wheel direction
     const zoom = d3.zoom<SVGSVGElement, unknown>()
-      .filter(event => !(event.target as Element)?.closest('[data-lod-controls]') && (!event.ctrlKey || event.type === 'wheel') && !event.button)
+      .filter(event => !(event.target as Element)?.closest('[data-lod-controls]') && (event.type === 'wheel' || !(event.target as Element)?.closest('[data-local-item-card]')) && (!event.ctrlKey || event.type === 'wheel') && !event.button)
       .scaleExtent([0.1, 3])
       .wheelDelta((event: WheelEvent) => {
         // Standard direction (like maps/most apps): scroll UP (deltaY<0) zooms IN.
@@ -1686,16 +1736,14 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // strips physics keys (fx/fy) to preserve live velocity, so placed nodes
     // arriving via a graph-switch or poll would otherwise come back unpinned
     // and drift. Snapshot-authoritative load must hold here too.
-    if (!layoutReflowingRef.current) {
-      (nodeMerge.nodes as any[]).forEach((node: any) => {
+    (nodeMerge.nodes as any[]).forEach((node: any) => {
         const placed = !(((node.positionX ?? 0) === 0) && ((node.positionY ?? 0) === 0));
         if (placed && !node._dragging) {
           node.fx = node.positionX;
           node.fy = node.positionY;
           node.userPinned = true;
         }
-      });
-    }
+    });
     simulation.nodes(nodeMerge.nodes as any);
     const linkForce = simulation.force('link') as d3.ForceLink<any, any>;
     if (linkForce) {
@@ -1802,7 +1850,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     
     // Create or reuse zoom behavior with reversed wheel direction
     const zoom = d3.zoom<SVGSVGElement, unknown>()
-      .filter(event => !(event.target as Element)?.closest('[data-lod-controls]') && (!event.ctrlKey || event.type === 'wheel') && !event.button)
+      .filter(event => !(event.target as Element)?.closest('[data-lod-controls]') && (event.type === 'wheel' || !(event.target as Element)?.closest('[data-local-item-card]')) && (!event.ctrlKey || event.type === 'wheel') && !event.button)
       .scaleExtent([0.1, 4])
       .wheelDelta((event: WheelEvent) => {
         // Standard direction (like maps/most apps): scroll UP (deltaY<0) zooms IN.
@@ -1940,6 +1988,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // never-placed nodes are seeded near center and left free to flow.
     // (This block used to null every node's fx/fy unconditionally, which is
     //  why arrangements never survived a reload — the real drift bug.)
+    const initialOrganization = nodes.length && nodes.every(node => !(node.positionX || node.positionY))
+      ? organizeTopology(nodes, validatedEdges as any[], node => graphItemLayout(node, measureGraphText), {width, height})
+      : null;
     const spreadCols = Math.max(1, Math.ceil(Math.sqrt(nodes.length)));
     const spreadSpacing = 260; // > collision diameter so the spread has no overlaps
     const spreadHalf = (spreadCols * spreadSpacing) / 2;
@@ -1954,13 +2005,17 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         node.fx = node.positionX;
         node.fy = node.positionY;
       } else {
-        node.userPinned = false;
-        node.fx = null;
-        node.fy = null;
-        // Clean grid spread (not a random pile) so physics refines from a
-        // non-overlapping start.
-        if (!node.x) node.x = (i % spreadCols) * spreadSpacing - spreadHalf + ((i * 13) % 23) - 11;
-        if (!node.y) node.y = Math.floor(i / spreadCols) * spreadSpacing - spreadHalf + ((i * 7) % 19) - 9;
+        const point = initialOrganization?.positions.get(node.id);
+        node.userPinned = Boolean(point);
+        node.fx = point?.x ?? null;
+        node.fy = point?.y ?? null;
+        if (point) {
+          node.x = point.x;
+          node.y = point.y;
+        } else {
+          if (!node.x) node.x = (i % spreadCols) * spreadSpacing - spreadHalf + ((i * 13) % 23) - 11;
+          if (!node.y) node.y = Math.floor(i / spreadCols) * spreadSpacing - spreadHalf + ((i * 7) % 19) - 9;
+        }
       }
     });
 
@@ -1975,16 +2030,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       }
     });
 
-    // Viewport culling - only render visible nodes for performance
-    const margin = 200;
-    const visibleNodes = (currentTransform?.k || 1) < LOD_THRESHOLDS.VERY_FAR ? 
-      nodes.filter((node: WorkItem) => {
-        const nodeX = (node.positionX || 0) * (currentTransform?.k || 1) + (currentTransform?.x || 0);
-        const nodeY = (node.positionY || 0) * (currentTransform?.k || 1) + (currentTransform?.y || 0);
-        return nodeX >= -margin && nodeX <= width + margin && 
-               nodeY >= -margin && nodeY <= height + margin;
-      }) : nodes;
-    
+    const visibleNodes = nodes;
+
     // Simple 2D force simulation
     const simulation = d3.forceSimulation(visibleNodes as any);
     simulationLayoutScopeRef.current = activeLayoutScopeRef.current;
@@ -3745,7 +3792,15 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     const CULL_MIN_SCALE = 0.5;
     let cullCounter = 0;
     let cullActive = false;
-    const edgeDisplay = (d: any) => d._priorityVisible === false || !d._route || (cullActive && d.source?._culled && d.target?._culled) ? 'none' : null;
+    const edgeDisplay = (d: any) => {
+      if (d._priorityVisible === false || !d._route || (cullActive && d.source?._culled && d.target?._culled)) return 'none';
+      if (localItemBoardRef.current) {
+        const camera = d3.zoomTransform(svg.node()!);
+        const visible = (node: any) => node.x * camera.k + camera.x >= 0 && node.x * camera.k + camera.x <= width && node.y * camera.k + camera.y >= 0 && node.y * camera.k + camera.y <= height;
+        if (!visible(d.source) || !visible(d.target)) return 'none';
+      }
+      return null;
+    };
     const applyEdgeDisplays = () => {
       linkElements.style('display', edgeDisplay);
       clickableEdges.style('display', edgeDisplay);
@@ -3938,7 +3993,16 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       updateZoomPresentation(event.transform.k);
     });
 
+    zoom.on('start.local-item', event => {
+      window.dispatchEvent(new CustomEvent('graphdone:camera-start', { detail: { manual: !!event.sourceEvent } }));
+    });
+    zoom.on('end.local-item', event => {
+      window.dispatchEvent(new CustomEvent('graphdone:camera-settled', { detail: { x: event.transform.x, y: event.transform.y, scale: event.transform.k, manual: !!event.sourceEvent } }));
+    });
+    zoomingRef.current = false;
+    zoom.on('start.presentation', event => { zoomingRef.current = !event.sourceEvent; });
     zoom.on('end.labels', () => {
+      zoomingRef.current = false;
       if (simulationRef.current === simulation) itemPresentation.schedule();
     });
 
@@ -4004,6 +4068,24 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         g.attr('data-presentation-scale', d3.zoomTransform(svg.node()!).k);
       },
     });
+    // A first-load organization places every card inside the viewport at the
+    // identity camera. Frame it before the first paint: otherwise the cards are
+    // visible and tappable at scale 1, then the delayed framing loop jumps the
+    // camera under a person's first touch.
+    if (initialOrganization) {
+      const gid = currentGraphIdRef.current;
+      let savedCamera = false;
+      try { savedCamera = !!gid && localStorage.getItem(`graphdone:camera:${gid}`) !== null; } catch { /* storage unavailable */ }
+      if (gid && !fittedGraphsRef.current.has(gid) && !savedCamera) {
+        // Card size depends on the presented scale, so converge on the camera
+        // whose cards it frames instead of letting the framing loop creep there.
+        for (let pass = 0; pass < 6 && fitViewRef.current(false); pass++) {
+          const k = d3.zoomTransform(svg.node()!).k;
+          if (Math.abs(k - itemPresentationScaleRef.current) < 0.0005) break;
+          itemPresentationScaleRef.current = k;
+        }
+      }
+    }
     itemPresentation.refresh();
     setTimeout(() => { if (simulationRef.current === simulation) updateEdgePositions(true); }, 500);
   }, [nodes, validatedEdges, handleNodeClick, initializeEmptyVisualization]); // Include handleNodeClick to get fresh connection state
@@ -4035,6 +4117,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     if (beginSession || overviewReturnCamera.current?.graphId !== currentGraphIdRef.current) {
       overviewReturnCamera.current = { graphId: currentGraphIdRef.current, transform: d3.zoomTransform(svgRef.current) };
     }
+    requestLocalFocus(id);
     // Selection is intentional here; never invoke the Grow/connect click path.
     setSelectedNode(item);
     setSelectedNodes(new Set([id]));
@@ -4044,7 +4127,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     const k = 1.2;
     const transform = d3.zoomIdentity.translate(containerRef.current.clientWidth / 2 - item.x * k, containerRef.current.clientHeight / 2 - item.y * k).scale(k);
     d3.select(svgRef.current).interrupt().call(zoomBehaviorRef.current.transform, transform);
-  }, []);
+  }, [requestLocalFocus]);
   const returnToOverview = useCallback(() => {
     setSelectedNode(null);
     const saved = overviewReturnCamera.current;
@@ -4067,15 +4150,19 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     }
   }, [semanticOverviewActive, currentGraph?.id]);
 
-  // True only while "Reset layout" is re-flowing — suspends snapshot pinning
-  const layoutReflowingRef = useRef(false);
   const mousedownNodeRef = useRef<any>(null);
+  const organizationZoomFloorRef = useRef(0);
+  const organizationFocusRef = useRef<string>();
+  useEffect(() => {
+    organizationZoomFloorRef.current = 0;
+    organizationFocusRef.current = undefined;
+  }, [layoutScope]);
 
   // Fit view to show all nodes. Returns true if a fit transform was applied,
   // false if it couldn't yet (no svg/container, or the simulation has no
   // positioned nodes) — the once-per-graph framing polls on this so a slow data
   // load doesn't leave the graph pinned off-screen (the live-guest bug).
-  const fitViewToNodes = useCallback((animate = true): boolean => {
+  const fitViewToNodes = useCallback((animate = true, minimumScale = organizationZoomFloorRef.current): boolean => {
     if (!svgRef.current || !containerRef.current) return false;
     // Bounds must come from the LIVE simulation objects (the React-state
     // nodes are different objects since the identity merge and may hold
@@ -4095,6 +4182,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     const containerRect = container.getBoundingClientRect();
     const gap = 12;
     const obstacles = Array.from(document.querySelectorAll<HTMLElement>('[data-graph-fit-obstacle="true"]'))
+      // A passive save note lets taps through and disappears on its own; it
+      // must not reframe the camera under a person's first touch.
+      .filter(element => element.dataset.layoutSavePassive !== 'true' && !(minimumScale > 0 && element.dataset.layoutSaveProgress === 'true'))
       .map(element => {
         const rect = element.getBoundingClientRect();
         return {
@@ -4104,15 +4194,38 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           bottom: Math.max(0, Math.min(height, rect.bottom - containerRect.top + gap)),
         };
       });
+    const cards = simNodes.filter((node: any) => typeof node.x === 'number' && typeof node.y === 'number');
     const fit = computeGraphFit({
       width,
       height,
       obstacles,
-      cards: simNodes.filter((node: any) => typeof node.x === 'number' && typeof node.y === 'number'),
+      cards,
       dimensionsAt: getNodeDimensionsAt,
     });
     if (!fit) return false; // No valid positions yet
-    const { scale, translateX, translateY } = fit;
+    let { scale, translateX, translateY } = fit;
+    if (minimumScale > scale) {
+      // A freshly organized graph keeps a readable floor instead of shrinking
+      // every card to fit: stay centred on the same cards at that scale.
+      const centerX = (fit.region.x + fit.region.width / 2 - translateX) / scale;
+      const centerY = (fit.region.y + fit.region.height / 2 - translateY) / scale;
+      scale = minimumScale;
+      translateX = fit.region.x + fit.region.width / 2 - centerX * scale;
+      translateY = fit.region.y + fit.region.height / 2 - centerY * scale;
+    }
+    const focus = organizationFocusRef.current && cards.find(node => node.id === organizationFocusRef.current);
+    if (minimumScale > 0 && focus) {
+      const at = frameOrganizedNeighborhood(
+        cards.map(node => ({ id: node.id, x: node.x, y: node.y, ...getNodeDimensionsAt(node, scale) })),
+        focus.id,
+        { width, height },
+        obstacles.filter(rect => rect.right > rect.left && rect.bottom > rect.top).map(rect => ({ x: rect.left, y: rect.top, width: rect.right - rect.left, height: rect.bottom - rect.top })),
+        scale,
+        { x: width / 2, y: height / 2 }
+      );
+      translateX = at.x - focus.x * scale;
+      translateY = at.y - focus.y * scale;
+    }
     const transform = d3.zoomIdentity.translate(translateX, translateY).scale(scale);
 
     // Use the component's own zoom behavior so handlers fire and state stays
@@ -4257,9 +4370,14 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       });
     };
     window.addEventListener('graphdone:minimap-open', snapshot);
+    window.addEventListener('graphdone:layout-organized', publish);
     const id = setInterval(() => { publish(); if (++n >= 5) clearInterval(id); }, 800);
     publish();
-    return () => { clearInterval(id); window.removeEventListener('graphdone:minimap-open', snapshot); };
+    return () => {
+      clearInterval(id);
+      window.removeEventListener('graphdone:minimap-open', snapshot);
+      window.removeEventListener('graphdone:layout-organized', publish);
+    };
   }, [currentGraph?.id, workItemsData?.workItems?.length]);
 
   // Center on specific node
@@ -4347,36 +4465,40 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   }, []);
 
 
-  // Reset layout = the explicit "re-flow everything" escape hatch. It must
-  // override snapshot-authoritative pinning: clear each node's saved-position
-  // intent (in memory) and unpin, suspend re-pinning while physics rearranges,
-  // then persist the fresh layout once it settles so it becomes the new
-  // authoritative snapshot.
   const resetLayout = useCallback(() => {
-    layoutReflowingRef.current = true;
-    // Unpin + mark unplaced; initializeVisualization will lay the unplaced
-    // nodes out on a CLEAN spread grid (see getUnplacedSpread) so physics
-    // REFINES a non-overlapping start instead of trying to explode a pile.
-    nodes.forEach((node: any) => {
-      node.userPinned = false;
+    const simulation = simulationRef.current, container = containerRef.current;
+    if (!simulation || !container || simulationLayoutScopeRef.current !== activeLayoutScopeRef.current) return;
+    layoutModeRef.current = 'force';
+    try { window.localStorage.setItem(LAYOUT_MODE_STORAGE_KEY, 'force'); } catch (error) { console.warn('Unable to save layout mode', error); }
+    window.dispatchEvent(new CustomEvent('graphdone-layout-mode-change', { detail: 'force' }));
+    const arranged = organizeTopology(simulation.nodes() as WorkItem[], validatedEdges as any[], node => graphItemLayout(node, measureGraphText), {width:container.clientWidth,height:container.clientHeight});
+    for (const node of simulation.nodes() as any[]) {
+      const point = arranged.positions.get(node.id);
+      if (!point) continue;
+      node.x = node.fx = point.x;
+      node.y = node.fy = point.y;
+      node.vx = node.vy = 0;
+      node.userPinned = true;
+      delete node.__layerPinned;
+      delete node.__preLayerFx;
+      delete node.__preLayerFy;
       node.userPreferredPosition = null;
       node.userPreferenceVector = null;
-      node.fx = null;
-      node.fy = null;
-      node.positionX = 0;
-      node.positionY = 0;
-      node.targetX = null;
-      node.targetY = null;
-      node.x = 0;
-      node.y = 0;
-    });
-    initializeVisualization();
-    setTimeout(() => {
+    }
+    (window as any).__graphOrganization = {components:arranged.components,work:arranged.work};
+    organizationZoomFloorRef.current = 0.65;
+    organizationFocusRef.current = arranged.components[0]?.focus;
+    cameraManuallyPositionedRef.current = true;
+    if (currentGraphIdRef.current) fittedGraphsRef.current.add(currentGraphIdRef.current);
+    simulation.alpha(0).restart();
+    window.dispatchEvent(new CustomEvent('graphdone:layout-organized'));
+    persistAllPositions();
+    requestAnimationFrame(() => {
+      if (simulationRef.current !== simulation) return;
+      runLabelAvoidanceRef.current?.();
       fitViewToNodes();
-      persistAllPositions();      // the reflowed layout becomes the new snapshot
-      layoutReflowingRef.current = false;
-    }, 2500);
-  }, [nodes, initializeVisualization, fitViewToNodes, persistAllPositions]);
+    });
+  }, [validatedEdges, fitViewToNodes, persistAllPositions]);
 
   // Hierarchical mode packs actual card sizes into compact dependency rows.
   // Pin both axes so repulsion cannot spread a finished row across the viewport.
@@ -4387,6 +4509,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const applyLayoutMode = useCallback((mode: LayoutMode) => {
     layoutModeRef.current = mode;
     try { window.localStorage?.setItem(LAYOUT_MODE_STORAGE_KEY, mode); } catch { /* storage unavailable */ }
+    window.dispatchEvent(new CustomEvent('graphdone-layout-mode-change', { detail: mode }));
     const sim = simulationRef.current;
     const container = containerRef.current;
     if (!sim || !container) return;
@@ -4480,6 +4603,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           && cameraViewportRef.current.h === containerRef.current?.clientHeight
           && cameraResizeFrameRef.current === null
           && !(svgRef.current as (SVGSVGElement & { __transition?: unknown }) | null)?.__transition,
+        cameraFramed: !!currentGraphIdRef.current && fittedGraphsRef.current.has(currentGraphIdRef.current),
         cameraViewport: cameraViewportRef.current,
         alpha: Math.round(alpha * 10000) / 10000,
         lastSettleMs: lastSettleMsRef.current,
@@ -4618,6 +4742,12 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       const frame = containerRef.current?.getBoundingClientRect();
       const svg = svgRef.current;
       if (!frame || !svg) return false;
+      if (localItemActiveRef.current) {
+        const focusId = containerRef.current?.querySelector<HTMLElement>('[data-local-focus]')?.dataset.localFocus;
+        const focus = simulationRef.current?.nodes().find(node => node.id === focusId);
+        const transform = d3.zoomTransform(svg);
+        return !!focus && focus.x * transform.k + transform.x >= 0 && focus.x * transform.k + transform.x <= frame.width && focus.y * transform.k + transform.y >= 0 && focus.y * transform.k + transform.y <= frame.height;
+      }
       const cards = Array.from(svg.querySelectorAll<SVGGraphicsElement>('.node-bg'))
         .map(node => node.getBoundingClientRect());
       const showsANode = cards.some(card => card.width > 0 && card.height > 0
@@ -4788,7 +4918,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   // every node without touching the camera-restore state. Calls through the ref so
   // the latest fit fn is used regardless of when the button mounts.
   useEffect(() => {
-    (window as any).triggerZoomToFit = () => fitViewRef.current();
+    (window as any).triggerZoomToFit = () => {
+      organizationZoomFloorRef.current = 0;
+      return fitViewRef.current();
+    };
     return () => {
       delete (window as any).triggerZoomToFit;
     };
@@ -4811,7 +4944,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   useEffect(() => {
     if (!hasNodes) return undefined;
     if (!isHierarchicalLayout(layoutModeRef.current)) return undefined;
-    const timer = setTimeout(() => applyLayoutModeRef.current('hierarchical'), 1600);
+    const timer = setTimeout(() => {
+      if (isHierarchicalLayout(layoutModeRef.current)) applyLayoutModeRef.current('hierarchical');
+    }, 1600);
     return () => clearTimeout(timer);
   }, [hasNodes, currentGraphId]);
 
@@ -5197,13 +5332,13 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
 
   return (
-    <div ref={containerRef} className="graph-container relative w-full h-full overflow-hidden select-none" data-overview={semanticOverviewActive || undefined} data-quality={qualityTier} data-dense={isDenseGraph ? 'true' : undefined} data-simplify={isSimplified ? 'true' : undefined} data-dots={isDotMode ? 'true' : undefined}
+    <div ref={containerRef} className="graph-container relative w-full h-full overflow-hidden select-none" data-overview={semanticOverviewActive || localItemActive || undefined} data-local-item-lod={localItemActive || undefined} data-quality={qualityTier} data-dense={isDenseGraph ? 'true' : undefined} data-simplify={isSimplified ? 'true' : undefined} data-dots={isDotMode ? 'true' : undefined}
       data-relationship-priority={relationshipLevel} data-relationship-total={workItemEdges.length}
       data-priority-summarized={priorityProjection.summarized.length} data-priority-represented={priorityProjection.represented.length} data-priority-pending={priorityProjection.pending.length}>
-      {workItems.length < 40 && <div data-graph-fit-obstacle="true" className="absolute left-3 right-16 top-16 md:left-16 md:right-40 md:top-3 z-20 flex flex-wrap gap-3">{priorityControl}</div>}
+      {workItems.length < 40 && <div data-graph-fit-obstacle="true" className="absolute left-3 right-16 top-16 md:left-16 md:right-40 md:top-3 z-20 flex flex-wrap gap-3">{priorityControl}{localItemControls}</div>}
       {!semanticOverviewActive && <GraphStatusDock>
       <LayoutSaveStatus queue={positionSaveQueue} />
-      {workItemEdges.length > 0 && <button
+      {localItemActive ? localItemFooter : workItemEdges.length > 0 && <button
         ref={itemRelationshipTriggerRef}
         data-graph-fit-obstacle="true"
         className="max-w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 shadow-lg"
@@ -5216,7 +5351,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         scope={itemRelationshipScope}
         contextFor={id => itemRelationshipIndex.hierarchy.paths.get(id)?.map(key => itemRelationshipIndex.hierarchy.groups.get(key)?.label).filter(Boolean).join(' / ') || 'Ungrouped'}
         onScope={setItemRelationshipScope}
-        onInspect={id => { setItemRelationshipScope(null); inspectOverviewItem(id, true); }}
+        onInspect={id => { setItemRelationshipScope(null); if (localItemActive) inspectLocalItem(id); else inspectOverviewItem(id, true); }}
         onBack={closeItemRelationships}
         backLabel="Back to graph"
         visible={true}
@@ -5242,11 +5377,13 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       >
         <foreignObject className="semantic-overview-host" width="100%" height="100%" style={{ pointerEvents: 'none' }}>
       {currentGraph && workItems.length >= 40 && <SemanticGraphOverview
-        key={currentGraph.id}
+        key={layoutScope ?? currentGraph.id}
+        viewScope={layoutScope}
         items={workItems}
         edges={workItemEdges}
         relationshipPriority={priorityProjection}
         relationshipControl={priorityControl}
+        itemDetailControl={localItemControls}
         camera={currentTransform}
         readPositions={readOverviewPositions}
         onActiveChange={handleOverviewActive}
@@ -5255,6 +5392,26 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         onBrowse={closeOverviewInspector}
         onInspect={inspectOverviewItem}
         onBack={returnToOverview}
+      />}
+      {currentGraph && <LocalItemNeighborhood
+        key={`local-${layoutScope ?? currentGraph.id}`}
+        graphId={currentGraph.id}
+        viewScope={layoutScope}
+        index={itemRelationshipIndex}
+        representedIds={priorityProjection.representedIds}
+        camera={currentTransform}
+        selectedId={Array.from(selectedNodes).slice(-1)[0]}
+        navigationRequest={localFocusRequest?.scope===layoutScope?localFocusRequest:undefined}
+        onNavigationHandled={acknowledgeLocalFocus}
+        enabled={!semanticOverviewActive}
+        readPositions={readOverviewPositions}
+        onActive={handleLocalActive}
+        onControls={setLocalItemControls}
+        onFooter={setLocalItemFooter}
+        onInspect={inspectLocalItem}
+        onNavigate={navigateLocalItem}
+        onBoard={handleLocalBoard}
+        onBrowse={browseLocalRelationships}
       />}
         </foreignObject>
       </svg>
@@ -5392,8 +5549,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         const dataNode = (nodes as any[]).find((n: any) => n.id === quickEditNode.id) || quickEditNode;
         const gx = simNode?.x ?? dataNode.x ?? 0;
         const gy = simNode?.y ?? dataNode.y ?? 0;
-        const left = gx * currentTransform.scale + currentTransform.x;
-        const top = gy * currentTransform.scale + currentTransform.y;
+        const projected = localItemActive ? Array.from(containerRef.current?.querySelectorAll<HTMLElement>('[data-original-item]') ?? []).find(element => element.dataset.originalItem === quickEditNode.id)?.getBoundingClientRect() : undefined;
+        const frame = containerRef.current?.getBoundingClientRect();
+        const left = projected ? projected.left + projected.width / 2 - (frame?.left ?? 0) : gx * currentTransform.scale + currentTransform.x;
+        const top = projected ? projected.top + projected.height / 2 - (frame?.top ?? 0) : gy * currentTransform.scale + currentTransform.y;
         const onCommit = (c: QuickEditCommit) => {
           updateWorkItemMutation({ variables: { where: { id: quickEditNode.id }, update: c.update } })
             .then(() => {

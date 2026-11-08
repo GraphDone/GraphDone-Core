@@ -22,7 +22,7 @@ export async function measureGraphZoom({
     b.right <= a.right + 0.5 &&
     b.top >= a.top - 0.5 &&
     b.bottom <= a.bottom + 0.5;
-  const visible = (element: Element) => {
+  const visible = (element: Element, stroked = false) => {
     for (
       let current: Element | null = element;
       current;
@@ -38,8 +38,9 @@ export async function measureGraphZoom({
     }
     const box = element.getBoundingClientRect();
     return (
-      box.width > 0 &&
-      box.height > 0 &&
+      (stroked
+        ? box.width > 0 || box.height > 0
+        : box.width > 0 && box.height > 0) &&
       box.right > viewport.left &&
       box.left < viewport.right &&
       box.bottom > viewport.top &&
@@ -57,11 +58,14 @@ export async function measureGraphZoom({
     );
   };
   const ready = () => {
+    const local = host.querySelector(
+      '.local-item-neighborhood[data-active="true"]'
+    );
     if (
       Math.abs(svg.__zoom.k - scale) >= 0.00001 ||
       group.getAttribute('data-presentation-scale') !== String(scale) ||
       (overview?.getAttribute('data-active') === 'true') !== scale < 1 ||
-      (host.getAttribute('data-overview') === 'true') !== scale < 1
+      (host.getAttribute('data-overview') === 'true') !== (scale < 1 || !!local)
     )
       return false;
     if (scale < 1) {
@@ -73,6 +77,37 @@ export async function measureGraphZoom({
         summaries.every(
           card =>
             visible(card) && contains(viewport, card.getBoundingClientRect())
+        )
+      );
+    }
+    if (local) {
+      const cards = Array.from(
+        local.querySelectorAll('[data-local-item-card]')
+      );
+      const originals = local.querySelectorAll('[data-original-item]');
+      const wires = Array.from(local.querySelectorAll('[data-lod-bundle]'));
+      return (
+        originals.length >= 2 &&
+        cards.length <= 7 &&
+        cards.every(card => {
+          const title = card.querySelector('[data-local-open]')!;
+          return (
+            visible(card) &&
+            contains(viewport, card.getBoundingClientRect()) &&
+            parseFloat(getComputedStyle(title).fontSize) >= 18 &&
+            Number(getComputedStyle(title).fontWeight) >= 600 &&
+            contains(
+              card.getBoundingClientRect(),
+              title.getBoundingClientRect()
+            )
+          );
+        }) &&
+        wires.length > 0 &&
+        wires.every(
+          wire =>
+            visible(wire, true) &&
+            getComputedStyle(wire).stroke !== 'none' &&
+            Number(getComputedStyle(wire).strokeOpacity) > 0
         )
       );
     }

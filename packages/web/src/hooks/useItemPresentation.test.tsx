@@ -136,3 +136,26 @@ it('refreshes cards and current relationships before paint on automatic exit and
   expect(drawn.length).toBe(hiddenAgain + 1);
   expect(container.querySelector('svg > path')?.getAttribute('d')).toBe('M0,0 L120,2');
 });
+
+it('leaves the overview mid-zoom with one terminal item pass instead of two', () => {
+  let zooming = false;
+  const { result, rerender } = renderHook(({ active }) => useItemPresentation(active, () => zooming), { initialProps: { active: true } });
+  const draw = renderer();
+  result.current.bind(draw);
+  result.current.refresh();
+  expect(draw.presentOverview).toHaveBeenCalledTimes(1);
+  // The overview hands off while the zoom transition is still running.
+  zooming = true;
+  rerender({ active: false });
+  expect(draw.renderItems).not.toHaveBeenCalled();
+  // The zoom's end schedules the only item pass, resuming from the overview.
+  zooming = false;
+  result.current.schedule();
+  flushFrames();
+  expect(draw.renderItems).toHaveBeenCalledTimes(1);
+  expect(draw.renderItems).toHaveBeenLastCalledWith(true);
+  // Without a zoom in flight the hand-off still renders immediately.
+  rerender({ active: true });
+  rerender({ active: false });
+  expect(draw.renderItems).toHaveBeenCalledTimes(2);
+});

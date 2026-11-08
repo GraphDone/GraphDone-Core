@@ -470,3 +470,63 @@ describe('readable overview', () => {
     }
   );
 });
+
+it('shifts phone rows below measured controls instead of wasting a viable third readable slot', () => {
+  const obstacles = [
+    { left: 12, right: 246, top: 12, bottom: 214 },
+    { left: 64, right: 298, top: 671, bottom: 729 },
+    { left: 284, right: 378, top: 12, bottom: 56 },
+    { left: 334, right: 378, top: 64, bottom: 108 },
+    { left: 334, right: 378, top: 112, bottom: 156 },
+  ];
+  const anchors = Array.from({ length: 8 }, (_, i) => ({
+    id: String(i),
+    x: 195,
+    y: 400,
+  }));
+  const layout = placeOverviewLabels(anchors, 390, 741, obstacles);
+  expect(layout.placed).toHaveLength(3);
+  expect(overviewLabelCapacity(390, 741, obstacles)).toBe(3);
+  expect(layout.hidden).toHaveLength(5);
+  for (const card of layout.placed) {
+    expect(card.width).toBe(240);
+    expect(card.height).toBe(96);
+    for (const other of layout.placed.filter(other => other.id !== card.id))
+      expect(Math.abs(card.y - other.y) - 96).toBeGreaterThanOrEqual(64);
+    for (const obstacle of obstacles) {
+      const dx = Math.max(
+        0,
+        obstacle.left - card.x - card.width,
+        card.x - obstacle.right
+      );
+      const dy = Math.max(
+        0,
+        obstacle.top - card.y - card.height,
+        card.y - obstacle.bottom
+      );
+      expect(Math.hypot(dx, dy)).toBeGreaterThanOrEqual(20);
+    }
+  }
+});
+
+it('keeps the regular desktop grid when it already holds every overview card', () => {
+  // Hosted 1440px geometry: the control bar blocks the first row and the
+  // MiniMap one bottom slot. A phase shift would gain unused slots but spread
+  // eight groups over four rows and halve the clear routing lanes.
+  const obstacles = [
+    { left: 64, right: 1216, top: 12, bottom: 68 },
+    { left: 64, right: 308, top: 680, bottom: 738 },
+    { left: 12, right: 56, top: 12, bottom: 56 },
+    { left: 12, right: 56, top: 112, bottom: 156 },
+    { left: 12, right: 52, top: 64, bottom: 104 },
+    { left: 1104, right: 1360, top: 542, bottom: 734 },
+  ];
+  const anchors = Array.from({ length: 8 }, (_, i) => ({ id: String(i), x: 688, y: 375 }));
+  const layout = placeOverviewLabels(anchors, 1376, 750, obstacles);
+  expect(layout.placed).toHaveLength(8);
+  expect(layout.hidden).toHaveLength(0);
+  for (const card of layout.placed) expect((card.y - 64) % 160).toBe(0);
+  expect(new Set(layout.placed.map(card => card.y)).size).toBe(3);
+  // Capacity still reports the best phase for deciding how many fit.
+  expect(overviewLabelCapacity(1376, 750, obstacles)).toBeGreaterThanOrEqual(11);
+});

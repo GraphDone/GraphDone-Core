@@ -174,23 +174,84 @@ export function schematicJunctions(segments: readonly SchematicSegment[]) {
   return junctions;
 }
 
-function ports(card: SchematicCard) {
+export function segmentSeparation(a: SchematicSegment, b: SchematicSegment) {
+  const dx = Math.max(
+    0,
+    Math.max(Math.min(a.a.x, a.b.x), Math.min(b.a.x, b.b.x)) -
+      Math.min(Math.max(a.a.x, a.b.x), Math.max(b.a.x, b.b.x))
+  );
+  const dy = Math.max(
+    0,
+    Math.max(Math.min(a.a.y, a.b.y), Math.min(b.a.y, b.b.y)) -
+      Math.min(Math.max(a.a.y, a.b.y), Math.max(b.a.y, b.b.y))
+  );
+  return Math.hypot(dx, dy);
+}
+
+export function measureSchematicClearance(
+  cards: readonly SchematicCard[],
+  routes: readonly SchematicRoute[]
+) {
+  let cardClearance = Infinity,
+    wireClearance = Infinity;
+  const segments = routes.flatMap(route =>
+    schematicSegments(route.points, route.bus)
+  );
+  for (const route of routes) {
+    const owned = schematicSegments(route.points, route.bus);
+    owned.forEach((segment, index) => {
+      for (const card of cards) {
+        if (
+          (index === 0 && card.id === route.source) ||
+          (index === owned.length - 1 && card.id === route.target)
+        )
+          continue;
+        const dx = Math.max(
+          0,
+          Math.max(Math.min(segment.a.x, segment.b.x), card.x) -
+            Math.min(Math.max(segment.a.x, segment.b.x), card.x + card.width)
+        );
+        const dy = Math.max(
+          0,
+          Math.max(Math.min(segment.a.y, segment.b.y), card.y) -
+            Math.min(Math.max(segment.a.y, segment.b.y), card.y + card.height)
+        );
+        cardClearance = Math.min(cardClearance, Math.hypot(dx, dy));
+      }
+    });
+  }
+  for (let i = 0; i < segments.length; i++)
+    for (let j = 0; j < i; j++)
+      if (segments[i].bus !== segments[j].bus)
+        wireClearance = Math.min(
+          wireClearance,
+          segmentSeparation(segments[i], segments[j])
+        );
+  return {
+    minCardClearance: Number.isFinite(cardClearance) ? cardClearance : null,
+    minUnrelatedWireClearance: Number.isFinite(wireClearance)
+      ? wireClearance
+      : null,
+  };
+}
+
+function ports(card: SchematicCard, clearance: number) {
   return [
     [
       { x: card.x + card.width, y: card.y + card.height / 2 },
-      { x: card.x + card.width + 8, y: card.y + card.height / 2 },
+      { x: card.x + card.width + clearance, y: card.y + card.height / 2 },
     ],
     [
       { x: card.x, y: card.y + card.height / 2 },
-      { x: card.x - 8, y: card.y + card.height / 2 },
+      { x: card.x - clearance, y: card.y + card.height / 2 },
     ],
     [
       { x: card.x + card.width / 2, y: card.y },
-      { x: card.x + card.width / 2, y: card.y - 8 },
+      { x: card.x + card.width / 2, y: card.y - clearance },
     ],
     [
       { x: card.x + card.width / 2, y: card.y + card.height },
-      { x: card.x + card.width / 2, y: card.y + card.height + 8 },
+      { x: card.x + card.width / 2, y: card.y + card.height + clearance },
     ],
   ];
 }
@@ -217,8 +278,14 @@ export function routeSchematicConnections(
     maxAttempts?: number;
     maxExpandedStates?: number;
     sharedEndpoint?: 'source' | 'target';
+    cardClearance?: number;
+    wireClearance?: number;
   } = {}
 ) {
+  const cardClearance = Math.max(8, Math.min(32, budget.cardClearance ?? 8));
+  const padding = budget.cardClearance === undefined ? 5 : cardClearance;
+  const wireClearance = Math.max(0, Math.min(24, budget.wireClearance ?? 0));
+  const lane = cardClearance + Math.max(6, wireClearance + 8);
   const byId = new Map(cards.map(card => [card.id, card]));
   const grouped = new Map<string, SchematicConnection[]>();
   for (const connection of [...connections].sort((a, b) =>
@@ -235,10 +302,16 @@ export function routeSchematicConnections(
     target: entries[0].target,
     connections: entries,
     edgeIds: entries.flatMap(entry => entry.edgeIds),
-    priority: entries.reduce((best, entry) => Math.min(best, entry.priority ?? 0), Infinity),
+    priority: entries.reduce(
+      (best, entry) => Math.min(best, entry.priority ?? 0),
+      Infinity
+    ),
   }));
   buses.sort(
-    (a, b) => a.priority - b.priority || b.edgeIds.length - a.edgeIds.length || a.id.localeCompare(b.id)
+    (a, b) =>
+      a.priority - b.priority ||
+      b.edgeIds.length - a.edgeIds.length ||
+      a.id.localeCompare(b.id)
   );
   const blocks = [...cards, ...obstacles];
   const xs = [
@@ -246,11 +319,11 @@ export function routeSchematicConnections(
       8,
       width - 8,
       ...blocks.flatMap(card => [
-        card.x - 8,
-        card.x - 14,
+        card.x - cardClearance,
+        card.x - lane,
         card.x + card.width / 2,
-        card.x + card.width + 8,
-        card.x + card.width + 14,
+        card.x + card.width + cardClearance,
+        card.x + card.width + lane,
       ]),
     ]),
   ]
@@ -261,11 +334,11 @@ export function routeSchematicConnections(
       8,
       height - 8,
       ...blocks.flatMap(card => [
-        card.y - 8,
-        card.y - 14,
+        card.y - cardClearance,
+        card.y - lane,
         card.y + card.height / 2,
-        card.y + card.height + 8,
-        card.y + card.height + 14,
+        card.y + card.height + cardClearance,
+        card.y + card.height + lane,
       ]),
     ]),
   ]
@@ -274,10 +347,10 @@ export function routeSchematicConnections(
   const valid = (p: SchematicPoint) =>
     !blocks.some(
       card =>
-        p.x > card.x - 5 &&
-        p.x < card.x + card.width + 5 &&
-        p.y > card.y - 5 &&
-        p.y < card.y + card.height + 5
+        p.x > card.x - padding &&
+        p.x < card.x + card.width + padding &&
+        p.y > card.y - padding &&
+        p.y < card.y + card.height + padding
     );
   const occupied: SchematicSegment[] = [];
   const routes: SchematicRoute[] = [];
@@ -315,10 +388,13 @@ export function routeSchematicConnections(
     work.attempts++;
     const conflicts = (segment: SchematicSegment) =>
       occupied.some(
-        other => other.bus !== bus.bus && segmentContact(segment, other)
+        other =>
+          other.bus !== bus.bus &&
+          (segmentContact(segment, other) ||
+            segmentSeparation(segment, other) < wireClearance)
       );
     const availablePorts = (card: SchematicCard) =>
-      ports(card).filter(
+      ports(card, cardClearance).filter(
         ([inner, outer]) =>
           xs.includes(outer.x) &&
           ys.includes(outer.y) &&
@@ -327,7 +403,11 @@ export function routeSchematicConnections(
           !blocks.some(
             other =>
               other.id !== card.id &&
-              segmentHitsCard({ a: inner, b: outer, bus: bus.bus }, other, 5)
+              segmentHitsCard(
+                { a: inner, b: outer, bus: bus.bus },
+                other,
+                padding
+              )
           )
       );
     const starts = availablePorts(source),
@@ -380,7 +460,7 @@ export function routeSchematicConnections(
         const segment = { a: p, b: next, bus: bus.bus };
         if (
           !valid(next) ||
-          blocks.some(card => segmentHitsCard(segment, card, 5)) ||
+          blocks.some(card => segmentHitsCard(segment, card, padding)) ||
           conflicts(segment)
         )
           continue;
