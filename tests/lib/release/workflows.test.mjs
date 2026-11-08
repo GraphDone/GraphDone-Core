@@ -115,7 +115,7 @@ test('release writes happen only after the source gate, from the verified commit
 });
 
 const ci = workflow('ci');
-const required = ['quality', 'unit-tests', 'mcp-contract', 'build', 'security-scan', 'smoke-gate', 'runtime-images'];
+const required = ['quality', 'unit-tests', 'mcp-contract', 'build', 'security-scan', 'smoke-gate', 'device-fit', 'runtime-images'];
 function aggregate(results, selected) {
   const step = ci.jobs['ci-success'].steps.find(item => item.name === 'Verify required jobs passed');
   const script = step.run.replace(/\$\{\{ needs\.([\w-]+)\.result \}\}/g, (_, name) => results[name] ?? '');
@@ -127,6 +127,15 @@ test('aggregate waits for the production job and selects it on main PRs', () => 
   assert.match(ci.jobs['prod-smoke'].if, /github\.base_ref == 'main'/);
   assert.match(ci.jobs['ci-success'].steps[0].env.PROD_REQUIRED, /github\.base_ref == 'main'/);
   assert.ok(ci.jobs['prod-smoke'].steps.some(step => step.run?.includes('node scripts/test-production-stack.mjs')));
+});
+
+test('every required job, including the UI fit matrix, can fail CI on its own', () => {
+  for (const name of required) {
+    const results = Object.fromEntries(required.map(job => [job, 'success']));
+    results['prod-smoke'] = 'skipped';
+    results[name] = 'failure';
+    assert.equal(aggregate(results, false).status, 1, `${name} failure must fail CI Success`);
+  }
 });
 
 for (const selected of [true, false]) {

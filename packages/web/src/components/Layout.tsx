@@ -4,7 +4,7 @@ import { OfflineStatus } from './OfflineStatus';
 import React from 'react';
 import { HostedUsage } from './HostedUsage';
 import { Link, useLocation } from 'react-router-dom';
-import { Brain, Bot, BarChart3, Settings, Server, Globe, Shield, Users, Terminal } from 'lucide-react';
+import { Brain, Bot, BarChart3, Settings, Server, Globe, Shield, Users, Terminal, Plus } from 'lucide-react';
 import { UserSelector } from './UserSelector';
 import { GraphSelector } from './GraphSelector';
 import { useAuth } from '../contexts/AuthContext';
@@ -64,7 +64,7 @@ export function Layout({ children }: LayoutProps) {
             <div className="flex-1 min-w-0">
               <GraphSelector testId="graph-selector-mobile" />
             </div>
-            <button aria-label="New work item" onClick={()=>window.dispatchEvent(new Event('graphdone-create-task'))} className="min-h-[44px] min-w-[44px] ml-2 rounded-lg bg-violet-700 text-white text-xl">+</button>
+            <button aria-label="New work item" onClick={()=>window.dispatchEvent(new Event('graphdone-create-task'))} className="min-h-[44px] min-w-[44px] ml-2 flex items-center justify-center rounded-lg bg-violet-700 text-white"><Plus className="h-6 w-6" aria-hidden="true" /></button>
           </div>
         </div>
       )}

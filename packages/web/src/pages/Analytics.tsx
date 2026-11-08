@@ -47,7 +47,7 @@ export function Analytics() {
 
   return (
     <div
-      className="h-full min-h-0 flex flex-col text-gray-100"
+      className="h-full min-h-0 flex flex-col text-gray-100 short:overflow-y-auto"
       data-testid="live-analytics"
     >
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-700/40 p-4 sm:px-6">
@@ -92,7 +92,7 @@ export function Analytics() {
           </button>
         ))}
       </nav>
-      <section aria-label="Analytics results" className="flex-1 min-h-0 overflow-auto p-4 sm:p-6 space-y-4">
+      <section aria-label="Analytics results" className="flex-1 min-h-0 overflow-auto p-4 sm:p-6 space-y-4 short:flex-none short:overflow-visible">
         {!currentGraph ? (
           <p>Select a graph to explore its progress.</p>
         ) : error ? (

@@ -419,6 +419,7 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
           <div className="flex items-center justify-between p-4 border-b border-gray-700">
             <button
               onClick={() => navigateMonth('prev')}
+              aria-label={`Previous ${viewMode === 'week' ? 'week' : 'month'}`}
               className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
             >
               <ChevronLeft className="h-5 w-5" />
@@ -430,6 +431,7 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
 
             <button
               onClick={() => navigateMonth('next')}
+              aria-label={`Next ${viewMode === 'week' ? 'week' : 'month'}`}
               className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
             >
               <ChevronRight className="h-5 w-5" />
@@ -528,7 +530,17 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
                 return (
                   <div
                     key={index}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={isSelected}
+                    aria-label={`${day.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}${taskCount ? `, ${taskCount} task${taskCount === 1 ? '' : 's'}` : ''}`}
                     onClick={() => handleDateClick(day)}
+                    onKeyDown={(event) => {
+                      if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
+                        event.preventDefault();
+                        handleDateClick(day);
+                      }
+                    }}
                     className={`
                       min-h-[120px] p-3 border-2 rounded-lg transition-all duration-200 cursor-pointer
                       ${isCurrentMonthDay ? 'bg-gray-700/50 backdrop-blur-sm' : 'bg-gray-800/30 backdrop-blur-sm'}

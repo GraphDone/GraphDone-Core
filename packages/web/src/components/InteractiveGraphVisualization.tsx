@@ -59,6 +59,7 @@ import type { ObstacleBox } from '../lib/edgeLabelLayout';
 import { createParallelEdgeRoute, edgeRouteLabel, edgeRouteArrowBounds, edgeSegmentHitsBox, projectEdgeRoutePointer, type EdgeRouteGeometry, type EdgeRouteLabel } from '../lib/edgeRouteGeometry';
 import { PerfMeter, DriftMeter } from '../lib/perfMeter';
 import { computeGraphFit } from '../lib/graphFit';
+import { appendNodeControlGlyph, nodeControlGlyphTransform } from '../lib/nodeControlIcons';
 import { graphItemLayout, itemTitleScale, measureGraphText, edgeLabelDimensions, GRAPH_FONT_FAMILY, ITEM_TITLE_SIZE, ITEM_TITLE_LINE, ITEM_HEADER_HEIGHT, EDGE_LABEL_SIZE, ITEM_WIRE_WIDTH } from '../lib/graphSymbolLayout';
 import { placeItemLabels } from '../lib/edgeLabelPlacement';
 import { separateCards } from '../lib/separateCards';
@@ -513,7 +514,12 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     setItemRelationshipScope(null);
     requestAnimationFrame(() => {
       if (document.activeElement && document.activeElement !== document.body) return;
-      if (trigger?.isConnected) trigger.focus({preventScroll:true});
+      // Return to whatever opened the list. A connection label counts only
+      // while it still opens that pair's list (with nothing summarized it
+      // becomes the connection's edit button); otherwise focus goes to
+      // "Browse all relationships".
+      const staleLabel = trigger?.classList.contains('edge-label-group') && trigger.dataset.pairBrowser !== 'true';
+      if (trigger?.isConnected && !staleLabel) trigger.focus({preventScroll:true});
       if (document.activeElement !== trigger) itemRelationshipTriggerRef.current?.focus({preventScroll:true});
     });
   }, []);
@@ -2157,14 +2163,20 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
     // Debug: Log edge visibility
 
-    const openEdgeEditor = (event: MouseEvent, edge: WorkItemEdge) => {
+    const openEdgeEditor = (event: MouseEvent | KeyboardEvent, edge: WorkItemEdge) => {
       event.stopPropagation();
       event.preventDefault();
+      // A keyboard opens the editor beside the focused label.
+      const box = event instanceof MouseEvent ? null : (event.currentTarget as Element | null)?.getBoundingClientRect();
+      const position = box ? { x: box.left + box.width / 2, y: box.top + box.height / 2 } : { x: (event as MouseEvent).clientX, y: (event as MouseEvent).clientY };
       setSelectedEdge(edge);
       setShowRelationshipWindow(true);
-      setEditingEdge({ edge, position: { x: event.clientX, y: event.clientY } });
+      setEditingEdge({ edge, position });
       setDragOffset({ x: 0, y: 0 });
     };
+    const edgeEndTitle = (end: unknown) => (typeof end === 'object' && end ? (end as { title?: string }).title : undefined) ?? 'an item';
+    const editEdgeLabel = (edge: WorkItemEdge) =>
+      `Edit connection: ${edgeEndTitle(edge.source)} ${getRelationshipConfig(edge.type as RelationshipType).label.toLowerCase()} ${edgeEndTitle(edge.target)}`;
     const openPriorityPair = (event: MouseEvent | KeyboardEvent, edge: WorkItemEdge) => {
       const pair = relationshipPriorityRef.current.byEdge.get(edge.id);
       if (!pair || pair.primary.id !== edge.id || !pair.summarized.length) return false;
@@ -2701,18 +2713,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .attr('stroke', 'rgba(255, 255, 255, 0.8)')
       .attr('stroke-width', 1);
     
-    // Simple gear using text (emoji) - proper size
-    editIcons.append('text')
-      .attr('class', 'edit-gear')
-      .attr('x', 0)
-      .attr('y', 0)
-      .attr('text-anchor', 'middle')
-      .attr('dominant-baseline', 'central')
-      .style('font-size', `${iconSize * 1.1}px`)
-      .style('fill', '#ffffff')
-      .style('pointer-events', 'none')
-      .text('⚙');
-    
+    // Vector icons, centred exactly on every device (see lib/nodeControlIcons).
+    appendNodeControlGlyph(editIcons, 'settings', iconSize, 'edit-gear');
+
     // Hover effects for the entire edit icon group
     editIcons
       .on('mouseenter', function() {
@@ -2731,10 +2734,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           .attr('stroke', '#3b82f6')
           .attr('stroke-width', 2);
         
-        // Scale up text slightly
+        // Enlarge the icon slightly around its centre
         icon.select('.edit-gear')
           .transition().duration(200)
-          .style('font-size', `${iconSize * 1.3}px`);
+          .attr('transform', nodeControlGlyphTransform(iconSize, 1.18));
       })
       .on('mouseleave', function() {
         const icon = d3.select(this);
@@ -2745,10 +2748,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           .attr('stroke', 'rgba(255, 255, 255, 0.8)')
           .attr('stroke-width', 1);
         
-        // Scale text back to normal
+        // Icon back to normal size
         icon.select('.edit-gear')
           .transition().duration(200)
-          .style('font-size', `${iconSize * 1.1}px`);
+          .attr('transform', nodeControlGlyphTransform(iconSize));
       });
     
     const openQuickEdit = (event: MouseEvent | KeyboardEvent, d: WorkItem) => {
@@ -2785,6 +2788,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // Relationship creation icon in title bar (centered vertically, right side) - mirrors edit icon
     const relationshipIcons = nodeElements.append('g')
       .attr('class', 'node-relationship-icon')
+      .attr('role', 'button')
+      .attr('tabindex', 0)
+      .attr('aria-label', (d: WorkItem) => `Add a connection from ${d.title}`)
+      .attr('data-node-id', (d: WorkItem) => d.id)
       .attr('transform', (d: WorkItem) => {
         const x = getNodeDimensions(d).width / 2 - iconSize / 2 - 12; // Right side, mirrored from edit icon
         const y = -getNodeDimensions(d).height / 2 + 2 + titleBarHeight / 2;
@@ -2807,19 +2814,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .attr('stroke', 'rgba(255, 255, 255, 0.8)')
       .attr('stroke-width', 1);
     
-    // Plus sign using text - matching the gear styling
-    relationshipIcons.append('text')
-      .attr('class', 'relationship-plus')
-      .attr('x', 0)
-      .attr('y', 0)
-      .attr('text-anchor', 'middle')
-      .attr('dominant-baseline', 'central')
-      .style('font-size', `${iconSize * 1.2}px`) // Slightly bigger than gear for visual balance
-      .style('font-weight', 'bold')
-      .style('fill', '#ffffff')
-      .style('pointer-events', 'none')
-      .text('+');
-    
+    appendNodeControlGlyph(relationshipIcons, 'plus', iconSize, 'relationship-plus');
+
     // Hover effects for relationship icon - mirroring edit icon
     relationshipIcons
       .on('mouseenter', function() {
@@ -2835,10 +2831,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           .attr('fill', 'rgba(34, 197, 94, 0.9)') // Green color for relationship creation
           .attr('stroke', 'rgba(255, 255, 255, 1.0)');
         
-        // Scale up text slightly
+        // Enlarge the icon with its background
         icon.select('.relationship-plus')
           .transition().duration(200)
-          .style('font-size', `${iconSize * 1.4}px`);
+          .attr('transform', nodeControlGlyphTransform(iconSize, 1.2));
       })
       .on('mouseleave', function() {
         const icon = d3.select(this);
@@ -2853,27 +2849,43 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           .attr('fill', 'rgba(0, 0, 0, 0.7)')
           .attr('stroke', 'rgba(255, 255, 255, 0.8)');
         
-        // Scale text back to normal
+        // Icon back to normal size
         icon.select('.relationship-plus')
           .transition().duration(200)
-          .style('font-size', `${iconSize * 1.2}px`);
+          .attr('transform', nodeControlGlyphTransform(iconSize));
       });
 
-    // Relationship icon click handler - just opens relationship window
-    relationshipIcons.on('click', (event: MouseEvent, d: WorkItem) => {
+    // "+" means GROW: enter grow mode wired to this node. Click empty
+    // space → new connected item right there; click another node →
+    // connect to it; Esc / right-click / clicking this node → cancel.
+    // No modals, no instructions-as-UI (interaction-model W3).
+    const startGrow = (event: MouseEvent | KeyboardEvent, d: WorkItem) => {
       event.stopPropagation();
       event.preventDefault();
-
-      // "+" means GROW: enter grow mode wired to this node. Click empty
-      // space → new connected item right there; click another node →
-      // connect to it; Esc / right-click / clicking this node → cancel.
-      // No modals, no instructions-as-UI (interaction-model W3).
       setNodeMenu({ node: null, position: { x: 0, y: 0 }, visible: false });
       setEditingEdge(null);
       setShowRelationshipWindow(false);
       setConnectionSource(d.id);
       setIsConnecting(true);
-    });
+    };
+    // Like the gear and expand controls, "+" is a real keyboard action.
+    relationshipIcons
+      .on('click', startGrow)
+      .on('keydown', (event: KeyboardEvent, d: WorkItem) => {
+        if (event.key === 'Enter' || event.key === ' ') startGrow(event, d);
+      })
+      .on('focus', function() {
+        d3.select(this).select('.relationship-bg')
+          .attr('fill', 'rgba(34, 197, 94, 0.95)')
+          .attr('stroke', '#fbbf24')
+          .attr('stroke-width', 3);
+      })
+      .on('blur', function() {
+        d3.select(this).select('.relationship-bg')
+          .attr('fill', 'rgba(0, 0, 0, 0.7)')
+          .attr('stroke', 'rgba(255, 255, 255, 0.8)')
+          .attr('stroke-width', 1);
+      });
 
     // Expand-in-place icon (title bar, inboard of the + icon): opens a readable
     // peek panel anchored to the node (Card/Contents/Diagram at full size) so you
@@ -2905,17 +2917,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .attr('fill', 'rgba(0, 0, 0, 0.7)')
       .attr('stroke', 'rgba(255, 255, 255, 0.8)')
       .attr('stroke-width', 1);
-    expandIcons.append('text')
-      .attr('class', 'expand-glyph')
-      .attr('x', 0)
-      .attr('y', 0)
-      .attr('text-anchor', 'middle')
-      .attr('dominant-baseline', 'central')
-      .style('font-size', `${iconSize * 0.95}px`)
-      .style('font-weight', 'bold')
-      .style('fill', '#ffffff')
-      .style('pointer-events', 'none')
-      .text('⛶');
+    appendNodeControlGlyph(expandIcons, 'maximize', iconSize, 'expand-glyph');
     const toggleExpanded = (event: MouseEvent | KeyboardEvent, d: WorkItem) => {
       event.stopPropagation();
       event.preventDefault();
@@ -2959,6 +2961,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
     const descendIcon = sheetNodes.append('g')
       .attr('class', 'node-descend-icon')
+      .attr('role', 'button')
+      .attr('tabindex', 0)
+      .attr('aria-label', (d: WorkItem) => `Open the graph inside ${d.title}`)
+      .attr('data-node-id', (d: WorkItem) => d.id)
       .attr('transform', (d: WorkItem) => {
         const x = getNodeDimensions(d).width / 2 - iconSize / 2 - 8;
         const y = getNodeDimensions(d).height / 2 - iconSize / 2 - 6;
@@ -2977,16 +2983,12 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .attr('fill', 'rgba(99, 102, 241, 0.9)')
       .attr('stroke', 'rgba(255, 255, 255, 0.85)')
       .attr('stroke-width', 1);
-    descendIcon.append('text')
-      .attr('x', 0)
-      .attr('y', 0)
-      .attr('text-anchor', 'middle')
-      .attr('dominant-baseline', 'central')
-      .style('font-size', `${iconSize * 0.95}px`)
-      .style('font-weight', 'bold')
-      .style('fill', '#ffffff')
-      .style('pointer-events', 'none')
-      .text('⤢');
+    appendNodeControlGlyph(descendIcon, 'maximize2', iconSize, 'descend-glyph');
+    const descend = (event: MouseEvent | KeyboardEvent, d: WorkItem) => {
+      event.stopPropagation();
+      event.preventDefault();
+      if (d.subgraphId) descendIntoRef.current(d.subgraphId);
+    };
     descendIcon
       .on('mouseenter', function() {
         d3.select(this).select('.descend-bg').transition().duration(150)
@@ -2996,10 +2998,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         d3.select(this).select('.descend-bg').transition().duration(150)
           .attr('fill', 'rgba(99, 102, 241, 0.9)');
       })
-      .on('click', (event: MouseEvent, d: WorkItem) => {
-        event.stopPropagation();
-        event.preventDefault();
-        if (d.subgraphId) descendIntoRef.current(d.subgraphId);
+      .on('click', descend)
+      .on('keydown', (event: KeyboardEvent, d: WorkItem) => {
+        if (event.key === 'Enter' || event.key === ' ') descend(event, d);
       });
 
     // 44px touch targets (#29): the header icon buttons draw at iconSize (16-24px),
@@ -3096,6 +3097,12 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .append('g')
       .attr('class', 'edge-label-group')
       .attr('data-edge-id', (d: WorkItemEdge) => d.id)
+      // Every connection label is a button: it opens the connection editor
+      // (or, for a summarized pair, the list of its relationships).
+      .attr('role', 'button')
+      .attr('tabindex', liveScale >= 0.6 ? 0 : -1)
+      .attr('aria-hidden', liveScale >= 0.6 ? null : 'true')
+      .attr('aria-label', (d: WorkItemEdge) => editEdgeLabel(d))
       .style('opacity', (d: any) => (liveScale >= 0.6 ? 1 : 0))
       .style('pointer-events', (d: any) => (liveScale >= 0.6 ? 1 : 0) > 0 ? 'all' : 'none')
       .style('cursor', 'pointer')
@@ -3103,7 +3110,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         if (!openPriorityPair(event, edge)) openEdgeEditor(event, edge);
       })
       .on('keydown.priority', (event: KeyboardEvent, edge: WorkItemEdge) => {
-        if (event.key === 'Enter' || event.key === ' ') openPriorityPair(event, edge);
+        if (event.key === 'Enter' || event.key === ' ') {
+          if (!openPriorityPair(event, edge)) openEdgeEditor(event, edge);
+        }
       });
     edgeLabelGroups.append('title').attr('class', 'edge-priority-description');
 
@@ -3640,8 +3649,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
             group.select('.edge-label-bg').attr('width', edge._labelDims.width).attr('height', edge._labelDims.height).attr('x', -edge._labelDims.width / 2).attr('y', -edge._labelDims.height / 2);
             group.select('.edge-label-icon').attr('x', -edge._labelDims.width / 2 + 8);
           }
-          group.attr('role', more ? 'button' : null).attr('tabindex', more ? 0 : null)
-            .attr('aria-label', more ? `Browse ${pair!.original.length} relationships for this connection` : null);
+          group.attr('aria-label', more ? `Browse ${pair!.original.length} relationships for this connection` : editEdgeLabel(edge))
+            .attr('data-pair-browser', more ? 'true' : null);
           group.select('.edge-priority-description').text(pair
             ? `${edge.type}. ${pair.fallback ? 'Highest available types retained for this pair.' : `Priority: ${priority.level}.`} ${pair.original.length} original relationships; ${pair.summarized.length} summarized.${more ? ' Open to inspect every original.' : ''}`
             : edge.type);
@@ -3926,7 +3935,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       // Edge labels + arrows follow the edge LOD module (zoom-aware, crowd-aware).
       if (labelsShownAtScale !== (scale >= 0.6)) {
         labelsShownAtScale = scale >= 0.6;
-        edgeLabelGroups.style('opacity', labelsShownAtScale ? 1 : 0).style('pointer-events', labelsShownAtScale ? 'all' : 'none');
+        edgeLabelGroups.style('opacity', labelsShownAtScale ? 1 : 0).style('pointer-events', labelsShownAtScale ? 'all' : 'none')
+          .attr('tabindex', labelsShownAtScale ? 0 : -1).attr('aria-hidden', labelsShownAtScale ? null : 'true');
       }
       arrowElements.filter((d: any) => edgeDisplay(d) !== 'none')
         .style('opacity', (d: any) =>

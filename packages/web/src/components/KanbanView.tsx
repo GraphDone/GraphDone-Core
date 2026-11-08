@@ -129,15 +129,18 @@ const KanbanView: React.FC<KanbanViewProps> = ({ filteredNodes, handleEditNode, 
         Show empty lanes
       </label>
       {filteredNodes.length === 0 && !showEmpty && <p className="p-6 text-gray-400">No work matches this view. Clear filters or add a work item to get started.</p>}
-      <div className="flex-1 min-h-0 flex flex-col gap-4 p-3 overflow-y-auto sm:flex-row sm:space-x-4 sm:gap-0 sm:p-6 sm:overflow-x-auto">
+      {/* Phones (either way up) stack the lanes and scroll down; larger screens
+          put lanes side by side, the board scrolls sideways and each lane
+          scrolls its own cards. */}
+      <div className="flex-1 min-h-0 flex flex-col gap-4 p-3 overflow-y-auto sm:p-6 board:flex-row board:space-x-4 board:gap-0 board:overflow-x-auto board:overflow-y-hidden">
       {statuses.filter(status => showEmpty || nodesByStatus[status].length > 0).map((status) => {
         const nodes = nodesByStatus[status] || [];
         const config = getStatusConfig(status);
 
         return (
-          <div key={status} className="w-full sm:w-80 flex-shrink-0">
-            <div className="bg-gray-800/40 backdrop-blur-sm rounded-lg h-full">
-              <div className={`p-4 border-b border-gray-600/30`}>
+          <div key={status} className="w-full board:w-80 flex-shrink-0 board:h-full board:min-h-0">
+            <div className="bg-gray-800/40 backdrop-blur-sm rounded-lg h-full board:flex board:flex-col board:min-h-0">
+              <div className={`p-4 border-b border-gray-600/30 shrink-0`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
                     <div className={`${config.bgColor} rounded-lg p-2 border ${config.borderColor}`}>
@@ -152,7 +155,7 @@ const KanbanView: React.FC<KanbanViewProps> = ({ filteredNodes, handleEditNode, 
                 </div>
               </div>
               
-              <div className="p-4 space-y-3">
+              <div className="p-4 space-y-3 board:flex-1 board:min-h-0 board:overflow-y-auto overscroll-contain">
                 {[...nodes]
                   .sort((a, b) => {
                     const dateA = new Date(a.updatedAt || a.createdAt).getTime();

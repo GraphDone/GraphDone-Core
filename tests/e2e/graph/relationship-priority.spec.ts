@@ -286,7 +286,9 @@ for (const width of [1440, 390]) {
     await priority.focus();
     await page.keyboard.press('End');
     await expect(priority).toHaveValue('all');
-    await expect(label).not.toHaveAttribute('tabindex');
+    // With nothing summarized the label stops browsing the pair and is the
+    // plain connection button again (it opens this connection's editor).
+    await expect(label).toHaveAttribute('aria-label', /^Edit connection: /);
     await browser
       .getByRole('button', { name: 'Back to graph', exact: true })
       .focus();
