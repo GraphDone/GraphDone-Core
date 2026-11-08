@@ -1,5 +1,9 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  // The app is unconditionally dark-themed; force the `dark` class so every
+  // `dark:` text/color variant always applies (otherwise light-OS users get
+  // black text on the dark surfaces). Applied via <html class="dark">.
+  darkMode: 'class',
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
@@ -35,6 +39,8 @@ export default {
   ],
   theme: {
     extend: {
+      fontSize: { xs: ['0.875rem', { lineHeight: '1.25rem' }] },
+      fontWeight: { normal: '500', medium: '600' },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
       },

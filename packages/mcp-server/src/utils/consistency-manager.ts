@@ -230,7 +230,7 @@ export async function withReadConsistency<T>(
   const staleCheck = consistency.wouldReadBeStale(nodeId);
   
   if (staleCheck.stale) {
-    console.log(
+    console.error(
       `Waiting for consistency for ${operationName || 'read'} on node ${nodeId}. ` +
       `Recent write version: ${staleCheck.version}, wait: ${staleCheck.waitMs}ms`
     );
@@ -258,7 +258,7 @@ export async function withWriteConsistency<T>(
     // Record successful write
     const version = consistency.recordWrite(nodeId, operationType, result);
     
-    console.log(
+    console.error(
       `Recorded write consistency for ${operationName || 'write'} on node ${nodeId}. ` +
       `Version: ${version}, operation: ${operationType}`
     );

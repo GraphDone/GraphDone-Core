@@ -1,6 +1,6 @@
 {
   "name": "@graphdone/mcp-server",
-  "version": "0.3.1-alpha",
+  "version": "0.4.0-alpha",
   "description": "MCP server for GraphDone graph operations",
   "main": "dist/index.js",
   "type": "module",
@@ -10,39 +10,33 @@
     "dev:start": "tsx watch src/index.ts",
     "start": "node dist/index.js",
     "test": "NODE_OPTIONS='--max-old-space-size=4096' vitest --run",
-    "test:coverage": "vitest run --coverage", 
-    
-    "test:input": "vitest --run tests/garbage-input.test.ts",
-    "test:security": "vitest --run tests/comprehensive-chaos.test.ts tests/multi-perspective-chaos.test.ts",
-    "test:ddos": "vitest --run tests/concurrency-chaos.test.ts tests/network-protocol-chaos.test.ts tests/performance-chaos.test.ts",
-    "test:stress": "vitest --run tests/resource-exhaustion-chaos.test.ts tests/distributed-systems-chaos.test.ts tests/filesystem-io-chaos.test.ts",
-    
-    "test:integration:local": "vitest --run tests/real-database-integration.test.ts tests/real-chaos-testing.test.ts",
-    "test:safe:ci": "npm run test:input && npm run test:security",
-    "test:unsafe:local": "npm run test:ddos && npm run test:stress && npm run test:integration:local",
+    "test:coverage": "vitest run --coverage",
+    "test:contract:local": "RUN_DB_CONTRACT=1 vitest --run tests/neo4j-contract.test.ts",
+    "test:integration:local": "GRAPHDONE_MCP_INTEGRATION_REQUIRED=1 vitest --run tests/real-database-integration.test.ts tests/mock-validation.test.ts",
     "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist coverage",
-    "ci:safe": "npm run lint && npm run typecheck && npm run test && npm run test:safe:ci",
-    "ci:full:local": "npm run ci:safe && npm run test:unsafe:local"
+    "ci:safe": "npm run lint && npm run typecheck && npm run test",
+    "ci:full:local": "npm run ci:safe && npm run test:integration:local"
   },
   "dependencies": {
     "@graphdone/core": "*",
-    "@modelcontextprotocol/sdk": "^0.5.0",
-    "neo4j-driver": "^5.15.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "dotenv": "^16.3.0",
-    "zod": "^3.22.0"
+    "neo4j-driver": "^5.15.0",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
     "@typescript-eslint/eslint-plugin": "^8.39.1",
     "@typescript-eslint/parser": "^8.39.1",
-    "@vitest/coverage-v8": "^1.0.0",
+    "@vitest/coverage-v8": "^4.1.12",
     "eslint": "^9.33.0",
     "globals": "^16.3.0",
     "tsx": "^4.6.0",
     "typescript": "^5.3.0",
-    "vitest": "^1.0.0"
+    "vitest": "^4.1.12",
+    "vite": "^7.3.7"
   },
   "files": [
     "dist",

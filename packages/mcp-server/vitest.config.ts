@@ -1,20 +1,17 @@
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
+    exclude: [...configDefaults.exclude, '**/dist/**'],
     environment: 'node',
-    testTimeout: 30000, // Increase timeout for chaos tests from default 5000ms
+    testTimeout: 30000,
     pool: 'forks', // Use forked processes for better isolation
-    poolOptions: {
-      forks: {
-        // Chaos suites deliberately exhaust fds/CPU/network; parallel files
-        // starve each other and flake. One fork keeps measurements honest.
-        singleFork: true,
-        isolate: true, // Isolate each test file
-      },
-    },
+    maxWorkers: 1,
+    fileParallelism: false,
+    isolate: true,
     coverage: {
       provider: 'v8',
+      include: ['src/**/*.ts'],
       reporter: ['text', 'html'],
       exclude: [
         'node_modules/',

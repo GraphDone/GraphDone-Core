@@ -1,23 +1,34 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import {AgentApproval} from './pages/AgentApproval';
+import {SharedProject} from './pages/SharedProject';
+import {FeedbackHost} from './components/Feedback';
+import { lazy, Suspense } from 'react';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { Workspace } from './pages/Workspace';
-import { Ontology } from './pages/Ontology';
-import { Agents } from './pages/Agents';
-import { Analytics } from './pages/Analytics';
 import { Settings } from './pages/Settings';
-import { Admin } from './pages/Admin';
-import { Backend } from './pages/Backend';
+// Rarely-visited pages are code-split out of the main bundle (live-audit perf).
+const Ontology = lazy(() => import('./pages/Ontology').then((m) => ({ default: m.Ontology })));
+const Agents = lazy(() => import('./pages/Agents').then((m) => ({ default: m.Agents })));
+const Analytics = lazy(() => import('./pages/Analytics').then((m) => ({ default: m.Analytics })));
+const Admin = lazy(() => import('./pages/Admin').then((m) => ({ default: m.Admin })));
+const Backend = lazy(() => import('./pages/Backend').then((m) => ({ default: m.Backend })));
+import { RequireRole } from './components/RequireRole';
+import { canAccessAdmin, canAccessBackend } from './lib/roleAccess';
 import { Signin } from './pages/Signin';
-import { Signup } from './pages/Signup';
 import { ForgotPassword } from './pages/ForgotPassword';
 import { ResetPassword } from './pages/ResetPassword';
 import { InteractiveGraphVisualization } from './components/InteractiveGraphVisualization';
+import { PositionSaveProvider } from './hooks/usePositionSaveQueue';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { GraphProvider } from './contexts/GraphContext';
+import { ViewModeProvider } from './contexts/ViewModeContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 
 function AuthenticatedApp() {
   const { isAuthenticated, isInitializing } = useAuth();
+  const location=useLocation();
+  if(location.pathname==='/agent-approval')return <AgentApproval/>;
+  if(location.pathname==='/share')return <SharedProject/>;
 
   if (isInitializing) {
     // Maintain consistent structure during initial load to prevent DOM flash
@@ -85,7 +96,9 @@ function AuthenticatedApp() {
       <Routes>
         <Route path="/" element={<Signin />} />
         <Route path="/login" element={<Signin />} />
-        <Route path="/signup" element={<Signup />} />
+        {/* Passwordless: signing up and signing in are the same action (email → link →
+            account, new or returning). /signup opens the magic-link flow directly. */}
+        <Route path="/signup" element={<Signin initialMagicLink />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="*" element={<Navigate to="/" replace />} />
@@ -96,7 +109,9 @@ function AuthenticatedApp() {
   return (
     <NotificationProvider>
       <GraphProvider>
+        <ViewModeProvider>
         <Layout>
+          <Suspense fallback={<div className="h-full w-full flex items-center justify-center text-gray-400 text-sm">Loading…</div>}>
           <Routes>
             <Route path="/" element={<Workspace />} />
             <Route path="/workspace" element={<Workspace />} />
@@ -104,11 +119,13 @@ function AuthenticatedApp() {
             <Route path="/agents" element={<Agents />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/settings" element={<Settings />} />
-            <Route path="/admin" element={<Admin />} />
-            <Route path="/backend" element={<Backend />} />
+            <Route path="/admin" element={<RequireRole can={canAccessAdmin}><Admin /></RequireRole>} />
+            <Route path="/backend" element={<RequireRole can={canAccessBackend}><Backend /></RequireRole>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </Suspense>
         </Layout>
+        </ViewModeProvider>
       </GraphProvider>
     </NotificationProvider>
   );
@@ -117,7 +134,9 @@ function AuthenticatedApp() {
 function App() {
   return (
     <AuthProvider>
-      <AuthenticatedApp />
+      <PositionSaveProvider>
+        <AuthenticatedApp /><FeedbackHost />
+      </PositionSaveProvider>
     </AuthProvider>
   );
 }

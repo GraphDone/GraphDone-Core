@@ -1,13 +1,23 @@
+import { hostedUsageEnabled, skipBackgroundPoll } from '../lib/hostedUsage';
 import { useState, useEffect } from 'react';
+import { apiUrl } from '../lib/apiUrl';
 
-interface HealthStatus {
+export interface HealthStatus {
   status: string;
-  timestamp: string;
+  timestamp?: string;
+  check?: string;
+  db?: boolean | string;
   services: {
-    graphql: { status: string; port: number };
-    neo4j: { status: string; uri: string; error?: string };
-    mcp: { status: string; port: number; error?: string };
+    graphql: { status: string; port?: number; check?: string };
+    neo4j?: { status: string; uri: string; error?: string; check?: string };
+    mcp?: { status: string; port: number; error?: string };
   };
+}
+
+/** A liveness endpoint may prove the API route is mounted without spending a DB read. */
+export function isGraphServiceAvailable(health: HealthStatus | null): boolean {
+  const status = health?.services?.graphql?.status;
+  return status === 'healthy' || status === 'available';
 }
 
 export function useHealthStatus() {
@@ -17,7 +27,7 @@ export function useHealthStatus() {
 
   const checkHealth = async () => {
     try {
-      const response = await fetch('/health'); // Use relative URL to leverage Vite proxy
+      const response = await fetch(apiUrl('/health'));
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
@@ -34,13 +44,15 @@ export function useHealthStatus() {
 
   useEffect(() => {
     checkHealth();
+    const reconnect=()=>void checkHealth();
+    window.addEventListener('online',reconnect);
     
     // Dynamic polling: faster when unhealthy, slower when healthy
     const getPollingInterval = () => {
+      if (hostedUsageEnabled) return 60000;
       if (!health) return 5000; // Initial check every 5 seconds
       
-      const hasUnhealthyService = health.services?.neo4j?.status !== 'healthy' || 
-                                  health.services?.graphql?.status !== 'healthy';
+      const hasUnhealthyService = !isGraphServiceAvailable(health);
       
       // Poll every 5 seconds if unhealthy, 15 seconds if healthy
       return hasUnhealthyService ? 5000 : 15000;
@@ -52,7 +64,7 @@ export function useHealthStatus() {
     const scheduleNext = () => {
       const interval = getPollingInterval();
       timeoutId = setTimeout(async () => {
-        await checkHealth();
+        if (!skipBackgroundPoll()) await checkHealth();
         scheduleNext(); // Schedule the next check
       }, interval);
     };
@@ -62,8 +74,9 @@ export function useHealthStatus() {
     
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
+      window.removeEventListener('online',reconnect);
     };
-  }, [health?.services?.neo4j?.status, health?.services?.graphql?.status]);
+  }, [health?.services?.graphql?.status]);
 
   return { health, loading, error, refetch: checkHealth };
 }

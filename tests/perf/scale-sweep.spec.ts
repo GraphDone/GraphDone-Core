@@ -1,11 +1,11 @@
 import { test, expect, Page } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
-import { login, TEST_USERS } from '../helpers/auth';
-import { seedLargeGraph, deleteGraphDeep } from '../helpers/seedGraph';
-import { sweepTestData } from '../helpers/dbHealing';
-import '../helpers/testEnv';
-import { envIntList, envList } from '../helpers/testEnv';
+import { login, TEST_USERS } from '../lib/auth';
+import { seedLargeGraph, deleteGraphDeep } from '../lib/seedGraph';
+import { sweepTestData } from '../lib/dbHealing';
+import '../lib/testEnv';
+import { envIntList, envList } from '../lib/testEnv';
 
 /**
  * Large-scale graph creation + performance metric sweep. Seeds real graphs of

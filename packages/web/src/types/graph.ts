@@ -80,6 +80,7 @@ export interface WorkItem {
   priority?: number;
   dueDate?: string;
   tags?: string[];
+  metadata?: string | Record<string, unknown> | null;
   assignedTo?: {
     id: string;
     name: string;

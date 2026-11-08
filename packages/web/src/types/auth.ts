@@ -25,7 +25,7 @@ export interface AuthContextType {
   currentTeam: Team | null;
   availableUsers: User[]; // Legacy - empty for real auth
   availableTeams: Team[]; // Legacy - empty for real auth
-  login: (user: User, token?: string) => void;
+  login: (user: User, token?: string, keepLoggedIn?: boolean) => void;
   logout: () => void;
   switchUser: (userId: string) => void; // Legacy
   switchTeam: (teamId: string) => void; // Legacy

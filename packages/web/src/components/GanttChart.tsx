@@ -66,29 +66,29 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
             return false;
           }
         }
-        
+
         // Status filter
         if (filterStatus !== 'all' && node.status !== filterStatus) return false;
-        
+
         // Priority filter
         if (filterPriority !== 'all') {
           const priority = node.priority || 0;
           const priorityLevel = getPriorityConfig(priority).value;
           if (priorityLevel !== filterPriority) return false;
         }
-        
+
         // Type filter
         if (filterType !== 'all' && node.type !== filterType) return false;
-        
+
         return true;
       })
       .map((node, index) => {
         const startDate = new Date(node.createdAt);
-        const endDate = node.dueDate ? new Date(node.dueDate) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+        const endDate = node.dueDate ? new Date(node.dueDate) : startDate;
         const duration = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
         const progress = getStatusCompletionPercentage(node.status as WorkItemStatus);
         const priority = node.priority || 0;
-        
+
         return {
           ...node,
           startDate,
@@ -130,15 +130,15 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
     const allDates = timelineData.flatMap(item => [item.startDate, item.endDate]);
     const rawMinDate = new Date(Math.min(...allDates.map(d => d.getTime())));
     const rawMaxDate = new Date(Math.max(...allDates.map(d => d.getTime())));
-    
+
     // Add padding
     const minDate = new Date(rawMinDate);
     minDate.setDate(minDate.getDate() - 7);
     const maxDate = new Date(rawMaxDate);
     maxDate.setDate(maxDate.getDate() + 14);
-    
+
     const totalDays = Math.ceil((maxDate.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-    
+
     return { minDate, maxDate, totalDays };
   }, [timelineData]);
 
@@ -148,7 +148,7 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
   const timelineHeaders = useMemo(() => {
     const headers = [];
     const current = new Date(minDate);
-    
+
     if (viewMode === 'days') {
       while (current <= maxDate) {
         headers.push({
@@ -181,7 +181,7 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
         current.setMonth(current.getMonth() + 1);
       }
     }
-    
+
     return headers;
   }, [minDate, maxDate, viewMode]);
 
@@ -206,7 +206,7 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-  
+
   const getProgressColor = (status: WorkItemStatus) => {
     return getStatusConfig(status).color.replace('text-', 'bg-');
   };
@@ -216,51 +216,24 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
     const toY = toTask.row * 60 + 30;
     const fromX = ((fromTask.endDate.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24) / totalDays) * 100;
     const toX = ((toTask.startDate.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24) / totalDays) * 100;
-    
+
     return `M ${fromX}% ${fromY}px L ${toX}% ${toY}px`;
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col min-h-full min-w-0">
       {/* Header */}
-      <div className="p-6 border-b border-gray-700">
-        <div className="flex items-center justify-between mb-4">
+      <div className="p-3 sm:p-4 border-b border-gray-700">
+        <div className="flex items-center justify-between mb-2">
           <div className="flex items-center space-x-3">
             <GanttChartSquare className="h-6 w-6 text-green-400" />
-            <h2 className="text-2xl font-bold text-white">Gantt Chart</h2>
+            <h2 className="text-xl font-semibold text-white">Gantt Chart</h2>
           </div>
-          <div className="flex items-center space-x-2">
-            <button className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors">
-              <Download className="h-4 w-4" />
-            </button>
-            <button className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors">
-              <MoreVertical className="h-4 w-4" />
-            </button>
-          </div>
+
         </div>
-        
-        {/* Search Bar */}
-        <div className="relative mb-4">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search tasks by type, status, priority"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
-            >
-              ×
-            </button>
-          )}
-        </div>
-        
+
         {/* Primary Controls */}
-        <div className="flex flex-wrap items-center gap-4 mb-3">
+        <div className="flex flex-wrap items-center gap-2 mb-1">
           {/* View Mode */}
           <div className="flex items-center space-x-2">
             <label className="text-sm font-medium text-gray-300">View:</label>
@@ -269,9 +242,9 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
                 <button
                   key={mode}
                   onClick={() => setViewMode(mode)}
-                  className={`px-3 py-1 text-xs rounded-md transition-colors ${
-                    viewMode === mode 
-                      ? 'bg-green-600 text-white' 
+                  className={`min-h-[44px] px-3 py-1 text-sm rounded-md transition-colors ${
+                    viewMode === mode
+                      ? 'bg-green-600 text-white'
                       : 'text-gray-300 hover:text-white'
                   }`}
                 >
@@ -302,6 +275,29 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
 
         </div>
 
+        <details>
+          <summary className="min-h-[44px] flex items-center cursor-pointer text-sm text-gray-300">Search, filters & sorting</summary>
+        {/* Search Bar */}
+        <div className="relative mb-4">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search tasks by type, status, priority"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
+            >
+              ×
+            </button>
+          )}
+        </div>
+
+
         {/* Filter Controls Row */}
         <div className="flex flex-wrap items-center gap-4">
           {/* Type Filter */}
@@ -316,8 +312,8 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
                   const selectedOption = TYPE_OPTIONS.find(opt => opt.value === filterType);
                   return (
                     <>
-                      {selectedOption?.icon && React.createElement(selectedOption.icon as any, { 
-                        className: `h-3 w-3 ${selectedOption.color || 'text-gray-400'}` 
+                      {selectedOption?.icon && React.createElement(selectedOption.icon as any, {
+                        className: `h-3 w-3 ${selectedOption.color || 'text-gray-400'}`
                       })}
                       <span className="truncate">{selectedOption?.label || 'All Type'}</span>
                       <ChevronDown className="h-3 w-3 ml-auto" />
@@ -336,8 +332,8 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
                       }}
                       className="w-full px-3 py-2 text-left text-sm text-white hover:bg-gray-600 flex items-center space-x-2 first:rounded-t-lg last:rounded-b-lg"
                     >
-                      {option.icon && React.createElement(option.icon as any, { 
-                        className: `h-3 w-3 ${option.color || 'text-gray-400'}` 
+                      {option.icon && React.createElement(option.icon as any, {
+                        className: `h-3 w-3 ${option.color || 'text-gray-400'}`
                       })}
                       <span>{option.label}</span>
                     </button>
@@ -359,8 +355,8 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
                   const selectedOption = STATUS_OPTIONS.find(opt => opt.value === filterStatus);
                   return (
                     <>
-                      {selectedOption?.icon && React.createElement(selectedOption.icon as any, { 
-                        className: `h-3 w-3 ${selectedOption.color || 'text-gray-400'}` 
+                      {selectedOption?.icon && React.createElement(selectedOption.icon as any, {
+                        className: `h-3 w-3 ${selectedOption.color || 'text-gray-400'}`
                       })}
                       <span className="truncate">{selectedOption?.label || 'All Status'}</span>
                       <ChevronDown className="h-3 w-3 ml-auto" />
@@ -379,8 +375,8 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
                       }}
                       className="w-full px-3 py-2 text-left text-sm text-white hover:bg-gray-600 flex items-center space-x-2 first:rounded-t-lg last:rounded-b-lg"
                     >
-                      {option.icon && React.createElement(option.icon as any, { 
-                        className: `h-3 w-3 ${option.color || 'text-gray-400'}` 
+                      {option.icon && React.createElement(option.icon as any, {
+                        className: `h-3 w-3 ${option.color || 'text-gray-400'}`
                       })}
                       <span>{option.label}</span>
                     </button>
@@ -402,8 +398,8 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
                   const selectedOption = PRIORITY_OPTIONS.find(opt => opt.value === filterPriority);
                   return (
                     <>
-                      {selectedOption?.icon && React.createElement(selectedOption.icon as any, { 
-                        className: `h-3 w-3 ${selectedOption.color || 'text-gray-400'}` 
+                      {selectedOption?.icon && React.createElement(selectedOption.icon as any, {
+                        className: `h-3 w-3 ${selectedOption.color || 'text-gray-400'}`
                       })}
                       <span className="truncate">{selectedOption?.label || 'All Priority'}</span>
                       <ChevronDown className="h-3 w-3 ml-auto" />
@@ -422,8 +418,8 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
                       }}
                       className="w-full px-3 py-2 text-left text-sm text-white hover:bg-gray-600 flex items-center space-x-2 first:rounded-t-lg last:rounded-b-lg"
                     >
-                      {option.icon && React.createElement(option.icon as any, { 
-                        className: `h-3 w-3 ${option.color || 'text-gray-400'}` 
+                      {option.icon && React.createElement(option.icon as any, {
+                        className: `h-3 w-3 ${option.color || 'text-gray-400'}`
                       })}
                       <span>{option.label}</span>
                     </button>
@@ -448,11 +444,55 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
             </select>
           </div>
         </div>
+        </details>
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-hidden">
-        <div className="h-full overflow-auto" ref={scrollRef}>
+      <div className="flex-1 min-h-[260px] min-w-0">
+        {/* Mobile Schedule List */}
+        <div className="sm:hidden p-3 space-y-3">
+          {timelineData.length === 0 ? (
+            <div className="text-center text-sm text-gray-400 py-8">No tasks to display</div>
+          ) : (
+            timelineData.map(item => {
+              const statusConfig = getStatusConfig(item.status as WorkItemStatus);
+              const priorityConfig = getPriorityConfig(item.priority);
+              return (
+                <div
+                  key={item.id}
+                  className={`rounded-lg border p-3 ${
+                    selectedTask === item.id
+                      ? `${WORK_ITEM_STATUSES.COMPLETED.bgColor} ${WORK_ITEM_STATUSES.COMPLETED.borderColor}`
+                      : 'bg-gray-800/50 border-gray-700/50'
+                  }`}
+                  onClick={() => setSelectedTask(selectedTask === item.id ? null : item.id)}
+                >
+                  <div className="flex items-center space-x-2 mb-2">
+                    <div
+                      className="w-1 h-6 rounded-full shrink-0"
+                      style={{ backgroundColor: priorityConfig.color.replace('text-', '') }}
+                      title={`Priority: ${priorityConfig.label}`}
+                    />
+                    <div className="text-sm font-medium text-white truncate">{item.title}</div>
+                  </div>
+                  <div className="flex items-center space-x-2 text-xs text-gray-400 mb-1">
+                    <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${statusConfig.bgColor}`} />
+                    <span>{item.status.replace('_', ' ')}</span>
+                    <span>•</span>
+                    <span>{item.progress}%</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-gray-400">
+                    <span>{item.dueDate ? `Created ${item.startDate.toLocaleDateString()} · Due ${item.endDate.toLocaleDateString()}` : 'Unscheduled'}</span>
+                    {item.dueDate && <span>{item.duration}d</span>}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Interactive Gantt Timeline */}
+        <div className="hidden sm:block h-full overflow-auto" ref={scrollRef}>
           <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700/50">
             <div className="overflow-x-auto">
               <div className="relative" style={{ minWidth: `${800 * zoomLevel}px`, transform: `scale(${zoomLevel})`, transformOrigin: 'top left' }}>
@@ -463,8 +503,8 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
                   </div>
                   <div className="flex-1 flex">
                     {timelineHeaders.map((header, index) => (
-                      <div 
-                        key={index} 
+                      <div
+                        key={index}
                         className={`flex-1 min-w-[120px] px-3 py-3 border-r border-gray-600 text-center ${
                           header.isWeekend ? 'bg-gray-600' : 'bg-gray-700'
                         }`}
@@ -502,16 +542,16 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
                           />
                         </marker>
                       </defs>
-                      {timelineData.map(task => 
+                      {timelineData.map(task =>
                         task.dependencies?.map((dep: any) => {
                           const depTask = timelineData.find(t => t.id === dep.id);
-                          if (!depTask) return null;
-                          
+                          if (!depTask?.dueDate || !task.dueDate) return null;
+
                           const fromY = depTask.row * 60 + 30;
                           const toY = task.row * 60 + 30;
                           const fromX = ((depTask.endDate.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24) / totalDays) * 100;
                           const toX = ((task.startDate.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24) / totalDays) * 100;
-                          
+
                           return (
                             <g key={`${depTask.id}-${task.id}`}>
                               <line
@@ -530,7 +570,7 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
                       ).flat().filter(Boolean)}
                     </svg>
                   )}
-                  
+
                   {timelineData.map((item, index) => {
                     const startOffset = Math.floor((item.startDate.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24));
                     const barWidth = (item.duration / totalDays) * 100;
@@ -541,8 +581,8 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
                     const typeConfig = getTypeConfig(item.type as WorkItemType);
 
                     return (
-                      <div 
-                        key={item.id} 
+                      <div
+                        key={item.id}
                         className={`flex border-b border-gray-700 transition-all duration-200 h-15 ${
                           isSelected ? `${WORK_ITEM_STATUSES.COMPLETED.bgColor} ${WORK_ITEM_STATUSES.COMPLETED.borderColor}` : 'hover:bg-gray-700/30'
                         }`}
@@ -553,25 +593,25 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
                         <div className="w-80 px-4 py-3 border-r border-gray-600 flex items-center">
                           <div className="flex items-center space-x-3 flex-1">
                             {/* Priority Indicator */}
-                            <div 
+                            <div
                               className="w-1 h-8 rounded-full"
                               style={{ backgroundColor: priorityConfig.color.replace('text-', '') }}
                               title={`Priority: ${priorityConfig.label}`}
                             />
-                            
+
                             {/* Status & Type */}
                             <div className="flex flex-col space-y-1">
                               <div className={`w-3 h-3 rounded-full ${statusConfig.bgColor}`} title={item.status.replace('_', ' ')}></div>
                               <div className="text-xs text-gray-500">{React.createElement(typeConfig.icon as any, { className: 'h-3 w-3' })}</div>
                             </div>
-                            
+
                             {/* Task Details */}
                             <div className="flex-1 min-w-0">
                               <div className="text-sm font-medium text-white truncate mb-1">{item.title}</div>
                               <div className="flex items-center space-x-2 text-xs text-gray-400">
                                 <span>{item.status.replace('_', ' ')}</span>
                                 <span>•</span>
-                                <span>{item.duration}d</span>
+                                {item.dueDate && <span>{item.duration}d</span>}
                                 {item.assignedTo && (
                                   <>
                                     <span>•</span>
@@ -586,8 +626,9 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
                         {/* Timeline Bar */}
                         <div className="flex-1 relative py-3 px-2">
                           <div className="relative h-9">
-                            {/* Main Task Bar */}
-                            <div 
+                            {/* No invented schedule for work without a due date. */}
+                            {!item.dueDate && <span className="text-xs text-gray-400">Unscheduled</span>}
+                            {item.dueDate && <div
                               className={`absolute h-6 bg-gray-600/40 backdrop-blur-sm rounded-lg shadow-sm border transition-all duration-200 cursor-pointer ${
                                 isSelected ? 'border-green-500 shadow-lg shadow-green-500/25' : 'border-gray-500/50'
                               }`}
@@ -596,30 +637,30 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
                                 width: `${Math.max(barWidth, 2)}%`,
                                 top: '6px'
                               }}
-                              title={`${item.title}\nStart: ${item.startDate.toLocaleDateString()}\nEnd: ${item.endDate.toLocaleDateString()}\nDuration: ${item.duration} days\nProgress: ${item.progress}%`}
+                              title={`${item.title}\nCreated: ${item.startDate.toLocaleDateString()}\nDue: ${item.endDate.toLocaleDateString()}\nDuration: ${item.duration} days\nProgress: ${item.progress}%`}
                             >
                               {/* Progress Fill */}
-                              <div 
+                              <div
                                 className={`h-full rounded-lg transition-all duration-300 ${getProgressColor(item.status as WorkItemStatus)} opacity-60`}
                                 style={{ width: `${item.progress}%` }}
                               />
-                              
+
                               {/* Task Label */}
                               <div className="absolute inset-0 flex items-center px-2">
                                 <span className="text-xs font-medium text-white truncate drop-shadow-sm">
                                   {item.title.length > 20 ? item.title.substring(0, 20) + '...' : item.title}
                                 </span>
                               </div>
-                              
+
                               {/* Progress Percentage */}
                               <div className="absolute -top-5 right-0 text-xs text-gray-400">
                                 {item.progress}%
                               </div>
-                            </div>
-                            
+                            </div>}
+
                             {/* Milestone Indicator */}
-                            {item.type === 'MILESTONE' && (
-                              <div 
+                            {item.dueDate && item.type === 'MILESTONE' && (
+                              <div
                                 className={`absolute w-3 h-3 ${WORK_ITEM_TYPES.MILESTONE.color.replace('text-', 'bg-')} rotate-45 border ${WORK_ITEM_TYPES.MILESTONE.borderColor}`}
                                 style={{
                                   left: `${barLeft + barWidth}%`,
@@ -629,9 +670,9 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
                                 title="Milestone"
                               />
                             )}
-                            
+
                             {/* Overdue Indicator */}
-                            {new Date() > item.endDate && item.status !== 'COMPLETED' && (
+                            {item.dueDate && new Date() > item.endDate && item.status !== 'COMPLETED' && (
                               <div className={`absolute -top-1 right-0 w-2 h-2 ${WORK_ITEM_STATUSES.BLOCKED.color.replace('text-', 'bg-')} rounded-full animate-pulse`} title="Overdue" />
                             )}
                           </div>
@@ -647,10 +688,11 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
       </div>
 
       {/* Footer with Statistics and Legend */}
-      <div className="border-t border-gray-700/50 p-4 bg-gray-800/50 backdrop-blur-sm">
+      <details className="border-t border-gray-700/50 p-3 bg-gray-800/50 backdrop-blur-sm">
+        <summary className="min-h-[44px] flex items-center cursor-pointer text-sm text-gray-300">Summary</summary>
         <div className="flex flex-wrap items-center justify-between gap-4">
           {/* Statistics */}
-          <div className="flex items-center space-x-6 text-sm">
+          <div className="flex flex-wrap gap-3 text-sm">
             <div className="text-gray-300">
               <span className="font-medium">{timelineData.length}</span> tasks
             </div>
@@ -661,7 +703,7 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
             </div>
             <div className="text-gray-300">
               <span className="font-medium">
-                {timelineData.filter(t => new Date() > t.endDate && t.status !== 'COMPLETED').length}
+                {timelineData.filter(t => t.dueDate && new Date() > t.endDate && t.status !== 'COMPLETED').length}
               </span> overdue
             </div>
             <div className="text-gray-300">
@@ -670,9 +712,9 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
               </span> avg progress
             </div>
           </div>
-          
+
           {/* Legend */}
-          <div className="flex items-center space-x-4 text-xs">
+          <div className="flex flex-wrap gap-3 text-xs">
             <div className="flex items-center space-x-1">
               <div className="w-3 h-2 bg-gray-500 rounded"></div>
               <span className="text-gray-400">Not Started</span>
@@ -695,7 +737,7 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
             </div>
           </div>
         </div>
-      </div>
+      </details>
     </div>
   );
 };

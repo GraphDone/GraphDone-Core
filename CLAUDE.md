@@ -2,9 +2,14 @@
 
 This file provides guidance to Claude Code when working with GraphDone-Core.
 
+Read [AGENTS.md](AGENTS.md) for current integration authority and operational
+lessons. Administrative integration into `dev` must follow the
+[high-validation-bar playbook](.agents/playbooks/dev-admin-integration.md);
+admin merge authority is not a non-author review approval.
+
 ## Project Overview
 
-GraphDone is a graph-native project management system that reimagines work coordination through dependencies and democratic prioritization rather than hierarchical assignments. Currently in active development (v0.3.1-alpha) with TLS/SSL production readiness.
+GraphDone is a graph-native management system that reimagines work coordination through dependencies and democratic prioritization rather than hierarchical assignments. Currently in active alpha development (version: root `package.json`) with TLS/SSL production readiness.
 
 ## Core Philosophy
 
@@ -106,10 +111,10 @@ git add . && git commit -m "Update version to v0.3.2-alpha"
 ## Testing Strategy
 
 **🔑 Authentication System for E2E Tests:**
-GraphDone includes a comprehensive, battle-tested authentication system for E2E tests in `tests/helpers/auth.ts`. **This is the foundation for all E2E testing** and should be used by every test that requires user authentication.
+GraphDone includes a comprehensive, battle-tested authentication system for E2E tests in `tests/lib/auth.ts`. **This is the foundation for all E2E testing** and should be used by every test that requires user authentication.
 
 ```typescript
-import { login, navigateToWorkspace, TEST_USERS } from '../helpers/auth';
+import { login, navigateToWorkspace, TEST_USERS } from '../../lib/auth';
 
 test('my feature test', async ({ page }) => {
   // Robust cross-browser authentication
@@ -167,14 +172,42 @@ The automated testing has revealed important UI inflexibility issues that need a
 
 **🚀 Usage:**
 ```bash
-# Run comprehensive tests with beautiful HTML report
-./start test
+# Run the unified harness — dual output: HTML (with screenshots + .webm video
+# clips) AND machine-parsable JSON, from the reusable tests/lib modules.
+npm run test:unified              # full battery (unit + e2e + report captures + cloud audit)
+npm run test:unified:smoke        # fast blocking subset (unit + THE GATE + a focused e2e)
+npm run test:unified:open         # full battery, then open the HTML report
 
-# View interactive report
-make test-report
+# Outputs land in test-artifacts/unified/: report.html + report.json (+ sequences/*.json)
+make test-report                  # open the latest unified HTML report
 # or
-open test-results/reports/index.html
+open test-artifacts/unified/report.html
 ```
+
+**📊 Live test dashboard (the continuous "guiding light"):**
+```bash
+npm run dashboard                 # serve at http://localhost:3199 (read-only, localhost)
+npm run dashboard:open            # …and open the browser
+make dashboard
+bash scripts/install-dashboard-service.sh   # ALWAYS-on: systemd --user service (auto-restart + boot)
+```
+Leave it running while you work. It watches every `graphdone.unified-report/1` run
+in BOTH repos (Core `test-artifacts/unified*` + Cloud `live-full-report/<stamp>`),
+keeps append-only trend history that survives Core's per-run overwrite, and
+**updates live over SSE** when a new run lands — performance trend charts, a runs
+timeline, per-check drill-down with embedded screenshots + video clips. Zero deps
+(`node:http` + SSE). It also has a **🎧 Narrated tab**: `npm run dashboard:narrate`
+(`make dashboard-narrate`) renders a piper-tts walkthrough of progress (female
+voice en_US-lessac-high) — test health, shipped PRs, perf trends, feature tour —
+each segment's audio synced to its chart/video/screenshot. See
+`tests/lib/dashboard/README.md`.
+
+The unified harness (`tests/run-unified.mjs` + `tests/sequences/unified.config.mjs`)
+is the single entry; profiles are `smoke|pr|full|report`. The test tree is organised
+as `tests/e2e/<domain>/`, `tests/diagnostics/<concern>/`, `tests/integration/`, with
+all reusable helpers + harness modules under `tests/lib/`. Retired/legacy specs from the
+2026-06 cleanup were removed from the tree; recover any of them from git history with
+`git show fb83fec:archive/2026-06-test-cleanup/MANIFEST.md`.
 
 **🔐 HTTPS/TLS Testing Setup (for next developer):**
 ```bash
@@ -281,7 +314,7 @@ const GraphView = () => {
 };
 ```
 
-## Current UI Evolution: Slick Dialog Revolution
+## Contextual Dialog Direction (slick inline editors)
 
 GraphDone is undergoing a **major UI transformation** moving away from heavy modal dialogs toward slick, contextual, inline-style editors. This shift prioritizes **immediate feedback, minimal context switching, and delightful micro-interactions**.
 
@@ -357,7 +390,7 @@ npm run dev
 TEST_URL=http://localhost:3127 npm run test:smoke
 ```
 
-`tests/e2e/user-smoke.spec.ts` sees the app exactly as a user does: login →
+`tests/e2e/smoke/user-smoke.spec.ts` sees the app exactly as a user does: login →
 nodes AND edges render → no error chrome → no GraphQL errors reach the client
 → no uncaught JS errors → the grow flow works → no orphan edges in the DB.
 **Green unit tests do not mean the app works.** This gate exists because of a
@@ -412,26 +445,28 @@ Development is driven by **[docs/USER_STORIES.md](./docs/USER_STORIES.md)**. The
 - [ ] **Admin page**: Apply workspace visual language consistently  
 - [ ] **Backend Status page**: Add top bar with right-aligned status indicators
 
-## File Organization (Recently Cleaned)
+## File Organization
 
-**Organized Structure:**
+The top-level map and where each kind of file goes live in [AGENTS.md](AGENTS.md#repository-map).
+
+**Test tree:**
 ```
-artifacts/
-├── screenshots/     # All .png files moved here
-├── test-reports/    # Playwright reports and test artifacts  
-└── certificates/    # Test certificates
-
 tests/
-├── e2e/            # All E2E test specs
-├── helpers/        # Authentication system
-└── *.js            # Moved test files from root level
+├── run-unified.mjs        # single entry — npm run test:unified
+├── sequences/             # unified.config.mjs — declarative sequences + profiles
+├── e2e/<domain>/          # smoke, auth, graph, ui, a11y, mobile, responsive, api, admin, reports
+├── diagnostics/<concern>/ # layout, interactions, hierarchy, inspector, physics, perf, ui
+├── integration/           # infra specs (TLS, installation) — out of the default project
+├── fixtures/              # shared test data
+└── lib/                   # reusable: auth + helpers, metrics/, audit/, reporting/, adapters/, runner/
 ```
 
 **Clean Patterns:**
-- Test files belong in `tests/` directory
-- Screenshots go in `artifacts/screenshots/`
-- No loose files at repository root
-- Certificate management consolidated
+- One default `playwright.config.ts` at the repo root (auto-discovered); single-purpose configs sit beside their specs (`tests/visual/`, `tests/integration/`). The unified harness is the single test entry.
+- All reusable helpers + harness modules live under `tests/lib/`; specs import `../../lib/<x>` (depth-2 domain folders).
+- Capture-heavy report-only specs live in `tests/e2e/reports/` (own Playwright projects), excluded from the fast default project.
+- Retired specs are deleted, not parked; git history keeps them (the 2026-06 set: `git show fb83fec:archive/2026-06-test-cleanup/MANIFEST.md`).
+- No loose files at repository root: `tests/toolchain/repo-root-contract.mjs` allowlists every root entry.
 
 ## Key Implementation Guidelines
 
@@ -454,7 +489,7 @@ export const getTypeGradientBackground = (type: WorkItemType, style: GradientSty
 ```
 
 ### Authentication for Tests
-Use the comprehensive auth system in `tests/helpers/auth.ts` for all E2E tests requiring login.
+Use the comprehensive auth system in `tests/lib/auth.ts` for all E2E tests requiring login.
 
 ## Common Gotchas
 

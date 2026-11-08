@@ -1,5 +1,5 @@
 # Dependencies
-node_modules/
+node_modules
 .pnp
 .pnp.js
 
@@ -80,8 +80,13 @@ lerna-debug.log*
 # VM configuration
 /tmp/graphdone-cloud-init.yml
 cloud-init.*.yml
-!cloud-init.template.yml
 .graphdone-cloud-init.yml
+
+# Local agent tooling
+.codex/
+.openai/
+.playwright-mcp/
+.worktrees/
 
 # IDE
 .vscode/*
@@ -118,3 +123,8 @@ tsconfig.tsbuildinfo
 
 # Prisma
 prisma/dev.db
+# Claude Code local worktrees/agent scratch — never commit
+.claude/
+
+# Private self-hosting bootstrap credentials
+deployment/self-host/.env

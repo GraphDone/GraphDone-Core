@@ -1,3 +1,6 @@
+import {randomBytes} from 'node:crypto';
+import { resolveOAuthAccount } from './oauth-account.js';
+import type { OAuthIdentity } from './oauth-identity.js';
 import sqlite3 from 'sqlite3';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
@@ -7,6 +10,8 @@ import fs from 'fs';
 // SQLite-based authentication system
 // Separate from Neo4j for better availability and security
 
+export type AuthLinkPurpose = 'login' | 'password-reset';
+
 interface User {
   id: string;
   email: string;
@@ -14,6 +19,7 @@ interface User {
   name: string;
   role: 'ADMIN' | 'USER' | 'VIEWER' | 'GUEST';
   passwordHash: string;
+  authVersion: number;
   createdAt: string;
   updatedAt: string;
   isActive: boolean;
@@ -27,6 +33,7 @@ interface User {
 class SQLiteAuthStore {
   private db: sqlite3.Database | null = null;
   private initialized = false;
+  private initializing: Promise<void> | null = null;
 
   private async getDb(): Promise<sqlite3.Database> {
     if (this.db) return this.db;
@@ -54,6 +61,13 @@ class SQLiteAuthStore {
 
   async initialize(): Promise<void> {
     if (this.initialized) return;
+    if (!this.initializing) {
+      this.initializing = this.initializeDatabase().finally(() => { this.initializing = null; });
+    }
+    return this.initializing;
+  }
+
+  private async initializeDatabase(): Promise<void> {
 
     const db = await this.getDb();
     
@@ -295,6 +309,7 @@ class SQLiteAuthStore {
           }
 
           try {
+            await this.migrateAuthLinks();
             await this.createDefaultUsers();
             await this.createDefaultFolders();
             this.initialized = true;
@@ -305,6 +320,29 @@ class SQLiteAuthStore {
         });
       });
     });
+  }
+
+  private async migrateAuthLinks(): Promise<void> {
+    const db = await this.getDb();
+    const run = (sql: string) => new Promise<void>((resolve, reject) => db.run(sql, error => error ? reject(error) : resolve()));
+    for (const [table, columns] of Object.entries({
+      users: { authVersion: 'INTEGER NOT NULL DEFAULT 0', deactivationDate: 'TEXT' },
+      magic_links: { purpose: "TEXT CHECK(purpose IN ('login', 'password-reset'))", authVersion: 'INTEGER' },
+    })) {
+      const existing = await new Promise<{ name: string }[]>((resolve, reject) => {
+        db.all(`PRAGMA table_info(${table})`, (error, rows: { name: string }[]) => error ? reject(error) : resolve(rows));
+      });
+      for (const [name, definition] of Object.entries(columns)) {
+        if (!existing.some(column => column.name === name)) await run(`ALTER TABLE ${table} ADD COLUMN ${name} ${definition}`);
+      }
+    }
+    await run("UPDATE magic_links SET usedAt = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE purpose IS NULL AND usedAt IS NULL");
+    await run(`CREATE TRIGGER IF NOT EXISTS revoke_links_on_auth_version
+      AFTER UPDATE OF authVersion ON users WHEN NEW.authVersion != OLD.authVersion
+      BEGIN
+        UPDATE magic_links SET usedAt = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+        WHERE usedAt IS NULL AND (userId = NEW.id OR (userId IS NULL AND email = NEW.email));
+      END`);
   }
 
   private async createDefaultFolders(): Promise<void> {
@@ -354,60 +392,28 @@ class SQLiteAuthStore {
   }
 
   private async createDefaultUsers(): Promise<void> {
-    const db = await this.getDb();
-
-    return new Promise((resolve, reject) => {
-      // Check if admin user exists
-      db.get('SELECT id FROM users WHERE username = ?', ['admin'], async (err, row) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-
-        if (!row) {
-          // Create default team
-          const teamId = uuidv4();
-          const now = new Date().toISOString();
-
-          db.run('INSERT INTO teams (id, name, createdAt, updatedAt) VALUES (?, ?, ?, ?)', 
-            [teamId, 'Development Team', now, now]);
-
-          // Create admin user
-          const adminId = uuidv4();
-          const adminPasswordHash = await bcrypt.hash('graphdone', 10);
-          
-          db.run(`INSERT INTO users (id, email, username, name, role, passwordHash, createdAt, updatedAt, isActive, isEmailVerified) 
-                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, 
-            [adminId, 'admin@graphdone.local', 'admin', 'Admin User', 'ADMIN', adminPasswordHash, now, now, 1, 1]);
-
-          // Link admin to team
-          db.run('INSERT INTO user_teams (userId, teamId, role, createdAt) VALUES (?, ?, ?, ?)',
-            [adminId, teamId, 'OWNER', now]);
-
-          // Create viewer user
-          const viewerId = uuidv4();
-          const viewerPasswordHash = await bcrypt.hash('viewer123', 10);
-          
-          db.run(`INSERT INTO users (id, email, username, name, role, passwordHash, createdAt, updatedAt, isActive, isEmailVerified) 
-                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, 
-            [viewerId, 'viewer@graphdone.local', 'viewer', 'Viewer User', 'VIEWER', viewerPasswordHash, now, now, 1, 1]);
-
-          // Link viewer to team
-          db.run('INSERT INTO user_teams (userId, teamId, role, createdAt) VALUES (?, ?, ?, ?)',
-            [viewerId, teamId, 'MEMBER', now], (err) => {
-              if (err) {
-                reject(err);
-              } else {
-                // Default users created successfully
-                resolve();
-              }
-            });
-        } else {
-          // Default users already exist
-          resolve();
-        }
-      });
-    });
+    const db=await this.getDb();
+    const run=(sql:string,args:unknown[])=>new Promise<void>((resolve,reject)=>db.run(sql,args,e=>e?reject(e):resolve()));
+    const existing=await new Promise<any>((resolve,reject)=>db.get("SELECT * FROM users WHERE username='admin'",(e,row)=>e?reject(e):resolve(row)));
+    if(existing)return;
+    const production=process.env.NODE_ENV==='production';
+    let password=process.env.ADMIN_PASSWORD||(production?randomBytes(32).toString('base64url'):'graphdone');
+    if(production&&password.length<20)throw Error('ADMIN_PASSWORD must be at least 20 characters in production.');
+    let email=process.env.ADMIN_EMAIL||'admin@graphdone.local';const now=new Date().toISOString(),adminId=uuidv4(),teamId=uuidv4();
+    if(production&&!process.env.ADMIN_PASSWORD){
+      const filename=path.join(process.cwd(),'data','bootstrap-admin.json');
+      // Retain recoverable first-start credentials on the persistent private volume.
+      if(fs.existsSync(filename)){const saved=JSON.parse(fs.readFileSync(filename,'utf8'));if(typeof saved.password!=='string'||saved.password.length<20||typeof saved.email!=='string')throw Error('Invalid bootstrap credential file');password=saved.password;email=saved.email;}
+      else fs.writeFileSync(filename,JSON.stringify({username:'admin',email,password,createdAt:now},null,2),{mode:0o600,flag:'wx'});
+    }
+    await run('BEGIN IMMEDIATE',[]);
+    try {
+    await run('INSERT INTO teams(id,name,createdAt,updatedAt) VALUES(?,?,?,?)',[teamId,'My team',now,now]);
+    await run('INSERT INTO users(id,email,username,name,role,passwordHash,createdAt,updatedAt,isActive,isEmailVerified) VALUES(?,?,?,?,?,?,?,?,1,1)',[adminId,email,'admin','Administrator','ADMIN',await bcrypt.hash(password,12),now,now]);
+    await run('INSERT INTO user_teams(userId,teamId,role,createdAt) VALUES(?,?,?,?)',[adminId,teamId,'OWNER',now]);
+    if(!production){const viewerId=uuidv4();await run('INSERT INTO users(id,email,username,name,role,passwordHash,createdAt,updatedAt,isActive,isEmailVerified) VALUES(?,?,?,?,?,?,?,?,1,1)',[viewerId,'viewer@graphdone.local','viewer','Viewer','VIEWER',await bcrypt.hash('viewer123',10),now,now]);await run('INSERT INTO user_teams(userId,teamId,role,createdAt) VALUES(?,?,?,?)',[viewerId,teamId,'MEMBER',now]);}
+    await run('COMMIT',[]);
+    }catch(error){await run('ROLLBACK',[]);throw error;}
   }
 
   async findUserByEmailOrUsername(emailOrUsername: string): Promise<User | null> {
@@ -435,6 +441,7 @@ class SQLiteAuthStore {
             name: row.name,
             role: row.role,
             passwordHash: row.passwordHash,
+            authVersion: row.authVersion,
             createdAt: row.createdAt,
             updatedAt: row.updatedAt,
             isActive: Boolean(row.isActive),
@@ -452,7 +459,7 @@ class SQLiteAuthStore {
     });
   }
 
-  async findUserById(id: string): Promise<User | null> {
+  async findUserById(id: string, includeInactive = false): Promise<User | null> {
     await this.initialize();
     const db = await this.getDb();
 
@@ -463,10 +470,10 @@ class SQLiteAuthStore {
         LEFT JOIN user_teams ut ON u.id = ut.userId
         LEFT JOIN teams t ON ut.teamId = t.id
         WHERE u.id = ?
-        AND u.isActive = 1
+        AND (? = 1 OR u.isActive = 1)
       `;
       
-      db.get(sql, [id], (err, row: any) => {
+      db.get(sql, [id, includeInactive ? 1 : 0], (err, row: any) => {
         if (err) {
           reject(err);
         } else if (row) {
@@ -477,6 +484,7 @@ class SQLiteAuthStore {
             name: row.name,
             role: row.role,
             passwordHash: row.passwordHash,
+            authVersion: row.authVersion,
             createdAt: row.createdAt,
             updatedAt: row.updatedAt,
             isActive: Boolean(row.isActive),
@@ -519,6 +527,7 @@ class SQLiteAuthStore {
             name: row.name,
             role: row.role,
             passwordHash: row.passwordHash,
+            authVersion: row.authVersion,
             createdAt: row.createdAt,
             updatedAt: row.updatedAt,
             isActive: Boolean(row.isActive),
@@ -567,6 +576,7 @@ class SQLiteAuthStore {
               name: userData.name,
               role: 'ADMIN',
               passwordHash,
+              authVersion: 0,
               createdAt: now,
               updatedAt: now,
               isActive: true,
@@ -594,6 +604,7 @@ class SQLiteAuthStore {
             name: row.name,
             role: row.role,
             passwordHash: row.passwordHash,
+            authVersion: row.authVersion,
             createdAt: row.createdAt,
             updatedAt: row.updatedAt,
             isActive: Boolean(row.isActive),
@@ -656,6 +667,7 @@ class SQLiteAuthStore {
                   name: row.name,
                   role: row.role,
                   passwordHash: row.passwordHash,
+                  authVersion: row.authVersion,
                   createdAt: row.createdAt,
                   updatedAt: row.updatedAt,
                   isActive: Boolean(row.isActive),
@@ -810,13 +822,16 @@ class SQLiteAuthStore {
     const deactivationDate = isActive ? null : now;
 
     return new Promise((resolve, reject) => {
-      db.run('UPDATE users SET isActive = ?, deactivationDate = ?, updatedAt = ? WHERE id = ?', 
-        [isActive ? 1 : 0, deactivationDate, now, userId], (err) => {
+      db.run('UPDATE users SET authVersion = authVersion + CASE WHEN isActive != ? THEN 1 ELSE 0 END, isActive = ?, deactivationDate = ?, updatedAt = ? WHERE id = ?',
+        [isActive ? 1 : 0, isActive ? 1 : 0, deactivationDate, now, userId], (err) => {
         if (err) {
           reject(err);
         } else {
           // Return updated user
-          this.findUserById(userId).then(user => resolve(user!)).catch(reject);
+          this.findUserById(userId, true).then(user => {
+            if (!user) throw new Error('User not found');
+            resolve(user);
+          }).catch(reject);
         }
       });
     });
@@ -830,7 +845,7 @@ class SQLiteAuthStore {
     const now = new Date().toISOString();
 
     return new Promise((resolve, reject) => {
-      db.run('UPDATE users SET passwordHash = ?, updatedAt = ? WHERE id = ?', 
+      db.run('UPDATE users SET passwordHash = ?, authVersion = authVersion + 1, updatedAt = ? WHERE id = ?',
         [passwordHash, now, userId], (err) => {
         if (err) {
           reject(err);
@@ -898,6 +913,43 @@ class SQLiteAuthStore {
     });
   }
 
+  async findFolderById(folderId: string): Promise<any | null> {
+    await this.initialize();
+    const db = await this.getDb();
+    return new Promise((resolve, reject) => {
+      db.get('SELECT * FROM folders WHERE id = ?', [folderId], (error, row: any) => {
+        if (error) reject(error);
+        else resolve(row ? { ...row, type: row.type.toLowerCase() } : null);
+      });
+    });
+  }
+
+  async getFolderDescendantIds(folderId: string): Promise<string[]> {
+    await this.initialize();
+    const db = await this.getDb();
+    return new Promise((resolve, reject) => {
+      db.all(`WITH RECURSIVE descendants(id) AS (
+        SELECT id FROM folders WHERE parentId = ?
+        UNION
+        SELECT folders.id FROM folders JOIN descendants ON folders.parentId = descendants.id
+      ) SELECT id FROM descendants`, [folderId], (error, rows: { id: string }[]) => {
+        if (error) reject(error);
+        else resolve(rows.map(row => row.id));
+      });
+    });
+  }
+
+  async isTeamMember(userId: string, teamId: string): Promise<boolean> {
+    await this.initialize();
+    const db = await this.getDb();
+    return new Promise((resolve, reject) => {
+      db.get('SELECT 1 FROM user_teams WHERE userId = ? AND teamId = ?', [userId, teamId], (error, row) => {
+        if (error) reject(error);
+        else resolve(Boolean(row));
+      });
+    });
+  }
+
   // Get user's folder structure
   async getUserFolders(userId: string): Promise<any[]> {
     await this.initialize();
@@ -907,17 +959,17 @@ class SQLiteAuthStore {
       const sql = `
         SELECT f.*, 
           CASE 
-            WHEN f.type = 'team' THEN t.name
-            WHEN f.type = 'user' THEN u.name
+            WHEN LOWER(f.type) = 'team' THEN t.name
+            WHEN LOWER(f.type) = 'user' THEN u.name
             ELSE 'System'
           END as ownerName
         FROM folders f
-        LEFT JOIN teams t ON f.type = 'team' AND f.ownerId = t.id
-        LEFT JOIN users u ON f.type = 'user' AND f.ownerId = u.id
+        LEFT JOIN teams t ON LOWER(f.type) = 'team' AND f.ownerId = t.id
+        LEFT JOIN users u ON LOWER(f.type) = 'user' AND f.ownerId = u.id
         WHERE 
-          f.type = 'system' 
-          OR (f.type = 'user' AND f.ownerId = ?)
-          OR (f.type = 'team' AND f.ownerId IN (
+          LOWER(f.type) = 'system'
+          OR (LOWER(f.type) = 'user' AND f.ownerId = ?)
+          OR (LOWER(f.type) = 'team' AND f.ownerId IN (
             SELECT teamId FROM user_teams WHERE userId = ?
           ))
         ORDER BY f.type, f.position, f.name
@@ -927,7 +979,7 @@ class SQLiteAuthStore {
         if (err) {
           reject(err);
         } else {
-          resolve(rows);
+          resolve(rows.map(row => ({ ...row, type: row.type.toLowerCase() })));
         }
       });
     });
@@ -1076,7 +1128,7 @@ class SQLiteAuthStore {
 
     return new Promise((resolve, reject) => {
       // Check if user already has personal folders
-      db.get('SELECT id FROM folders WHERE type = ? AND ownerId = ?', ['user', userId], (err, row) => {
+      db.get('SELECT id FROM folders WHERE LOWER(type) = ? AND ownerId = ?', ['user', userId], (err, row) => {
         if (err) {
           reject(err);
           return;
@@ -1140,6 +1192,7 @@ class SQLiteAuthStore {
             name: row.name,
             role: row.role,
             passwordHash: row.passwordHash,
+            authVersion: row.authVersion,
             createdAt: row.createdAt,
             updatedAt: row.updatedAt,
             isActive: Boolean(row.isActive),
@@ -1157,57 +1210,12 @@ class SQLiteAuthStore {
     });
   }
 
-  async findOrCreateUserFromOAuth(oauthData: {
-    provider: string;
-    providerId: string;
-    email: string;
-    name: string;
-    avatar?: string;
-    accessToken?: string;
-    refreshToken?: string;
-    profile?: any;
-  }): Promise<User> {
+  async findOrCreateUserFromOAuth(identity: OAuthIdentity): Promise<User> {
     await this.initialize();
-    const db = await this.getDb();
-
-    const existingUser = await this.findUserByOAuthProvider(oauthData.provider, oauthData.providerId);
-    if (existingUser) {
-      await this.updateOAuthProvider(existingUser.id, oauthData);
-      return existingUser;
-    }
-
-    const userByEmail = await this.findUserByEmailOrUsername(oauthData.email);
-    if (userByEmail) {
-      await this.linkOAuthProvider(userByEmail.id, oauthData);
-      return userByEmail;
-    }
-
-    const userId = uuidv4();
-    const now = new Date().toISOString();
-    const username = oauthData.email.split('@')[0] + '_' + Math.random().toString(36).substring(7);
-    const passwordHash = await bcrypt.hash(uuidv4(), 10);
-
-    return new Promise((resolve, reject) => {
-      db.serialize(() => {
-        db.run(`INSERT INTO users (id, email, username, name, role, passwordHash, createdAt, updatedAt, isActive, isEmailVerified)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [userId, oauthData.email.toLowerCase(), username, oauthData.name, 'USER', passwordHash, now, now, 1, 1],
-          async (err) => {
-            if (err) {
-              reject(err);
-              return;
-            }
-
-            try {
-              await this.linkOAuthProvider(userId, oauthData);
-              const newUser = await this.findUserById(userId);
-              resolve(newUser!);
-            } catch (linkErr) {
-              reject(linkErr);
-            }
-          });
-      });
-    });
+    const snapshot = await resolveOAuthAccount(await this.getDb(), identity);
+    const user = await this.findUserById(snapshot.id);
+    if (!user || user.authVersion !== snapshot.authVersion) throw new Error('Account changed during authentication');
+    return user;
   }
 
   async linkOAuthProvider(userId: string, oauthData: {
@@ -1303,10 +1311,13 @@ class SQLiteAuthStore {
     });
   }
 
-  async createMagicLink(email: string): Promise<{ id: string; token: string; expiresAt: string }> {
+  async createMagicLink(email: string, purpose: AuthLinkPurpose): Promise<{ id: string; token: string; expiresAt: string }> {
     await this.initialize();
     const db = await this.getDb();
 
+    if (purpose !== 'login' && purpose !== 'password-reset') throw new Error('Invalid email link purpose');
+    const account = await this.findUserByEmailOrUsername(email);
+    if ((account && !account.isActive) || (purpose === 'password-reset' && !account)) throw new Error('Email link unavailable');
     const id = uuidv4();
     const token = uuidv4() + uuidv4();
     const now = new Date();
@@ -1315,8 +1326,8 @@ class SQLiteAuthStore {
 
     return new Promise((resolve, reject) => {
       db.run(
-        'INSERT INTO magic_links (id, email, token, expiresAt, createdAt) VALUES (?, ?, ?, ?, ?)',
-        [id, email.toLowerCase(), token, expiresAt.toISOString(), createdAt],
+        'INSERT INTO magic_links (id, email, token, expiresAt, createdAt, purpose, userId, authVersion) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [id, email.toLowerCase(), token, expiresAt.toISOString(), createdAt, purpose, account?.id ?? null, account?.authVersion ?? 0],
         (err) => {
           if (err) {
             reject(err);
@@ -1328,39 +1339,72 @@ class SQLiteAuthStore {
     });
   }
 
-  async verifyMagicLink(token: string): Promise<{ valid: boolean; email?: string; userId?: string }> {
+  async verifyMagicLink(token: string): Promise<{ valid: boolean; email?: string; userId?: string; authVersion?: number; role?: string }> {
     await this.initialize();
     const db = await this.getDb();
     const now = new Date().toISOString();
 
-    return new Promise((resolve, reject) => {
+    const link = await new Promise<{ id: string; email: string; userId: string | null; authVersion: number } | undefined>((resolve, reject) => {
       db.get(
-        'SELECT * FROM magic_links WHERE token = ? AND usedAt IS NULL AND expiresAt > ?',
+        "SELECT id, email, userId, authVersion FROM magic_links WHERE token = ? AND purpose = 'login' AND authVersion IS NOT NULL AND usedAt IS NULL AND expiresAt > ?",
         [token, now],
-        async (err, row: any) => {
-          if (err) {
-            reject(err);
-          } else if (row) {
-            db.run('UPDATE magic_links SET usedAt = ? WHERE id = ?', [now, row.id]);
-
-            let user = await this.findUserByEmailOrUsername(row.email);
-            if (!user) {
-              user = await this.createUser({
-                email: row.email,
-                username: row.email.split('@')[0] + '_' + Math.random().toString(36).substring(7),
-                password: uuidv4(),
-                name: row.email.split('@')[0],
-                role: 'USER'
-              });
-            }
-
-            resolve({ valid: true, email: row.email, userId: user.id });
-          } else {
-            resolve({ valid: false });
-          }
+        (error, row: { id: string; email: string; userId: string | null; authVersion: number } | undefined) => {
+          if (error) reject(error);
+          else resolve(row);
         }
       );
     });
+    if (!link) return { valid: false };
+
+    const changed = await new Promise<number>((resolve, reject) => {
+      db.run(
+        `UPDATE magic_links SET usedAt = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+         WHERE id = ? AND token = ? AND purpose = 'login' AND usedAt IS NULL
+         AND expiresAt > strftime('%Y-%m-%dT%H:%M:%fZ', 'now') AND (
+           EXISTS (SELECT 1 FROM users WHERE users.email = magic_links.email AND users.isActive = 1
+             AND users.authVersion = magic_links.authVersion AND (magic_links.userId IS NULL OR users.id = magic_links.userId))
+           OR (userId IS NULL AND authVersion = 0 AND NOT EXISTS (SELECT 1 FROM users WHERE users.email = magic_links.email))
+         )`,
+        [link.id, token],
+        function (error) {
+          if (error) reject(error);
+          else resolve(this.changes);
+        }
+      );
+    });
+    if (changed !== 1) return { valid: false };
+
+    let user = await this.findUserByEmailOrUsername(link.email);
+    if (!user) {
+      user = await this.createUser({
+        email: link.email,
+        username: link.email.split('@')[0] + '_' + Math.random().toString(36).substring(7),
+        password: uuidv4(),
+        name: link.email.split('@')[0],
+        role: 'USER'
+      });
+    }
+    if (!user.isActive || user.authVersion !== link.authVersion || (link.userId && link.userId !== user.id)) return { valid: false };
+    return { valid: true, email: link.email, userId: user.id, authVersion: link.authVersion, role: user.role };
+  }
+
+  async resetPasswordWithLink(token: string, newPassword: string): Promise<boolean> {
+    await this.initialize();
+    const db = await this.getDb();
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    const changed = await new Promise<number>((resolve, reject) => {
+      db.run(`UPDATE users SET passwordHash = ?, authVersion = authVersion + 1,
+        updatedAt = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+        WHERE isActive = 1 AND EXISTS (
+          SELECT 1 FROM magic_links WHERE token = ? AND purpose = 'password-reset'
+          AND userId = users.id AND email = users.email AND authVersion = users.authVersion
+          AND usedAt IS NULL AND expiresAt > strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+        )`, [passwordHash, token], function (error) {
+          if (error) reject(error);
+          else resolve(this.changes);
+        });
+    });
+    return changed === 1;
   }
 
   async createShareableLink(data: {

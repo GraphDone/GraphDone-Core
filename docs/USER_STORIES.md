@@ -35,9 +35,19 @@ Why this exists: everybody hates Jira. GraphDone wins by being **alive, fast eve
 | ADAPT-4 | As a user with a huge graph on a slow link, I want the graph streamed by relevance (my items + center-of-gravity first, periphery progressively), so first paint is fast. | Initial query bounded (≤ 150 nodes); progressive fetch fills periphery in background; loading affordance on unexpanded frontier; TTFP < 2s on simulated 3G for 1k-node graph. | server test `server/src/__tests__/progressive-loading.test.ts`, e2e `tests/e2e/adaptive.spec.ts` | 💤 |
 | ADAPT-5 | As a user who upgrades conditions (wifi, plugged in), I want quality to step back up automatically, so I get the pretty version when I can afford it. | `connection.change` listener re-evaluates tier; hysteresis prevents flapping (≥ 10s between step-ups); unit-tested state machine. | `adaptiveQuality.test.ts` | ✅ |
 | ADAPT-6 | As a user, I want to optionally pin a quality tier in Settings (Auto / Low / High...), so I stay in control when auto guesses wrong. | Settings override persists (localStorage); "Auto" returns to detection; UI shows current effective tier. | `adaptiveQuality.test.ts`, `adaptive.spec.ts` | ✅ |
-| ADAPT-7 | As a phone user, I want LOD (level-of-detail) tuned per tier — labels, icons, minimap appear/disappear by zoom *and* tier — so small screens stay readable and fast. | LOD thresholds parameterized by tier; snapshot tests per tier; no text rendering at far zoom on LOW. | `adaptiveQuality.test.ts` | 💤 |
-| ADAPT-8 | As a developer, I want performance budgets enforced in CI (bundle size, TTI, fps on reference graph), so regressions get caught before merge. | CI job fails if: web bundle gzip > 450kB, 500-node graph first-render > 1.5s in headless bench, dropped-frame rate > 20% in pan bench. | `tests/perf/check-bundle-size.mjs` + `graph-perf.spec.ts`, gated in CI | ✅ |
+| ADAPT-7 | As a phone user, I want LOD (level-of-detail) tuned per tier — labels, icons, minimap appear/disappear by zoom *and* tier — so small screens stay readable and fast. | LOD policy uses tier, projected size and density; individual detail is replaced by readable group names/counts at far zoom, including LOW. | `adaptiveQuality.test.ts`; `semantic-lod.spec.ts` and `nested-semantic-lod.spec.ts` cover readable overview, nested cuts, parent fallback and navigation. Per-region/tier budgets remain in the [LOD continuation](architecture/dynamic-graph-lod.md). | 🔨 |
+| ADAPT-8 | As a developer, I want performance budgets enforced in CI (bundle size, TTI, fps on reference graph), so regressions get caught before merge. | Bundle gate and strict measured four-node fixture are implemented. The earlier 500-node first-render/pan targets are not established by that fixture; larger graph enforcement remains pending in the [LOD continuation](architecture/dynamic-graph-lod.md). | `tests/perf/check-bundle-size.mjs` + `tests/perf/graph-perf.spec.ts`; `tests/perf/scale-sweep.spec.ts` remains report-only | 🧪 |
 | ADAPT-9 | As a user with `prefers-reduced-motion`, I want all animation suppressed regardless of tier, so accessibility beats aesthetics. | Reduced-motion forces animation-free rendering at any tier; verified in unit + e2e. | `adaptiveQuality.test.ts`, `living-graph.spec.ts` | ✅ |
+
+The [dynamic graph LOD continuation](architecture/dynamic-graph-lod.md) specifies
+the current ADAPT-4/ADAPT-7 delivery path. Its stage IDs are proposed PR-sized
+work, not issued GitHub tickets or completed features.
+
+## Schematic graph exploration
+
+| ID | Story | Acceptance | Test mapping | Status |
+|----|-------|------------|--------------|--------|
+| LOD-WIRE-1 | As a user exploring a large system, I want readable group buses and focused incoming/outgoing traces so I can follow connections without a wire ball. | Wires avoid cards/controls and unrelated buses; exact IDs/directions remain inspectable; every neighbor is reachable through bounded pages; outside connections are counted; camera/selection return and saved layout are preserved. | `tests/visual/schematic-routing.test.mjs`, `tests/visual/schematic-browser.spec.ts`, `tests/e2e/graph/nested-semantic-lod.spec.ts`, `SemanticRelationships.test.tsx`, `semanticTrace.test.ts` | 🧪 Candidate; strict CI and item wiring remain open (#219) |
 
 ## Epic 3: Responsive Everywhere 📱💻
 *Phone, tablet, PC — same living graph, appropriately shaped.*
@@ -121,3 +131,28 @@ These profiles are encoded in `packages/web/src/lib/adaptiveQuality.ts` and exer
 | AINAT-1 | As an agent, I want MCP tools over the ontology (list sets, get defs, create typed objects/links, coverage), so domain work is fully scriptable. | MCP tools land in the same PR as each ONTO story; validation errors are machine-readable. | `mcp-server/tests/ontology-tools.test.ts` | 💤 |
 | AINAT-2 | As a Claude user, I want a GraphDone Skill that runs a full requirements workflow (spec doc → proposed graph → maintained trace links → coverage report), so AI does the bookkeeping while humans watch the living graph. | Skill in skills/; end-to-end demo against dev stack; humans see live updates. | skill smoke script | 💤 |
 | AINAT-3 | As an agent, I want get_graph_context to include the ontology section (active sets, type counts, coverage headline), so one call orients me on any domain graph. | <2.5kB response incl. ontology block. | `mcp-server/tests/graph-context.test.ts` | 💤 |
+
+## Live-data and responsive completion review (2026-09-07)
+
+See [state review](reviews/2026-09-07-state.md) for the evidence and remaining gaps.
+
+| ID | Story | Acceptance / evidence | Status |
+| --- | --- | --- | --- |
+| DATA-1 | As a contributor, I want analytics based on my selected graph so progress is trustworthy. | Actual node/status/priority/contributor data; graph selection, search/status filters, empty/error/retry states; `graphAnalytics.test.ts` and `responsive-real-workflows.spec.ts`. Historical voting metrics remain unavailable. | 🧪 |
+| RESP-1a | As a phone user, I want quick editing to remain within the visible screen in either orientation. | Viewport-bounded editor/sheet, 44px controls, one-tap entry, Escape/click-away and focus handling; responsive persistence journey. Native virtual-keyboard validation still required before closing RESP-1. | 🧪 |
+
+| OBS-1a | As a human, I want saved API progress to appear in my workspace without invented events or agents. | Recorded notes and timestamps, selected-graph AI contributor view, poll while visible; `recordedActivity.test.ts` and `recorded-ai-work.spec.ts`. Actor attribution and append-only events remain open. | 🧪 |
+
+The [human-first AI work contract](design/human-ai-workspace.md) defines the remaining release requirements: scoped hosted credentials, atomic claims, idempotent attributed progress, human input/review, evidence and reconnect recovery.
+
+| UX-1a | As a human, I want the work that matters first and direct access to editing. | Overview attention/current-work sections open items; Board hides empty lanes by default; graph editing takes one tap/click; Admin reference collapses and forms fit short screens. Headed responsive and Admin form journeys. | 🧪 |
+
+| UX-SCROLL-1 | As a user, I want screens without unnecessary scrollbar clutter. | Guest dialog fits 320px portrait without scrolling, including verification success; narrow inputs shrink correctly; actions stay visible on short screens; scroll lock and viewport anchoring; Calendar uses its parent scroll region. Scrollbar chrome stays quiet, with hover/focus and forced-color access preserved. `guest-dialog-layout.spec.ts`. | 🧪 |
+
+## New-user release gate
+
+| ID | Story | Acceptance criteria | Tests | Status |
+| --- | --- | --- | --- | --- |
+| QC-NEW-1 | As a first-time user, I can create useful work, record progress and return to it on my device. | First task can be created through visible UI in every view; status/notes/dates persist; the same data appears across views. | `quality/persona-lifecycle.spec.ts`, `quality/new-user-modes.spec.ts`, `docs/quality/SCENARIOS.md` | 🧪 |
+| QC-TEAM-1 | As a team member, I can hand off work without losing context or exposing private work. | Distinct editor/reviewer/viewer/outsider sessions, concurrency and membership changes pass the standard scenarios. | `docs/quality/SCENARIOS.md` COLLAB-* / LARGE-*; not yet full end-to-end coverage | 🔨 |
+| SEC-FOLDER-1 | As a user, my project folders and graph references stay within their access boundaries. | Current roles and membership govern reads and writes; foreign parents, owners and destinations fail before persistence; guests and viewers are read-only. | `packages/server/tests/folder-authorization.test.ts`; both GraphQL schemas with in-memory SQLite, simulated graph metadata; live browser/Neo4j evidence remains separate | 🧪 |

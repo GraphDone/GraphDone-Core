@@ -1,0 +1,122 @@
+import {test,expect} from '@playwright/test';
+import {mkdir,writeFile} from 'node:fs/promises';
+import {login,TEST_USERS} from '../../lib/auth';
+import {gql} from '../../lib/graphRequest';
+
+// Translation stability is separate from intentional color/scale animation.
+// Measure every animation frame, so a screenshot between shakes cannot pass.
+for(const [width,height] of [[390,844],[844,390],[1440,900]]) {
+ test(`graph settles after real drags, edits and rotation ${width} @motion`,async({page},info)=>{
+  test.setTimeout(100000);
+  await page.setViewportSize({width,height});
+  await login(page,TEST_USERS.ADMIN);
+  const me=(await gql(page,'{me{id}}')).me.id;
+  const graph=(await gql(page,'mutation($input:[GraphCreateInput!]!){createGraphs(input:$input){graphs{id}}}',{input:[{name:`Motion QC ${width} ${Date.now()}`,type:'PROJECT',status:'ACTIVE',createdBy:me}]})).createGraphs.graphs[0].id;
+  try{
+   const created=await gql(page,'mutation($input:[WorkItemCreateInput!]!){createWorkItems(input:$input){workItems{id title}}}',{input:[
+    {title:'Drag this task',positionX:400,positionY:300},
+    {title:'Keep this task still',positionX:750,positionY:550},
+   ].map(n=>({...n,type:'TASK',status:'IN_PROGRESS',positionZ:0,graph:{connect:{where:{node:{id:graph}}}}}))});
+   await page.evaluate(id=>{localStorage.setItem('currentGraphId',id);localStorage.setItem('graphdone:viewMode','graph');},graph);
+   await page.addInitScript(() => {
+    const Native = window.ResizeObserver;
+    const target = window as any;
+    target.__holdGraphResize = false;
+    target.__pendingGraphResizes = [];
+    window.ResizeObserver = class extends Native {
+     constructor(callback: ResizeObserverCallback) {
+      super((entries, observer) => {
+       const deliver = () => callback(entries, observer);
+       if (target.__holdGraphResize && entries.some(entry => entry.target.matches('.graph-container'))) target.__pendingGraphResizes.push(deliver);
+       else deliver();
+      });
+     }
+    };
+   });
+   await page.goto('/');
+   const itemId=created.createWorkItems.workItems.find((item:{id:string;title:string})=>item.title==='Drag this task').id;
+   const node=page.locator('.graph-container .node').filter({has:page.locator(`[data-node-id="${itemId}"]`)});
+   await expect(node).toBeVisible();
+   const lock = page.getByTestId('graph-lock-toggle');
+   if (await lock.isVisible()) {
+     if ((await lock.textContent())?.trim() === 'Locked') await lock.click();
+     await expect(lock).toHaveText('Editing');
+   }
+   await page.getByRole('button',{name:'Zoom to fit — frame all nodes'}).click();
+   await expect.poll(()=>page.evaluate(()=>(window as any).__layoutMetrics?.()?.atRest)).toBe(true);
+   const translation = () => node.evaluate(element => { const matrix = (element as SVGGraphicsElement).getScreenCTM(); return { x: matrix!.e, y: matrix!.f }; });
+   await expect(async()=>{const a=await translation();await page.waitForTimeout(120);const b=await translation();expect(Math.abs(a.x-b.x)+Math.abs(a.y-b.y)).toBeLessThan(0.1);}).toPass({timeout:3000});
+   const before=(await gql(page,'query($id:ID!){workItems(where:{graph:{id:$id}}){title positionX positionY}}',{id:graph})).workItems.find((n:any)=>n.title==='Drag this task');
+   const box=await node.boundingBox();
+   await page.mouse.move(box!.x+box!.width/2,box!.y+box!.height/2);
+   await page.mouse.down();
+   await page.mouse.move(box!.x+box!.width/2+45,box!.y+box!.height/2+35,{steps:24});
+   await page.mouse.up();
+   await expect.poll(async()=>{const after=(await gql(page,'query($id:ID!){workItems(where:{graph:{id:$id}}){title positionX positionY}}',{id:graph})).workItems.find((n:any)=>n.title==='Drag this task');return Math.hypot(after.positionX-before.positionX,after.positionY-before.positionY);},{timeout:5000}).toBeGreaterThan(20);
+   // A fully pinned graph has nothing to solve after release. It must not
+   // keep reheating for seconds or fight the user's chosen placement.
+   await expect.poll(()=>page.evaluate(()=>(window as any).__layoutMetrics?.()?.atRest),{timeout:2000}).toBe(true);
+   await expect.poll(()=>page.evaluate(()=>(window as any).__layoutMetrics?.()?.cameraReady)).toBe(true);
+   await node.dblclick({timeout:10000});
+   await expect(page.getByTestId('quick-edit-surface')).toBeVisible();
+   await expect(page.getByTestId('quick-title')).toHaveValue('Drag this task');
+   await page.getByTestId('quick-type').getByRole('button',{name:'Idea',exact:true}).click();
+   await page.keyboard.press('Escape');
+   await expect.poll(async()=>{
+    const items=(await gql(page,'query($id:ID!){workItems(where:{graph:{id:$id}}){title type}}',{id:graph})).workItems;
+    return items.find((item:any)=>item.title==='Drag this task')?.type;
+   }).toBe('IDEA');
+   await expect(node.locator('.node-type-text')).toHaveText(/idea/i);
+   await expect(node).toHaveAttribute('aria-label','Drag this task, Idea');
+   const ready = () => page.evaluate(() => {
+    const metrics = (window as any).__layoutMetrics?.();
+    return metrics?.atRest === true && metrics?.cameraReady === true;
+   });
+   await expect.poll(ready,{timeout:2000}).toBe(true);
+   if(width===390){
+    await page.evaluate(() => { (window as any).__holdGraphResize = true; });
+    await page.setViewportSize({width:844,height:390});
+    await expect.poll(()=>page.evaluate(()=>(window as any).__pendingGraphResizes.length)).toBeGreaterThan(0);
+    const held = await page.evaluate(() => (window as any).__layoutMetrics());
+    expect(held.atRest).toBe(true);
+    expect(held.cameraReady).toBe(false);
+    expect(await page.evaluate(() => {
+     const target = window as any;
+     target.__holdGraphResize = false;
+     for(const deliver of target.__pendingGraphResizes.splice(0)) deliver();
+     return target.__layoutMetrics().cameraReady;
+    })).toBe(false);
+    await expect.poll(ready,{timeout:2000}).toBe(true);
+    await page.setViewportSize({width,height});
+    await expect.poll(ready,{timeout:2000}).toBe(true);
+   }
+   await expect.poll(ready,{timeout:2000}).toBe(true);
+   const sample=await page.evaluate(async()=>{
+    const samples:Record<string,Array<{x:number;y:number}>>={};
+    const start=performance.now();let frames=0,maxGap=0,last=start;
+    await new Promise<void>(resolve=>{
+     const frame=()=>{
+      const now=performance.now();maxGap=Math.max(maxGap,now-last);last=now;frames++;
+      document.querySelectorAll<SVGGElement>('.graph-container .node').forEach(el=>{
+       const d=(el as any).__data__;const point=el.getScreenCTM();
+       if(d?.id&&point)(samples[d.id]??=[]).push({x:point.e,y:point.f});
+      });
+      if(now-start<17000)requestAnimationFrame(frame);else resolve();
+     };requestAnimationFrame(frame);
+    });
+    return {frames,maxGap,series:samples,nodes:Object.entries(samples).map(([id,points])=>({id,samples:points.length,xSpan:Math.max(...points.map(p=>p.x))-Math.min(...points.map(p=>p.x)),ySpan:Math.max(...points.map(p=>p.y))-Math.min(...points.map(p=>p.y))}))};
+   });
+   await mkdir('test-artifacts/quality',{recursive:true});
+   await writeFile(`test-artifacts/quality/motion-${width}.json`,JSON.stringify(sample,null,2));
+   await page.screenshot({path:`test-artifacts/quality/motion-${width}.png`});
+   await info.attach('motion-samples.json',{body:JSON.stringify(sample,null,2),contentType:'application/json'});
+   expect(sample.frames).toBeGreaterThan(100);
+   expect(sample.nodes).toHaveLength(2);
+   for(const sampleNode of sample.nodes){expect(sampleNode.xSpan,'idle horizontal shaking during the 17-second sample').toBeLessThanOrEqual(1);expect(sampleNode.ySpan,'idle vertical shaking during the 17-second sample').toBeLessThanOrEqual(1);}
+   await page.screenshot({path:`test-artifacts/quality/motion-${width}.png`});
+  }finally{
+   await gql(page,'mutation($id:ID!){deleteWorkItems(where:{graph:{id:$id}}){nodesDeleted}}',{id:graph});
+   await gql(page,'mutation($id:ID!){deleteGraphs(where:{id:$id}){nodesDeleted}}',{id:graph});
+  }
+ });
+}

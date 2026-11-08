@@ -1,18 +1,23 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/img/hero/graphdone-dark.svg">
+  <img src="docs/img/hero/graphdone-light.svg" width="100%" alt="GraphDone: relationship management for agents. Work items owned by people and AI agents complete in dependency order and flow into an outcome.">
+</picture>
+
 # GraphDone
 
-> Project management for teams who think differently. Coordinate through dependencies and outcomes, not hierarchies and top-down control.
+> Management for teams who think differently. Coordinate through dependencies and outcomes, not hierarchies and top-down control.
 
 ![GraphDone's living graph — priority glow, breathing nodes, energy flowing along dependencies](./docs/graphdone_ui.png)
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/version-0.3.1--alpha-orange.svg)
+![Version](https://img.shields.io/badge/version-0.4.0--alpha-orange.svg)
 ![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
 
 > 🔒 **SECURITY NOTE**: GraphDone supports both HTTP (development) and HTTPS/TLS (production) modes. For production deployment, enable TLS encryption and use production-grade authentication. See [TLS/SSL Setup Guide](./docs/tls-ssl-setup.md) for configuration details.
 
 ## What is GraphDone?
 
-GraphDone reimagines project management as a collaborative graph where work flows through natural dependencies rather than artificial hierarchies. It's designed for high-quality individual contributors who thrive on autonomy, teams that include AI agents, and organizations ready to embrace democratic coordination.
+GraphDone reimagines management as a collaborative graph where work flows through natural dependencies rather than artificial hierarchies. It's designed for high-quality individual contributors who thrive on autonomy, teams that include AI agents, and organizations ready to embrace democratic coordination.
 
 **Key Features:**
 - 🌊 **A living graph** - in-progress work breathes, priority glows, energy flows along dependencies, completed work celebrates. The graph feels inhabited, not diagrammed
@@ -45,28 +50,32 @@ GraphDone is built on the belief that:
 
 [Read our complete philosophy →](./docs/philosophy.md)
 
+## Public VPS hosting
+
+Use the [self-hosting guide](docs/deployment/SELF_HOSTING.md) and `./scripts/self-host.sh your-domain.example` for a production-oriented installation with generated credentials and private database networking. The development setup below uses demo credentials and is for local development.
+
 ## Quick Start
 
 ### 🚀 One-Line Install (Like Ollama!)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/scripts/install.sh | sh
 ```
 
 Or with wget:
 ```bash
-wget -qO- https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh | sh
+wget -qO- https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/scripts/install.sh | sh
 ```
 
 **What the installer does:**
 1. **Pre-flight Checks** - Validates network, disk space (5GB), download/upload speeds
 2. **System Detection** - Detects platform (macOS 10.15+, Linux distros)
-3. **Dependency Installation** - Installs Git, Node.js 18+, Docker if needed
+3. **Dependency Installation** - Installs Git, Node.js 22.18+, Docker if needed
    - macOS: Uses Homebrew + OrbStack (Docker alternative)
    - Linux: Smart sudo authentication (works with curl/wget pipes), uses apt/dnf/yum + Docker Engine (15+ distributions supported)
 4. **Code Setup** - Clones repository to `~/graphdone`, installs npm dependencies
 5. **Security Config** - Generates self-signed TLS certificates for HTTPS
-6. **Service Deployment** - Starts Neo4j, Redis, GraphQL API, React Web App
+6. **Service Deployment** - Starts Neo4j, GraphQL API, React Web App
 7. **Health Verification** - Waits for all services to be healthy (60s timeout)
 
 **Access URLs after installation:**
@@ -80,18 +89,13 @@ wget -qO- https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public
 
 ```bash
 # Option 1: Review the script first
-curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh | less
+curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/scripts/install.sh | less
 
 # Option 2: Download, inspect, then run
-curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh -o install.sh
+curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/scripts/install.sh -o install.sh
 cat install.sh  # Review the contents
 sh install.sh   # Run after verification
 
-# Option 3: Verify with checksums (for paranoid users)
-curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh.sha256 -o install.sh.sha256
-curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh -o install.sh
-sha256sum -c install.sh.sha256  # Verify integrity
-sh install.sh
 ```
 
 **What the installation script does:**
@@ -114,7 +118,7 @@ sh install.sh
 GraphDone requires:
 - **Docker** - For running Neo4j graph database ([Install Docker](https://docs.docker.com/get-docker/))
 - **Git** - For version control (usually pre-installed)
-- **Node.js 18+** - Optional for development (auto-installed if needed)
+- **Node.js 22.18+** - Optional for development (auto-installed if needed)
 
 ### Manual Installation
 
@@ -137,7 +141,7 @@ That's it! The script will automatically:
 
 Visit **http://localhost:3127** when you see the "GraphDone is Ready!" message.
 
-> 💡 **Don't have Node.js?** No problem! The setup script will detect this and offer to install Node.js 18 for you using nvm (Node Version Manager).
+> 💡 **Don't have Node.js?** No problem! The setup script will detect this and offer to install Node.js 22 for you using nvm (Node Version Manager).
 
 ### What You Get
 
@@ -162,8 +166,8 @@ Visit **http://localhost:3127** when you see the "GraphDone is Ready!" message.
 ./start quick
 
 # Manual control (advanced users)
-./tools/setup.sh  # One-time setup
-./tools/run.sh    # Start development servers
+./scripts/stack/setup.sh  # One-time setup
+./scripts/stack/run.sh    # Start development servers
 
 # Other commands
 ./start clean     # Clean and restart fresh
@@ -185,12 +189,12 @@ newgrp docker
 
 **Node.js Missing?**
 ```bash
-./start  # Will offer to install Node.js 18 automatically
+./start  # Will offer to install Node.js 22 automatically
 ```
 
 **Port Already in Use?**
 ```bash
-./tools/cleanup.sh  # Kill any hanging processes
+./scripts/stack/cleanup.sh  # Kill any hanging processes
 ./start             # Try starting again
 ```
 

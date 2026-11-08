@@ -15,15 +15,22 @@ Welcome to the GraphDone documentation! This directory contains comprehensive gu
 - [Systems Reference](./SYSTEMS.md) - **What's shipped and where it lives** — every subsystem mapped to its code, tests, and story
 - [Interaction Model — the friction-free contract](./design/interaction-model.md) - UX constitution: modes, exits, click budgets
 - [Progressive Streaming design](./design/progressive-streaming.md) - ADAPT-4: scale to huge graphs on slow links
+- [Dynamic graph LOD continuation](./architecture/dynamic-graph-lod.md) - Current evidence, semantic zoom, generic AI-authored systems, staged delivery and completion gates
+- [First LOD slice: validation and screenshots](./quality/DYNAMIC_LOD_VALIDATION_2026-10-27.md) - Owned desktop/phone fixtures, tested revisions and remaining gates
+- [CodeGraph LOD reuse](./architecture/codegraph-lod-reuse.md) - Working techniques, source references and regression contracts to share with GraphDone
 - [Testing & Refinement Plan](./TESTING_AND_REFINEMENT_PLAN.md) - The never-done loop; current cycle's verification debt
 - [AI Agents Quickstart](./api/AI_AGENTS.md) - 5-minute MCP/GraphQL setup for agent teammates
 
 ### [Developer Guides](./guides/)
 - [Getting Started](./guides/getting-started.md) - Setup and first steps
 - [Architecture Overview](./guides/architecture-overview.md) - System design and technical decisions
+- [Web / UI Architecture](./guides/web-ui-architecture.md) - View system, graph canvas, mobile shell, node inspector
 - [Testing Guide](../tests/README.md) - **E2E testing with robust authentication system**
 - [SQLite Deployment Modes](./guides/sqlite-deployment-modes.md) - Local dev vs Docker authentication storage
 - [User Flows](./guides/user-flows.md) - How teams actually use GraphDone
+- [VM Setup (Multipass)](./guides/vm-setup.md) - Run GraphDone in a throwaway VM
+- [Git Hooks](./guides/git-hooks.md) - Pre-commit / pre-push hooks
+- More: [`docs/testing/`](./testing/) (test architecture, PR + OAuth testing) · [`docs/security/`](./security/) (TLS, OAuth) · [`docs/deployment/`](./deployment/)
 
 ### 🤖 AI Agents Documentation
 > **Start here**: [Simple AI Agent Reality Check](./simple-agent-reality.md) - **What we're actually building**
@@ -50,22 +57,22 @@ Welcome to the GraphDone documentation! This directory contains comprehensive gu
 
 1. **Setup Development Environment**
    ```bash
-   ./tools/setup.sh
+   ./scripts/stack/setup.sh
    ```
 
 2. **Start Development Servers**
    ```bash
-   ./tools/run.sh
+   ./scripts/stack/run.sh
    ```
 
 3. **Run Tests**
    ```bash
-   ./tools/test.sh
+   ./scripts/stack/test.sh
    ```
 
 4. **Build for Production**
    ```bash
-   ./tools/build.sh --production
+   ./scripts/stack/build.sh --production
    ```
 
 ## 📖 Key Concepts

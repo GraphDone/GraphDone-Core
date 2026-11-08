@@ -78,7 +78,7 @@ export function CustomDropdown({
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-gray-700 border border-gray-600 rounded-lg shadow-lg max-h-60 overflow-auto">
+        <div data-testid="custom-dropdown-menu" className="absolute z-50 w-full mt-1 bg-gray-700 border border-gray-600 rounded-lg shadow-lg max-h-60 overflow-auto">
           {options.map((option) => (
             <button
               key={option.value}

@@ -7,13 +7,13 @@ GraphDone can be installed with a single command on macOS and Linux:
 ### Using GitHub (Recommended)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/scripts/install.sh | sh
 ```
 
 or using wget:
 
 ```bash
-wget -qO- https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh | sh
+wget -qO- https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/scripts/install.sh | sh
 ```
 
 ### Using Custom Domain (Future)
@@ -124,13 +124,13 @@ Your GraphDone instance will be available at:
 
 ```bash
 # Stop all GraphDone services
-sh ~/graphdone/public/install.sh stop
+sh ~/graphdone/scripts/install.sh stop
 
 # Complete cleanup (removes containers, volumes)
-sh ~/graphdone/public/install.sh remove
+sh ~/graphdone/scripts/install.sh remove
 
 # Reinstall/update GraphDone
-sh ~/graphdone/public/install.sh install
+sh ~/graphdone/scripts/install.sh install
 ```
 
 ## 📊 System Requirements
@@ -180,16 +180,16 @@ To host the installation script on graphdone.com:
 
 ### 1. Copy Script to Web Server
 
-Place `public/start.sh` in your web server's document root:
+Place `scripts/install.sh` in your web server's document root:
 
 ```bash
 # Example for nginx
-sudo cp public/start.sh /var/www/graphdone.com/start.sh
-sudo chmod 644 /var/www/graphdone.com/start.sh
+sudo cp scripts/install.sh /var/www/graphdone.com/install.sh
+sudo chmod 644 /var/www/graphdone.com/install.sh
 
 # Example for Apache
-sudo cp public/start.sh /var/www/html/start.sh
-sudo chmod 644 /var/www/html/start.sh
+sudo cp scripts/install.sh /var/www/html/install.sh
+sudo chmod 644 /var/www/html/install.sh
 ```
 
 ### 2. Configure Web Server
@@ -251,7 +251,7 @@ If using GitHub Pages for graphdone.com:
 
 ```bash
 # Test the script locally
-sh public/start.sh
+sh scripts/install.sh
 
 # Test from remote URL (once deployed)
 curl -fsSL https://graphdone.com/start.sh | sh
@@ -267,6 +267,15 @@ GRAPHDONE_HOME=/opt/graphdone curl -fsSL https://graphdone.com/start.sh | sh
 
 # Skip auto-start
 GRAPHDONE_NO_START=1 curl -fsSL https://graphdone.com/start.sh | sh
+```
+
+`scripts/install.sh` installs `main`, the branch it is served from. To install
+a release tag or another branch, set `GRAPHDONE_REF` for the shell that runs it
+(the clone, updates of `~/graphdone` and the setup-script downloads all follow
+it). `sh install.sh sources` prints the repository, ref and URLs it will use:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/scripts/install.sh | GRAPHDONE_REF=dev sh
 ```
 
 ## Updating GraphDone
@@ -297,17 +306,11 @@ rm -rf ~/.graphdone
 
 ```bash
 # Option 1: Review before running
-curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh | less
+curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/scripts/install.sh | less
 
 # Option 2: Download, inspect, then execute
-curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh -o install.sh
+curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/scripts/install.sh -o install.sh
 cat install.sh  # Review contents
-sh install.sh
-
-# Option 3: Verify with checksums (recommended for production)
-curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh.sha256 -o install.sh.sha256
-curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh -o install.sh
-sha256sum -c install.sh.sha256  # Verify integrity
 sh install.sh
 ```
 

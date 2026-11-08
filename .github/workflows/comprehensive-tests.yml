@@ -1,15 +1,14 @@
 name: Comprehensive Test Suite
 
-# Complements ci.yml (Node 20 + full-stack smoke gate) by proving the real
+# Complements ci.yml (Node 22 + full-stack smoke gate) by proving the real
 # unit suites also pass on the minimum supported Node version, and by
 # validating the installer + deployment config. Runs daily so flakes and
 # dependency drift surface even without a push.
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, dev]
   pull_request:
-    branches: [main, develop]
   schedule:
     - cron: '0 2 * * *'   # daily 02:00 UTC
   workflow_dispatch:
@@ -19,7 +18,7 @@ permissions:
   pull-requests: write
 
 jobs:
-  # Real unit suites across the supported Node range (engines: >=18)
+  # Real unit suites across the supported Node range (engines: >=22.18)
   unit-matrix:
     name: Unit Tests (Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
@@ -27,35 +26,45 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node-version: ['18.x', '20.x']
+        node-version: ['22.18.0', '24.x']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
-      # npm install (not ci) avoids the rollup optional-deps bug (npm/cli#4828)
       - name: Install dependencies
-        run: npm install --legacy-peer-deps
+        run: npm ci --legacy-peer-deps
       - name: Run all unit suites (core, web, server, mcp-server)
-        run: npm run test
+        run: npm run test:coverage && npm run test:unified:lib
 
-  # Genuinely-real checks: the installer exists, deployment compose parses
+  # Genuinely-real checks: the installer installs a ref that exists and can
+  # fetch its code, and the deployment compose files parse
   installer-and-deploy-config:
     name: Installer & Deploy Config
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.18.0'
+      - name: Installer ref and image-tag contract
+        run: node --test tests/toolchain/installer-contract.mjs
+      - name: Installer end to end in a container (clone, update, setup-script URLs)
+        run: sh tests/integration/installer-container.sh
       - name: Installation script present and executable
         run: |
-          test -f public/install.sh || { echo "::error::public/install.sh missing"; exit 1; }
-          test -x public/install.sh || echo "::warning::public/install.sh is not marked executable"
+          test -f scripts/install.sh || { echo "::error::scripts/install.sh missing"; exit 1; }
+          test -x scripts/install.sh || echo "::warning::scripts/install.sh is not marked executable"
           echo "✅ installer present"
       - name: Production docker compose config is valid
         run: |
-          docker compose -f deployment/docker-compose.yml config > /dev/null \
-            && echo "✅ deployment/docker-compose.yml is valid" \
-            || { echo "::error::deployment/docker-compose.yml failed to parse"; exit 1; }
+          for file in deployment/docker-compose.yml deployment/docker-compose.registry.yml; do
+            docker compose -f "$file" config > /dev/null \
+              && echo "✅ $file is valid" \
+              || { echo "::error::$file failed to parse"; exit 1; }
+          done
 
   # Honest PR comment derived from real job outcomes (no fabricated numbers)
   report:
@@ -75,7 +84,7 @@ jobs:
             const body = [
               '## 🧪 Comprehensive Test Suite',
               '',
-              `- **Unit suites (Node 18.x & 20.x)** — core, web, server, mcp-server: ${mark(unit)}`,
+              `- **Unit suites (Node 22.18.0 & 24.x)** — core, web, server, mcp-server: ${mark(unit)}`,
               `- **Installer & deploy config**: ${mark(cfg)}`,
               '',
               '_Full-stack smoke gate runs in the **CI** workflow._',

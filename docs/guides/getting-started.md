@@ -1,6 +1,6 @@
 # Getting Started with GraphDone
 
-Welcome to GraphDone! This guide will help you set up and start using GraphDone for your team's project management needs.
+Welcome to GraphDone! This guide will help you set up and start using GraphDone for your team's management needs.
 
 ## Prerequisites
 
@@ -24,7 +24,7 @@ cd GraphDone-Core
 ./start
 
 # OR run setup script directly
-./tools/setup.sh
+./scripts/stack/setup.sh
 ```
 
 The setup script will:
@@ -64,7 +64,7 @@ Start the development servers:
 ./start
 
 # OR start servers directly
-./tools/run.sh
+./scripts/stack/run.sh
 ```
 
 This will start:

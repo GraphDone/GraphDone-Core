@@ -1,9 +1,11 @@
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useId, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, FileText, Network, CreditCard } from 'lucide-react';
 import { useGraph } from '../contexts/GraphContext';
 import { getTypeConfig, getStatusConfig } from '../constants/workItemConstants';
 import type { WorkItemType } from '../constants/workItemConstants';
 import { NodeSubgraphPreview } from './NodeSubgraphPreview';
+import { CopyableId } from './CopyableId';
 
 // Heavy (markdown + Prism) — lazy so it's out of the main bundle until a node's
 // contents are first opened.
@@ -14,16 +16,30 @@ type Mode = 'card' | 'contents' | 'diagram';
 interface NodeInspectorProps {
   node: any;
   onClose: () => void;
+  onEdit?: () => void;
+  compact?: boolean;
+  /** Override the root data-testid so an anchored instance is distinguishable
+   * from the docked one when both are mounted. */
+  rootTestId?: string;
+  maxHeight?: string;
 }
 
 /**
- * Docked inspector: shows the selected node's Card (summary), Contents (its
- * description rendered as readable markdown/code), or Diagram (its sub-graph),
- * each at full legible size regardless of canvas zoom. The mode is an explicit,
- * per-node toggle — not a side effect of zooming in.
+ * Inspector: shows the selected node's Card (summary), Contents (its description
+ * rendered as readable markdown/code), or Diagram (its sub-graph), each at full
+ * legible size regardless of canvas zoom. The mode is an explicit, per-node
+ * toggle — not a side effect of zooming in. Used both docked (Workspace) and
+ * anchored on-canvas (the expand-in-place peek), the latter via `compact`.
  */
-export function NodeInspector({ node, onClose }: NodeInspectorProps) {
+export function NodeInspector({ node, onClose, onEdit, compact = false, rootTestId = 'node-inspector', maxHeight }: NodeInspectorProps) {
   const { descendInto } = useGraph();
+  useLayoutEffect(() => {
+    const trigger = document.activeElement;
+    return () => {requestAnimationFrame(() => {
+      const active = document.activeElement;
+      if (trigger?.isConnected && (active === document.body || !active?.isConnected) && (trigger instanceof HTMLElement || trigger instanceof SVGElement)) trigger.focus({preventScroll:true});
+    });};
+  }, [node.id]);
   const hasSubgraph = !!node?.subgraphId;
   const [modeByNode, setModeByNode] = useState<Record<string, Mode>>({});
   const mode: Mode = modeByNode[node.id] ?? (node.description ? 'contents' : 'card');
@@ -34,29 +50,30 @@ export function NodeInspector({ node, onClose }: NodeInspectorProps) {
 
   return (
     <div
-      data-testid="node-inspector"
-      className="flex flex-col bg-gray-900/95 backdrop-blur-sm border border-gray-700/60 rounded-xl shadow-2xl w-72 max-h-[70vh] overflow-hidden"
+      data-testid={rootTestId}
+      style={{ maxHeight }}
+      className={`flex flex-col bg-gray-900/95 backdrop-blur-md border border-gray-700/60 rounded-xl shadow-2xl overflow-y-auto ${
+        compact ? 'w-full max-h-[60vh]' : 'w-full sm:w-72 max-h-[60vh] sm:max-h-[70vh]'
+      }`}
     >
       {/* Header */}
-      <div className="flex items-start gap-2 p-3 border-b border-gray-700/60">
+      <div className="shrink-0 flex items-start gap-2 p-3 border-b border-gray-700/60">
         <div className="flex-1 min-w-0">
-          <div className="text-[10px] uppercase tracking-wide" style={{ color: typeCfg.hexColor }}>{typeCfg.label}</div>
-          <div className="text-sm font-semibold text-white truncate" title={node.title}>{node.title}</div>
+          <div className="text-xs uppercase tracking-wide" style={{ color: typeCfg.hexColor }}>{typeCfg.label}</div>
+          <div className="max-h-24 overflow-y-auto text-base font-semibold text-white [overflow-wrap:anywhere]" tabIndex={0} title={node.title}>{node.title}</div>
+          <div className="mt-0.5"><CopyableId id={node.id} /></div>
         </div>
-        <button onClick={onClose} className="p-1 text-gray-400 hover:text-white rounded hover:bg-gray-700/50" title="Close">
+        {onEdit && <button onClick={onEdit} className="min-h-[44px] px-3 rounded-lg text-emerald-300 hover:bg-gray-800">Edit</button>}
+        <button onClick={onClose} className="min-h-[44px] min-w-[44px] flex items-center justify-center text-gray-400 hover:text-white rounded hover:bg-gray-700/50" title="Close">
           <X className="h-4 w-4" />
         </button>
       </div>
 
       {/* Mode toggle */}
-      <div className="flex gap-1 p-2 border-b border-gray-700/60">
-        <ModeBtn active={mode === 'card'} onClick={() => setMode('card')} icon={<CreditCard className="h-3.5 w-3.5" />} label="Card" />
-        <ModeBtn active={mode === 'contents'} onClick={() => setMode('contents')} icon={<FileText className="h-3.5 w-3.5" />} label="Contents" />
-        <ModeBtn active={mode === 'diagram'} onClick={() => setMode('diagram')} icon={<Network className="h-3.5 w-3.5" />} label="Diagram" disabled={!hasSubgraph} title={hasSubgraph ? 'Sub-graph' : 'No sub-graph'} />
-      </div>
+      <InspectorModeTabs key={node.id} mode={mode} onChange={setMode} hasSubgraph={hasSubgraph} />
 
       {/* Body */}
-      <div className="overflow-y-auto">
+      <div className="shrink-0">
         {mode === 'card' && (
           <div className="p-3 space-y-3 text-sm">
             <Row label="Type" value={typeCfg.label} color={typeCfg.hexColor} />
@@ -66,7 +83,7 @@ export function NodeInspector({ node, onClose }: NodeInspectorProps) {
               <div>
                 <div className="text-xs text-gray-500 mb-1">Tags</div>
                 <div className="flex flex-wrap gap-1">
-                  {node.tags.map((t: string) => <span key={t} className="text-[11px] bg-gray-700/60 text-gray-200 rounded px-1.5 py-0.5">{t}</span>)}
+                  {node.tags.map((t: string) => <span key={t} className="text-xs bg-gray-700/60 text-gray-200 rounded px-1.5 py-0.5">{t}</span>)}
                 </div>
               </div>
             )}
@@ -83,7 +100,7 @@ export function NodeInspector({ node, onClose }: NodeInspectorProps) {
         {mode === 'contents' && (
           <div className="p-3">
             <Suspense fallback={<div className="text-sm text-gray-500">Loading…</div>}>
-              <NodeContentRenderer content={node.description ?? ''} />
+              <NodeContentRenderer content={node.description ?? ''} compact={compact} />
             </Suspense>
           </div>
         )}
@@ -104,23 +121,127 @@ export function NodeInspector({ node, onClose }: NodeInspectorProps) {
   );
 }
 
-function ModeBtn({ active, onClick, icon, label, disabled, title }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string; disabled?: boolean; title?: string }) {
+function InspectorModeTabs({
+  mode,
+  onChange,
+  hasSubgraph,
+}: {
+  mode: Mode;
+  onChange: (mode: Mode) => void;
+  hasSubgraph: boolean;
+}) {
+  const bar = useRef<HTMLDivElement>(null);
+  const hintId = useId();
+  const [hovered, setHovered] = useState<Mode | null>(null);
+  const [focused, setFocused] = useState<Mode | null>(null);
+  const [dismissed, setDismissed] = useState(false);
+  const [anchor, setAnchor] = useState<{
+    left: number;
+    top?: number;
+    bottom?: number;
+  } | null>(null);
+  const tooltip = dismissed ? null : (hovered ?? focused);
+  const options = [
+    { id: 'card', label: 'Card', Icon: CreditCard },
+    { id: 'contents', label: 'Contents', Icon: FileText },
+    { id: 'diagram', label: 'Diagram', Icon: Network },
+  ] as const;
+  useLayoutEffect(() => {
+    if (!tooltip) {
+      setAnchor(null);
+      return;
+    }
+    const button = bar.current?.querySelector(
+      `[data-inspector-mode="${tooltip}"]`
+    );
+    if (!button) return;
+    const bounds = button.getBoundingClientRect();
+    setAnchor({
+      left: Math.max(8, Math.min(window.innerWidth - 232, bounds.left)),
+      ...(window.innerHeight - bounds.bottom >= 72
+        ? { top: bounds.bottom + 8 }
+        : { bottom: window.innerHeight - bounds.top + 8 }),
+    });
+    const dismiss = () => setDismissed(true);
+    const dismissOutside = (event: PointerEvent) => {
+      if (!(event.target instanceof Node) || !bar.current?.contains(event.target)) dismiss();
+    };
+    window.addEventListener('scroll', dismiss, true);
+    window.addEventListener('resize', dismiss);
+    window.addEventListener('wheel', dismiss, { passive: true, capture: true });
+    window.addEventListener('pointerdown', dismissOutside, true);
+    return () => {
+      window.removeEventListener('scroll', dismiss, true);
+      window.removeEventListener('resize', dismiss);
+      window.removeEventListener('wheel', dismiss, true);
+      window.removeEventListener('pointerdown', dismissOutside, true);
+    };
+  }, [tooltip]);
   return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      title={title}
-      className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-        disabled
-          ? 'text-gray-600 cursor-not-allowed'
-          : active
-            ? 'bg-emerald-500/25 text-emerald-200 border border-emerald-400/40'
-            : 'text-gray-300 hover:bg-gray-700/50 border border-transparent'
-      }`}
-    >
-      {icon}
-      {label}
-    </button>
+    <>
+      <div
+        ref={bar}
+        role="group"
+        aria-label="Inspector views"
+        className="shrink-0 flex gap-1 p-2 border-b border-gray-700/60"
+      >
+        {options.map(({ id, label, Icon }) => {
+          const disabled = id === 'diagram' && !hasSubgraph;
+          return (
+            <button
+              key={id}
+              type="button"
+              data-inspector-mode={id}
+              aria-label={label}
+              aria-pressed={mode === id}
+              aria-disabled={disabled}
+              aria-describedby={tooltip === id && anchor ? hintId : undefined}
+              onClick={() => {
+              if (!disabled) {
+                setDismissed(true);
+                onChange(id);
+              }
+              }}
+              onMouseEnter={() => {
+                setHovered(id);
+                setDismissed(false);
+              }}
+              onMouseLeave={() => setHovered(null)}
+              onFocus={() => {
+                setFocused(id);
+                setHovered(null);
+                setDismissed(false);
+              }}
+              onBlur={() => setFocused(null)}
+              onKeyDown={event => {
+                if (event.key === 'Escape' && tooltip) {
+                  event.stopPropagation();
+                  setDismissed(true);
+                }
+              }}
+              className={`flex-1 min-w-11 min-h-11 flex items-center justify-center rounded-lg border transition-colors ${disabled ? 'text-gray-500 border-transparent cursor-not-allowed' : mode === id ? 'bg-emerald-500/25 text-emerald-200 border-emerald-400/40' : 'text-gray-300 hover:bg-gray-700/50 border-transparent'}`}
+            >
+              <Icon aria-hidden="true" className="h-6 w-6" strokeWidth={2.25} />
+            </button>
+          );
+        })}
+      </div>
+      {tooltip &&
+        anchor &&
+        createPortal(
+          <span
+            id={hintId}
+            role="tooltip"
+            className="fixed z-[1000000] pointer-events-none w-max max-w-[224px] rounded-lg border border-slate-500 bg-slate-900 px-3 py-2 text-sm font-semibold leading-5 text-slate-100 shadow-lg"
+            style={anchor}
+          >
+            {tooltip === 'diagram' && !hasSubgraph
+              ? 'Diagram: No sub-graph'
+              : options.find(option => option.id === tooltip)!.label}
+          </span>,
+          document.body
+        )}
+    </>
   );
 }
 

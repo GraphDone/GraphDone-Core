@@ -1,5 +1,9 @@
+import './config/environment.js';
+import { verifyMagicLinkHandler, resetPasswordHandler } from './auth/email-link-handlers.js';
+import { operationsApi } from './operations-api.js';
+import { agentApi } from './agent-api.js';
 import { ApolloServer } from '@apollo/server';
-import { expressMiddleware } from '@apollo/server/express4';
+import { expressMiddleware, type ExpressContextFunctionArgument } from '@as-integrations/express4';
 import { ApolloServerPluginDrainHttpServer } from '@apollo/server/plugin/drainHttpServer';
 import express from 'express';
 import { createServer } from 'http';
@@ -7,7 +11,6 @@ import { createServer as createHttpsServer } from 'https';
 import { WebSocketServer } from 'ws';
 import { useServer } from 'graphql-ws/lib/use/ws';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import os from 'os';
 import session from 'express-session';
 import passport from 'passport';
@@ -19,19 +22,23 @@ import { authTypeDefs } from './schema/auth-schema.js';
 import { authOnlyTypeDefs } from './schema/auth-only-schema.js';
 import { sqliteAuthResolvers } from './resolvers/sqlite-auth.js';
 import { graphProtectionResolvers } from './resolvers/graph-protection.js';
-import { extractUserFromToken } from './middleware/auth.js';
+import { workItemRecoveryResolvers } from './resolvers/work-item-recovery.js';
+import { resolveActiveAuthUser } from './middleware/auth.js';
+import { webSocketAuthentication } from './auth/websocket-auth.js';
 import { mergeTypeDefs } from '@graphql-tools/merge';
 import { driver, NEO4J_URI } from './db.js';
 import { sqliteAuthStore } from './auth/sqlite-auth.js';
+import { ensureGraphIdentity } from './auth/graph-identity.js';
 import { configureOAuthStrategies } from './auth/oauth-strategies.js';
-import { generateToken } from './utils/auth.js';
+import { oauthLoginCallback } from './auth/oauth-callback.js';
 import { createTlsConfig, validateTlsConfig, type TlsConfig } from './config/tls.js';
 import { emailService } from './auth/email-service.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
 import rateLimit from 'express-rate-limit';
-import { createCaptchaChallenge, verifyCaptcha } from './utils/captcha.js';
+import { createCaptchaChallengeLimiter } from './utils/captcha-rate-limit.js';
+import { createCaptchaChallenge, verifyCaptcha, isCaptchaAction, captchaRequired, CAPTCHA_ACTIONS, CaptchaCapacityError } from './utils/captcha.js';
 
 const execAsync = promisify(exec);
 
@@ -95,15 +102,12 @@ async function getTotalGraphDoneMemory(): Promise<{ memory: number, label: strin
   }
 }
 
-dotenv.config();
-// OAuth LinkedIn and GitHub credentials updated
-
 const PORT = Number(process.env.PORT) || 4127;
 
 async function startServer() {
   // Use the start time from ./start command if available, otherwise use current time
   const startTime = process.env.GRAPHDONE_START_TIME ? parseInt(process.env.GRAPHDONE_START_TIME) : Date.now();
-  console.log('🚀 GraphDone Server v0.3.1-alpha starting...'); // eslint-disable-line no-console
+  console.log('🚀 GraphDone Server v0.4.0-alpha starting...'); // eslint-disable-line no-console
   if (process.env.GRAPHDONE_START_TIME) {
     console.log(`🕰️ Using ./start command timing: ${process.env.GRAPHDONE_START_TIME}`); // eslint-disable-line no-console
   }
@@ -286,14 +290,6 @@ async function startServer() {
       throw new Error('Neo4j connection timeout - falling back to auth-only mode');
     }
 
-    // Create default admin user for testing if none exists
-    try {
-      await execAsync('npm run create-admin', { cwd: process.cwd() });
-    } catch (error) {
-      // Admin creation is optional - may already exist
-      console.log('ℹ️  Default admin setup completed'); // eslint-disable-line no-console
-    }
-
     // Welcome graphs are now created per-user on first login (handled by frontend)
 
     // Merge type definitions (Neo4j schema + auth schema)
@@ -309,6 +305,8 @@ async function startServer() {
           ...sqliteAuthResolvers.Mutation,
           // Graph protection (prevent Welcome graph deletion)
           ...graphProtectionResolvers.Mutation,
+          // Preserve task identity when a user undoes deletion.
+          ...workItemRecoveryResolvers.Mutation,
         },
         Query: {
           ...sqliteAuthResolvers.Query,
@@ -364,7 +362,30 @@ async function startServer() {
     path: '/graphql',
   });
 
-  const serverCleanup = useServer({ schema }, wsServer);
+  const graphContext = async (authHeader?: string) => {
+    const user = await resolveActiveAuthUser(authHeader);
+    if (user && isNeo4jAvailable) {
+      const account = await sqliteAuthStore.findUserById(user.userId);
+      if (account) await ensureGraphIdentity(driver, account);
+    }
+    return {
+      driver: isNeo4jAvailable ? driver : null,
+      user,
+      // This value is created only from a server-verified token. Neo4j GraphQL
+      // uses it for tenant filters; client-supplied decoded JWT objects are ignored.
+      jwt: user ? { sub: user.userId, roles: [user.role] } : undefined,
+      isNeo4jAvailable,
+    };
+  };
+
+  const serverCleanup = useServer({
+    schema,
+    ...webSocketAuthentication,
+    context: async connection => {
+      const supplied = connection.connectionParams?.authorization ?? connection.connectionParams?.Authorization;
+      return graphContext(typeof supplied === 'string' ? supplied : undefined);
+    },
+  }, wsServer);
 
   const apolloServer = new ApolloServer({
     schema,
@@ -389,12 +410,9 @@ async function startServer() {
     cors<cors.CorsRequest>(),
     express.json(),
     expressMiddleware(apolloServer, {
-      context: async ({ req }) => {
-        const user = extractUserFromToken(req.headers.authorization);
+      context: async ({ req }: ExpressContextFunctionArgument) => {
         return {
-          driver: isNeo4jAvailable ? driver : null,
-          user,
-          isNeo4jAvailable,
+          ...await graphContext(req.headers.authorization),
           req,
         };
       },
@@ -402,6 +420,10 @@ async function startServer() {
   );
 
   // Enhanced health check endpoint that checks all services
+  app.use('/api/agent', agentApi);
+  if(process.env.TRUST_PROXY==='1'||process.env.TRUST_PROXY==='2')app.set('trust proxy',Number(process.env.TRUST_PROXY));
+  app.use('/api/ops', operationsApi);
+
   app.get('/health', cors<cors.CorsRequest>(), async (_req, res) => {
     const health: {
       status: string;
@@ -479,6 +501,7 @@ async function startServer() {
   // Live system configuration endpoint
   app.get('/config', cors<cors.CorsRequest>(), async (_req, res) => {
     const config = {
+      captcha: { provider: 'altcha', requiredActions: CAPTCHA_ACTIONS.filter(captchaRequired) },
       timestamp: new Date().toISOString(),
       services: {
         api: {
@@ -630,17 +653,7 @@ async function startServer() {
   app.get(
     '/auth/google/callback',
     passport.authenticate('google', { failureRedirect: `${process.env.CLIENT_URL || 'http://localhost:3127'}/login?error=google` }),
-    (req, res) => {
-      console.log('🔐 Google OAuth callback received'); // eslint-disable-line no-console
-      const user = req.user as any;
-      console.log('👤 User from OAuth:', user?.email || 'No user'); // eslint-disable-line no-console
-      const token = generateToken(user.id, user.email, user.role);
-      console.log('🎫 Generated token:', token?.substring(0, 20) + '...'); // eslint-disable-line no-console
-      const clientUrl = process.env.CLIENT_URL || 'http://localhost:3127';
-      const redirectUrl = `${clientUrl}/login?token=${token}`;
-      console.log('↪️  Redirecting to:', redirectUrl); // eslint-disable-line no-console
-      res.redirect(redirectUrl);
-    }
+    oauthLoginCallback
   );
 
   app.get('/auth/linkedin', passport.authenticate('linkedin', { scope: ['openid', 'profile', 'email'] }));
@@ -648,17 +661,7 @@ async function startServer() {
   app.get(
     '/auth/linkedin/callback',
     passport.authenticate('linkedin', { failureRedirect: `${process.env.CLIENT_URL || 'http://localhost:3127'}/login?error=linkedin` }),
-    (req, res) => {
-      console.log('🔐 LinkedIn OAuth callback received'); // eslint-disable-line no-console
-      const user = req.user as any;
-      console.log('👤 User from OAuth:', user?.email || 'No user'); // eslint-disable-line no-console
-      const token = generateToken(user.id, user.email, user.role);
-      console.log('🎫 Generated token:', token?.substring(0, 20) + '...'); // eslint-disable-line no-console
-      const clientUrl = process.env.CLIENT_URL || 'http://localhost:3127';
-      const redirectUrl = `${clientUrl}/login?token=${token}`;
-      console.log('↪️  Redirecting to:', redirectUrl); // eslint-disable-line no-console
-      res.redirect(redirectUrl);
-    }
+    oauthLoginCallback
   );
 
   app.get('/auth/github', passport.authenticate('github', { scope: ['user:email'] }));
@@ -666,17 +669,7 @@ async function startServer() {
   app.get(
     '/auth/github/callback',
     passport.authenticate('github', { failureRedirect: `${process.env.CLIENT_URL || 'http://localhost:3127'}/login?error=github` }),
-    (req, res) => {
-      console.log('🔐 GitHub OAuth callback received'); // eslint-disable-line no-console
-      const user = req.user as any;
-      console.log('👤 User from OAuth:', user?.email || 'No user'); // eslint-disable-line no-console
-      const token = generateToken(user.id, user.email, user.role);
-      console.log('🎫 Generated token:', token?.substring(0, 20) + '...'); // eslint-disable-line no-console
-      const clientUrl = process.env.CLIENT_URL || 'http://localhost:3127';
-      const redirectUrl = `${clientUrl}/login?token=${token}`;
-      console.log('↪️  Redirecting to:', redirectUrl); // eslint-disable-line no-console
-      res.redirect(redirectUrl);
-    }
+    oauthLoginCallback
   );
 
   const magicLinkCorsOptions = {
@@ -697,15 +690,16 @@ async function startServer() {
       }
 
       // Verify CAPTCHA
-      const isCaptchaValid = await verifyCaptcha(captchaPayload);
+      const isCaptchaValid = await verifyCaptcha(captchaPayload, 'magic-link');
       if (!isCaptchaValid) {
         return res.status(400).json({ error: 'CAPTCHA verification failed' });
       }
 
-      const user = await sqliteAuthStore.findUserByEmailOrUsername(email);
+      const account = await sqliteAuthStore.findUserByEmailOrUsername(email);
+      const user = account?.isActive ? account : null;
 
       if (user) {
-        const magicLink = await sqliteAuthStore.createMagicLink(email);
+        const magicLink = await sqliteAuthStore.createMagicLink(email, 'login');
         await emailService.sendMagicLink(email, magicLink.token);
         console.log(`✉️  Magic link sent to: ${email}`); // eslint-disable-line no-console
       } else {
@@ -726,31 +720,7 @@ async function startServer() {
     }
   });
 
-  app.get('/auth/magic-link/verify', async (req, res) => {
-    try {
-      const { token } = req.query;
-
-      if (!token || typeof token !== 'string') {
-        return res.redirect(`${process.env.CLIENT_URL || 'http://localhost:3127'}/login?error=invalid_magic_link`);
-      }
-
-      const result = await sqliteAuthStore.verifyMagicLink(token);
-
-      if (!result.valid || !result.userId) {
-        return res.redirect(`${process.env.CLIENT_URL || 'http://localhost:3127'}/login?error=expired_magic_link`);
-      }
-
-      const jwtToken = generateToken(result.userId, result.email!, 'USER');
-      const clientUrl = process.env.CLIENT_URL || 'http://localhost:3127';
-      const redirectUrl = `${clientUrl}/login?token=${jwtToken}`;
-
-      console.log(`🔐 Magic link verified for: ${result.email}`); // eslint-disable-line no-console
-      res.redirect(redirectUrl);
-    } catch (error) {
-      console.error('❌ Magic link verification failed:', error); // eslint-disable-line no-console
-      res.redirect(`${process.env.CLIENT_URL || 'http://localhost:3127'}/login?error=magic_link_failed`);
-    }
-  });
+  app.get('/auth/magic-link/verify', verifyMagicLinkHandler);
 
   const forgotPasswordCorsOptions = {
     origin: process.env.CORS_ORIGIN || 'http://localhost:3127',
@@ -770,17 +740,18 @@ async function startServer() {
       }
 
       // Verify CAPTCHA
-      const isCaptchaValid = await verifyCaptcha(captchaPayload);
+      const isCaptchaValid = await verifyCaptcha(captchaPayload, 'forgot-password');
       if (!isCaptchaValid) {
         return res.status(400).json({ error: 'CAPTCHA verification failed' });
       }
 
       // Check if user exists
-      const user = await sqliteAuthStore.findUserByEmailOrUsername(email);
+      const account = await sqliteAuthStore.findUserByEmailOrUsername(email);
+      const user = account?.isActive ? account : null;
 
       if (user) {
         // User exists - create reset link and send email
-        const resetLink = await sqliteAuthStore.createMagicLink(email);
+        const resetLink = await sqliteAuthStore.createMagicLink(email, 'password-reset');
         await emailService.sendPasswordReset(email, resetLink.token);
         console.log(`🔐 Password reset link sent to: ${email}`); // eslint-disable-line no-console
       } else {
@@ -831,52 +802,12 @@ async function startServer() {
 
   app.options('/auth/reset-password', cors<cors.CorsRequest>(resetPasswordCorsOptions));
 
-  app.post('/auth/reset-password', cors<cors.CorsRequest>(resetPasswordCorsOptions), express.json(), async (req, res) => {
-    try {
-      const { token, newPassword, captchaPayload } = req.body;
-
-      if (!token || typeof token !== 'string') {
-        return res.status(400).json({ error: 'Reset token is required' });
-      }
-
-      if (!newPassword || typeof newPassword !== 'string') {
-        return res.status(400).json({ error: 'New password is required' });
-      }
-
-      if (newPassword.length < 8) {
-        return res.status(400).json({ error: 'Password must be at least 8 characters' });
-      }
-
-      // Verify CAPTCHA
-      const isCaptchaValid = await verifyCaptcha(captchaPayload);
-      if (!isCaptchaValid) {
-        return res.status(400).json({ error: 'CAPTCHA verification failed' });
-      }
-
-      const result = await sqliteAuthStore.verifyMagicLink(token);
-
-      if (!result.valid || !result.userId) {
-        return res.status(400).json({ error: 'Invalid or expired reset token' });
-      }
-
-      await sqliteAuthStore.updateUserPassword(result.userId, newPassword);
-
-      console.log(`🔐 Password updated successfully for: ${result.email}`); // eslint-disable-line no-console
-
-      return res.json({
-        success: true,
-        message: 'Password updated successfully'
-      });
-    } catch (error) {
-      console.error('❌ Password update failed:', error); // eslint-disable-line no-console
-      return res.status(500).json({ error: 'Failed to update password' });
-    }
-  });
+  app.post('/auth/reset-password', cors<cors.CorsRequest>(resetPasswordCorsOptions), express.json(), resetPasswordHandler);
 
   app.post('/share/create', cors<cors.CorsRequest>(), express.json(), async (req, res) => {
     try {
       const authHeader = req.headers.authorization;
-      const user = extractUserFromToken(authHeader);
+      const user = await resolveActiveAuthUser(authHeader);
 
       if (!user) {
         return res.status(401).json({ error: 'Authentication required' });
@@ -943,13 +874,17 @@ async function startServer() {
 
   app.options('/api/captcha/challenge', cors<cors.CorsRequest>(captchaCorsOptions));
 
-  app.get('/api/captcha/challenge', cors<cors.CorsRequest>(captchaCorsOptions), async (_req, res) => {
+  const captchaChallengeLimiter = createCaptchaChallengeLimiter();
+  app.get('/api/captcha/challenge', cors<cors.CorsRequest>(captchaCorsOptions), captchaChallengeLimiter, async (req, res) => {
     try {
-      const challenge = await createCaptchaChallenge();
-      res.json(challenge);
+      if (!isCaptchaAction(req.query.action)) return res.status(400).json({ error: 'Invalid verification action' });
+      const challenge = await createCaptchaChallenge(req.query.action);
+      res.setHeader('Cache-Control', 'no-store');
+      return res.json(challenge);
     } catch (error) {
-      console.error('❌ CAPTCHA challenge creation failed:', error); // eslint-disable-line no-console
-      res.status(500).json({ error: 'Failed to create CAPTCHA challenge' });
+      if (error instanceof CaptchaCapacityError) return res.status(503).json({ error: error.message });
+      console.error('CAPTCHA challenge creation failed'); // eslint-disable-line no-console
+      return res.status(500).json({ error: 'Failed to create CAPTCHA challenge' });
     }
   });
 
