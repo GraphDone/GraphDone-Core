@@ -10,6 +10,7 @@ results; scoped PR evidence is not proof of the deployed site or all 62
 
 | Area | Repeatable evidence | Remaining gate |
 |---|---|---|
+| Every control on every screen, per device | [`UI fit`](UI_FIT.md): 22 screens and dialogs on iPhone, iPad and desktop Chrome/Safari; names, pointer-only clickables, contrast, icon centring, fit, target size | Real iOS devices (WebKit emulation, not Safari on iOS), screens behind data states the seed does not create |
 | Entry and responsive dialogs | `guest-dialog-layout`, `graph-details`, `admin-dialog-responsive` | Real account recovery, provider failures, mobile keyboard, native assistive technology |
 | All eight workspace modes | `new-user-modes` at three sizes | Every filter, sort, date control, selection and bulk action |
 | Task lifecycle | Six `persona-lifecycle` scenarios, saved notes/status/date | Multi-actor assignment, conflicts, retry after interrupted save |

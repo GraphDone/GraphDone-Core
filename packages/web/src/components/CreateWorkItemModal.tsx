@@ -647,6 +647,7 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
               <div>
                 <input
                   type="range"
+                  aria-label="Priority"
                   min="0"
                   max="1"
                   step="0.1"

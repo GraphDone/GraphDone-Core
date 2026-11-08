@@ -40,8 +40,29 @@ export function InsecureConnectionBanner({ fixed = false, onDismiss, className =
     () => typeof sessionStorage !== 'undefined' && sessionStorage.getItem(DISMISS_KEY) === '1'
   );
 
+  const stripRef = React.useRef<HTMLDivElement>(null);
+  const showing = !isSecure && !dismissed;
+
+  // A pinned strip floats over the page, and on a phone its text wraps to two
+  // lines. Push the page down by the strip's real height (tracked as it
+  // wraps) so it never covers the content beneath it.
+  React.useLayoutEffect(() => {
+    const strip = stripRef.current;
+    if (!fixed || !showing || !strip) return;
+    const { body } = document;
+    const previous = body.style.paddingTop;
+    const reserve = () => { body.style.paddingTop = `${strip.offsetHeight}px`; };
+    reserve();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(reserve);
+    observer?.observe(strip);
+    return () => {
+      observer?.disconnect();
+      body.style.paddingTop = previous;
+    };
+  }, [fixed, showing]);
+
   // Nothing to warn about on HTTPS, or once the user has dismissed it.
-  if (isSecure || dismissed) return null;
+  if (!showing) return null;
 
   const dismiss = () => {
     try {
@@ -60,6 +81,7 @@ export function InsecureConnectionBanner({ fixed = false, onDismiss, className =
 
   const strip = (
     <div
+      ref={stripRef}
       role="status"
       data-testid="insecure-connection-banner"
       className={`${position} flex items-center justify-center gap-2 border-b px-4 py-1.5 text-xs sm:text-sm backdrop-blur-sm ${tone} ${className}`}

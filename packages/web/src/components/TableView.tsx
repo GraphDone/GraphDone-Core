@@ -133,7 +133,15 @@ const TableView: React.FC<TableViewProps> = ({ filteredNodes, handleEditNode, ed
             >
               <div className="p-4 space-y-3">
                 <div>
-                  <div className="text-white font-medium text-base break-words">{node.title}</div>
+                  {/* The title is the keyboard and screen-reader way to open the item;
+                      the whole card stays clickable for pointers. */}
+                  <button
+                    type="button"
+                    onClick={(event) => { event.stopPropagation(); handleEditNode(node); }}
+                    className="block w-full text-left text-white font-medium text-base break-words rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-green-400"
+                  >
+                    {node.title}
+                  </button>
                   {node.description && (
                     <div className="text-gray-400 text-sm mt-1 break-words">{node.description}</div>
                   )}
@@ -247,7 +255,13 @@ const TableView: React.FC<TableViewProps> = ({ filteredNodes, handleEditNode, ed
                 >
                   <td className="pl-6 pr-4 py-12 dynamic-table-cell">
                     <div className="space-y-6">
-                      <div className="text-white font-medium text-base table-text-content">{node.title}</div>
+                      <button
+                        type="button"
+                        onClick={(event) => { event.stopPropagation(); handleEditNode(node); }}
+                        className="block w-full text-left text-white font-medium text-base table-text-content rounded hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-green-400"
+                      >
+                        {node.title}
+                      </button>
                       {node.description && (
                         <div className="text-gray-400 text-sm table-text-content min-w-0">{node.description}</div>
                       )}

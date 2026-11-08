@@ -181,7 +181,8 @@ export function useHealthCheck(options: UseHealthCheckOptions = {}) {
       case 'unhealthy':
         return 'text-red-500';
       case 'offline':
-        return 'text-gray-500';
+        // gray-500 is under 3:1 on the dark sidebar; gray-400 stays muted but readable.
+        return 'text-gray-400';
       default:
         return 'text-gray-400';
     }
