@@ -17,8 +17,10 @@ COPY packages/server/package.json ./packages/server/
 COPY packages/web/package.json ./packages/web/
 COPY packages/mcp-server/package.json ./packages/mcp-server/
 
-# Install all dependencies (monorepo workspace)
-RUN npm ci --legacy-peer-deps
+# Install only what the web build needs: core and web. The server's native
+# sqlite3 has no part in it, and on Alpine its install falls back to a
+# source build (no Python here) whenever the prebuilt download fails.
+RUN npm ci --legacy-peer-deps --no-audit --no-fund --workspace=@graphdone/core --workspace=@graphdone/web --include-workspace-root=true
 
 # Copy all source code (needed for monorepo dependencies)
 COPY packages/ ./packages/
