@@ -386,8 +386,11 @@ export function GraphProvider({ children }: GraphProviderProps) {
 
           console.log('✅ Welcome graph created with tutorial content:', welcomeGraph.name);
 
-          // Refetch graphs to show the new graph with updated counts
+          // Refetch graphs to show the new graph with updated counts, and every
+          // open item/connection list (List view, header counts) that already
+          // asked while the graph was still empty (#262).
           await refetchGraphs();
+          await apolloClient.refetchQueries({ include: ['GetWorkItems', 'GetEdges'] });
         } catch (error) {
           console.error('❌ Failed to create Welcome graph:', error);
           isCreatingWelcomeGraphRef.current = false; // Allow retry on next attempt

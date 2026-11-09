@@ -90,6 +90,7 @@ export function Workspace() {
   const breadcrumb = getBreadcrumb();
   const [inspectorNode, setInspectorNode] = useState<any>(null);
   const [quickEditRequest, setQuickEditRequest] = useState<WorkItem | null>(null);
+  const [connectRequest, setConnectRequest] = useState<WorkItem | null>(null);
   const { health, loading: healthLoading, error: healthError } = useHealthStatus();
 
   useEffect(() => {
@@ -378,7 +379,7 @@ export function Workspace() {
                 </div>
               </div>
             )}
-            <SafeGraphVisualization onNodeSelected={setInspectorNode} interactionLocked={isMobile && graphLocked} quickEditRequest={quickEditRequest} onQuickEditRequestHandled={() => setQuickEditRequest(null)} undoStack={undoStack} />
+            <SafeGraphVisualization onNodeSelected={setInspectorNode} interactionLocked={isMobile && graphLocked} quickEditRequest={quickEditRequest} onQuickEditRequestHandled={() => setQuickEditRequest(null)} connectRequest={connectRequest} onConnectRequestHandled={() => setConnectRequest(null)} undoStack={undoStack} />
            </div>
            {/* Phone: Fit, Lock and View in one column, bottom right. Hidden
                while a card's peek sheet is open (it closes back to them). */}
@@ -438,7 +439,7 @@ export function Workspace() {
            </button>
            {inspectorNode && (
              <div className={`absolute z-40 inset-x-3 bottom-3 md:inset-x-auto md:top-3 md:right-3 ${showMiniMap ? 'md:bottom-56' : 'md:bottom-3'}`}>
-               <NodeInspector maxHeight={isMobile ? undefined : '100%'} node={inspectorNode} onClose={() => setInspectorNode(null)} onEdit={() => { setQuickEditRequest(inspectorNode); setInspectorNode(null); }} />
+               <NodeInspector maxHeight={isMobile ? undefined : '100%'} node={inspectorNode} onClose={() => setInspectorNode(null)} onEdit={() => { setQuickEditRequest(inspectorNode); setInspectorNode(null); }} onConnect={viewMode === 'graph' ? () => { setConnectRequest(inspectorNode); setInspectorNode(null); } : undefined} />
              </div>
            )}
           </div>
