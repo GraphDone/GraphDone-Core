@@ -75,6 +75,14 @@ export const SEQUENCES = {
   // recording .webm video + a labelled screenshot per step. Drives the real
   // production SPA — run with TEST_URL=https://graphdone-cloud.pages.dev.
   'live-journey': { adapter: 'playwright', title: 'Live site user journey (desktop + mobile)', args: ['--project=live-journey'], blocking: false },
+  // BASIC JOURNEYS: every way to do each basic thing (link so far), on desktop,
+  // tablet and phone, repeated so the report shows a success rate and its 95%
+  // lower bound per path. JOURNEY_BACKEND=hosted-guest with TEST_URL=<hosted
+  // site> runs the same journeys as a guest on the hosted build.
+  'journeys': { adapter: 'playwright', title: 'Basic journeys — success rate per path and device', args: [
+    '--project=journeys', '--project=journeys-ipad', '--project=journeys-iphone',
+    `--repeat-each=${process.env.JOURNEY_REPEAT || 10}`, '--workers=4', '--retries=0',
+  ], blocking: false },
   // Cross-repo: ingest the newest GraphDone-Cloud live-audit findings.json (sibling
   // repo) into the unified report. Skips cleanly when absent.
   'cloud-audit': { adapter: 'cloud-audit', title: 'Cloud live audit (ingested)', blocking: false },
@@ -86,4 +94,5 @@ export const PROFILES = {
   full: ['unit-web', 'smoke', 'e2e-auth', 'e2e-graph', 'agent-connection', 'inspector-readability', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'devices', 'perf-budgets', 'diagnostics', 'showcase', 'matrix', 'vlm', 'perf-scale', 'cloud-audit'],
   report: ['diagnostics', 'showcase', 'matrix', 'vlm', 'perf-scale', 'cloud-audit'],
   live: ['live-journey'],
+  journeys: ['journeys'],
 };

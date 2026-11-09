@@ -48,8 +48,30 @@ export default defineConfig({
       // Capture-heavy, report-only specs live under tests/e2e/reports/ and run in
       // their own projects below; keep that whole folder out of the default (fast)
       // project so the smoke gate stays quick.
-      testIgnore: '**/reports/**',
+      testIgnore: ['**/reports/**', '**/journeys/**'],
       use: { ...devices['Desktop Chrome'] },
+    },
+
+    /* Basic user journeys: every way to do each basic thing, from the real landing
+     * page, repeated (--repeat-each) so the unified report gives a success rate per
+     * path. JOURNEY_BACKEND=selfhost|hosted-guest picks how to enter and where the
+     * saved truth is read. Run: node tests/run-unified.mjs --sequence journeys */
+    {
+      name: 'journeys',
+      testMatch: /journeys\/.*\.spec\.ts/,
+      use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 }, trace: 'retain-on-failure', screenshot: 'only-on-failure' },
+    },
+    {
+      name: 'journeys-ipad',
+      testMatch: /journeys\/.*\.spec\.ts/,
+      // Chromium with the device's screen, touch and user agent: WebKit cannot pinch,
+      // and zooming is how a touch user reaches the + and gear controls.
+      use: { ...devices['iPad Pro 11'], browserName: 'chromium', trace: 'retain-on-failure', screenshot: 'only-on-failure' },
+    },
+    {
+      name: 'journeys-iphone',
+      testMatch: /journeys\/.*\.spec\.ts/,
+      use: { ...devices['iPhone 13'], browserName: 'chromium', trace: 'retain-on-failure', screenshot: 'only-on-failure' },
     },
 
     /* The massive resolution × feature report: every screen + key feature,
