@@ -57,7 +57,9 @@ export async function runPlaywrightSequence({ id, title, args = [], target, time
               }
             }
           }
-          cases.push({ title: spec.title, status, durationMs: last.duration, error: last.error?.message || (status === 'failed' ? 'Expected an executed, non-flaky passing test result.' : undefined), attachments });
+          const annotations = (Array.isArray(last.annotations) && last.annotations.length ? last.annotations : t?.annotations || [])
+            .filter((a) => a && typeof a.type === 'string').map((a) => ({ type: a.type, description: String(a.description ?? '') }));
+          cases.push({ title: spec.title, project: t?.projectName, status, durationMs: last.duration, error: last.error?.message || (status === 'failed' ? 'Expected an executed, non-flaky passing test result.' : undefined), attachments, ...(annotations.length ? { annotations } : {}) });
         }
       }
       if (s.suites) walk(s.suites);

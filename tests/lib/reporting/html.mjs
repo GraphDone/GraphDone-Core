@@ -29,6 +29,17 @@ function caseHtml(c) {
   </div>`;
 }
 
+const pct = (x) => (x == null ? '–' : `${Math.round(x * 100)}%`);
+
+/** Per-path success rates for repeated sequences, worst lower bound first. */
+function reliabilityHtml(rows) {
+  if (!rows?.length) return '';
+  const sorted = [...rows].sort((a, b) => a.lower95 - b.lower95 || a.title.localeCompare(b.title));
+  return `<table class="rel"><thead><tr><th>Path</th><th>Device</th><th>Passed</th><th>Rate</th><th title="95% Wilson lower bound: the success rate is at least this">At least (95%)</th><th>Setup failures</th><th>Why it failed</th></tr></thead><tbody>
+    ${sorted.map((g) => `<tr class="${g.trials && g.passes === g.trials ? 'ok' : 'bad'}"><td>${esc(g.title)}</td><td>${esc(g.project)}</td><td>${g.passes}/${g.trials}</td><td>${pct(g.rate)}</td><td>${pct(g.lower95)}</td><td>${g.setupFailures || ''}</td><td>${Object.entries(g.failures).map(([w, n]) => `${n}× ${esc(w)}`).join('<br>')}</td></tr>`).join('')}
+  </tbody></table>`;
+}
+
 function seqHtml(seq, i) {
   const c = seq.counts || {};
   const cases = (seq.cases || []);
@@ -45,6 +56,7 @@ function seqHtml(seq, i) {
     </summary>
     ${seq.command ? `<code class="cmd">${esc(seq.command)}</code>` : ''}
     ${seq.notes ? `<p class="notes">${esc(seq.notes)}</p>` : ''}
+    ${reliabilityHtml(seq.reliability)}
     ${cases.map(caseHtml).join('') || '<p class="empty">no per-case detail</p>'}
   </details>`;
 }
@@ -89,6 +101,11 @@ h1{font-size:22px;margin:0 0 4px;display:flex;align-items:center;gap:10px}
 .att img,.att video{width:280px;border-radius:8px;border:1px solid #1e293b;background:#000;display:block}
 .att figcaption{color:#64748b;font-size:11px;margin-top:4px;word-break:break-all}
 .empty{color:#64748b;font-size:12px;padding:6px 0 10px}
+.rel{width:100%;border-collapse:collapse;margin:8px 0 12px;font-size:12px}
+.rel th,.rel td{text-align:left;padding:5px 8px;border-bottom:1px solid #1e293b;vertical-align:top}
+.rel th{color:#94a3b8;font-weight:600}
+.rel tr.bad td:nth-child(3),.rel tr.bad td:nth-child(5){color:#f87171;font-weight:700}
+.rel tr.ok td:nth-child(3){color:#34d399}
 footer{color:#475569;font-size:12px;margin-top:30px;text-align:center}
 </style></head><body><div class="wrap">
 <h1>GraphDone — Unified Test Report
