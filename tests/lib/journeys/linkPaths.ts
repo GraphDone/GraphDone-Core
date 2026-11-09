@@ -84,23 +84,31 @@ async function panIntoView(page: Page, x: number, y: number) {
 async function revealControl(page: Page, item: Item, control: string) {
   const touch = await isTouch(page);
   let pans = 0;
+  const find = () => page.evaluate(({ id, control }) => {
+    for (const e of Array.from(document.querySelectorAll(`${control}[data-node-id="${id}"]`))) {
+      const r = e.getBoundingClientRect();
+      if (r.width < 8) continue; // hidden at this zoom (compact card)
+      const x = r.x + r.width / 2, y = r.y + r.height / 2;
+      return { x, y, hit: e.contains(document.elementFromPoint(x, y)) };
+    }
+    return null;
+  }, { id: item.id, control });
   for (let step = 0; step <= 6; step++) {
     let box = await cardBox(page, item.id);
     if (!box) throw new Error(`${item.title} is not drawn`);
     for (let p = 0; p < 4 && (await panIntoView(page, box!.cx, box!.cy)); p++) { pans++; box = await cardBox(page, item.id); }
     if (!box) throw new Error(`${item.title} is not drawn`);
     if (!touch) { await page.mouse.move(box.cx, box.cy); await page.waitForTimeout(250); }
-    const plus = await page.evaluate(({ id, control }) => {
-      for (const e of Array.from(document.querySelectorAll(`${control}[data-node-id="${id}"]`))) {
-        const r = e.getBoundingClientRect();
-        if (r.width < 8) continue;
-        const x = r.x + r.width / 2, y = r.y + r.height / 2;
-        if (e.contains(document.elementFromPoint(x, y))) return { x, y };
-      }
-      return null;
-    }, { id: item.id, control });
-    if (plus) return { ...plus, zoomIn: step, pans };
-    await zoomStep(page, box.cx, box.cy, 'in');
+    let found = await find();
+    // Shown but off screen (zoomed past it): drag it into view, as a person would.
+    for (let p = 0; found && !found.hit && p < 3 && (await panIntoView(page, found.x, found.y)); p++) {
+      pans++;
+      if (!touch) { const b2 = await cardBox(page, item.id); if (b2) await page.mouse.move(b2.cx, b2.cy); await page.waitForTimeout(250); }
+      found = await find();
+    }
+    if (found?.hit) return { x: found.x, y: found.y, zoomIn: step, pans };
+    // Zoom toward the card's header, where its controls live.
+    await zoomStep(page, box.cx, box.y + Math.min(box.height * 0.25, 30), 'in');
   }
   throw new Error(`no clickable ${control} on ${item.title}, even after zooming in 6 steps`);
 }
@@ -128,6 +136,20 @@ export const LINK_PATHS: (LinkPath & { desktopOnly?: boolean })[] = [
       const target = await findOnScreen(page, b);
       await press(page, target.box.cx, target.box.cy);
       return { zoomIn: plus.zoomIn, zoomOut: target.zoomOut, pans: plus.pans };
+    },
+  },
+  {
+    id: 'inspector-connect',
+    title: 'select an item, "Connect" in its panel, then click/tap another item (any zoom)',
+    async run(page, a, b) {
+      await frameAll(page);
+      const from = await findOnScreen(page, a);
+      await press(page, from.box.cx, from.box.cy);
+      await page.getByRole('button', { name: `Connect ${a.title} to another item`, exact: true }).click({ timeout: 5000 });
+      await expect(page.getByTestId('grow-hint').or(page.getByText('Click empty space to grow', { exact: false })).first(), 'Connect must enter connect mode').toBeVisible({ timeout: 2000 });
+      const target = await findOnScreen(page, b);
+      await press(page, target.box.cx, target.box.cy);
+      return { zoomOut: from.zoomOut + target.zoomOut };
     },
   },
   {

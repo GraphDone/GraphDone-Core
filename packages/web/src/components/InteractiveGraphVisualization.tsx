@@ -231,12 +231,15 @@ interface InteractiveGraphVisualizationProps {
   interactionLocked?: boolean;
   quickEditRequest?: WorkItem | null;
   onQuickEditRequestHandled?: () => void;
+  /** Start connecting from this item (the inspector's Connect button). */
+  connectRequest?: WorkItem | null;
+  onConnectRequestHandled?: () => void;
   /** Workspace-scoped history lets the primary create modal and graph gestures
    * share the same Ctrl/Cmd+Z and touch context-menu undo action. */
   undoStack?: UndoStack;
 }
 
-export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, interactionLocked, quickEditRequest, onQuickEditRequestHandled, undoStack: workspaceUndoStack }: InteractiveGraphVisualizationProps = {}) {
+export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, interactionLocked, quickEditRequest, onQuickEditRequestHandled, connectRequest, onConnectRequestHandled, undoStack: workspaceUndoStack }: InteractiveGraphVisualizationProps = {}) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   // Live-readable lock flag for d3 drag filters (avoids re-binding handlers on toggle).
@@ -376,6 +379,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   // Mutation for creating edges
   const [createEdgeMutation] = useMutation(CREATE_EDGE, {
     refetchQueries: [
+      // Every open connection list, whatever its filter: the header's
+      // "N connections" reads its own GetEdges query (#262).
+      'GetEdges',
       // Refetch all edges for graph visualization (matches ConnectNodeModal)
       { 
         query: GET_EDGES,
@@ -466,6 +472,24 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const [showCreateNodeModal, setShowCreateNodeModal] = useState(false);
   const [showNodeDetailsModal, setShowNodeDetailsModal] = useState(false);
   const [showConnectModal, setShowConnectModal] = useState(false);
+  // Fingers currently on the screen, anywhere: a pinch whose second finger lands
+  // off the card must still cancel the card's long-press menu (#262).
+  const activeTouchesRef = useRef(0);
+  const multiTouchCountRef = useRef(0); // bumps whenever a second finger lands
+  useEffect(() => {
+    const track = (e: TouchEvent) => {
+      activeTouchesRef.current = e.touches.length;
+      if (e.type === 'touchstart' && e.touches.length > 1) multiTouchCountRef.current++;
+    };
+    window.addEventListener('touchstart', track, { capture: true, passive: true });
+    window.addEventListener('touchend', track, { capture: true, passive: true });
+    window.addEventListener('touchcancel', track, { capture: true, passive: true });
+    return () => {
+      window.removeEventListener('touchstart', track, { capture: true });
+      window.removeEventListener('touchend', track, { capture: true });
+      window.removeEventListener('touchcancel', track, { capture: true });
+    };
+  }, []);
   const [connectModalInitialTab, setConnectModalInitialTab] = useState<'connect' | 'disconnect'>('connect');
   const [openedFromDeleteModal, setOpenedFromDeleteModal] = useState(false);
   const [showCreateGraphModal, setShowCreateGraphModal] = useState(false);
@@ -580,6 +604,17 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     setQuickEditNode(quickEditRequest);
     onQuickEditRequestHandled?.();
   }, [quickEditRequest, onQuickEditRequestHandled]);
+  // Connect from the inspector: works at any zoom, including when cards are
+  // compact and their "+" is hidden (#262). Next tap/click on an item connects.
+  useEffect(() => {
+    if (!connectRequest) return;
+    setInlineEdit(null);
+    setExpandedNode(null);
+    setNodeMenu({ node: null, position: { x: 0, y: 0 }, visible: false });
+    setConnectionSource(connectRequest.id);
+    setIsConnecting(true);
+    onConnectRequestHandled?.();
+  }, [connectRequest, onConnectRequestHandled]);
 
   // D3 handlers are bound once at init and the init effect intentionally
   // avoids re-initialising on mode changes — so handlers would capture STALE
@@ -961,6 +996,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   // Additional edge operations
   const [updateEdgeMutation] = useMutation(UPDATE_EDGE, {
     refetchQueries: [
+      'GetEdges',
       // Refetch all edges for graph visualization (matches other mutations)
       { 
         query: GET_EDGES,
@@ -1016,6 +1052,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
   const [deleteEdgeMutation] = useMutation(DELETE_EDGE, {
     refetchQueries: [
+      'GetEdges',
       // Refetch all edges for graph visualization (matches ConnectNodeModal)
       { 
         query: GET_EDGES,
@@ -1118,36 +1155,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     if (isConnectingRef.current && growSource) {
       // Complete connection (clicking the source itself just cancels)
       if (growSource !== node.id) {
-        // Check if edge already exists
-        if (edgeExists(growSource, node.id)) {
-          setIsConnecting(false);
-          setConnectionSource(null);
-          return;
-        }
-
-        // Create edge in backend
-        createEdgeMutation({
-          variables: {
-            input: [{
-              type: selectedRelationTypeRef.current,
-              weight: 0.8,
-              source: { connect: { where: { node: { id: growSource } } } },
-              target: { connect: { where: { node: { id: node.id } } } },
-            }]
-          }
-        }).then((result) => {
-          const createdEdgeId = result?.data?.createEdges?.edges?.[0]?.id;
-          if (createdEdgeId) {
-            undoStack.push({
-              label: 'Connect items',
-              undo: async () => {
-                await deleteEdgeMutation({ variables: { where: { id: createdEdgeId } } });
-              }
-            });
-          }
-        }).catch(() => {
-          // Error handled by GraphQL
-        });
+        void connectItemsRef.current(growSource, node.id, selectedRelationTypeRef.current);
         // Don't reinitialize - let refetchQueries handle the update
       }
 
@@ -1379,12 +1387,55 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   ];
 
   // Helper function to check if edge already exists
+  // D3 handlers are bound once, so they read the live edge list through a ref.
+  const latestEdgesRef = useRef(validatedEdges);
+  latestEdgesRef.current = validatedEdges;
   const edgeExists = (sourceId: string, targetId: string): boolean => {
-    return validatedEdges.some(edge => 
-      (edge.source === sourceId && edge.target === targetId) ||
-      (edge.source === targetId && edge.target === sourceId) // Check both directions
+    const id = (end: any) => (typeof end === 'string' ? end : end?.id);
+    return latestEdgesRef.current.some((edge: any) =>
+      (id(edge.source) === sourceId && id(edge.target) === targetId) ||
+      (id(edge.source) === targetId && id(edge.target) === sourceId) // either direction
     );
   };
+
+  /**
+   * The one way the canvas connects two items (+ then item, Shift-click,
+   * Alt-drag): refuses a duplicate out loud, saves, makes it undoable, and tells
+   * the person when the save fails instead of failing silently (#262).
+   */
+  const connectItems = (sourceId: string, targetId: string, type: string = selectedRelationTypeRef.current): Promise<boolean> => {
+    if (sourceId === targetId) return Promise.resolve(false);
+    const title = (nodeId: string) => validatedNodes.find(n => n.id === nodeId)?.title || 'item';
+    if (edgeExists(sourceId, targetId)) {
+      showSuccess('Already connected', `"${title(sourceId)}" and "${title(targetId)}" are already connected.`);
+      return Promise.resolve(false);
+    }
+    return createEdgeMutation({
+      variables: {
+        input: [{
+          type,
+          weight: 0.8,
+          source: { connect: { where: { node: { id: sourceId } } } },
+          target: { connect: { where: { node: { id: targetId } } } },
+        }]
+      }
+    }).then((result) => {
+      const createdEdgeId = result?.data?.createEdges?.edges?.[0]?.id;
+      if (!createdEdgeId) throw new Error('The connection was not saved.');
+      undoStack.push({
+        label: 'Connect items',
+        undo: async () => {
+          await deleteEdgeMutation({ variables: { where: { id: createdEdgeId } } });
+        }
+      });
+      return true;
+    }).catch((error: any) => {
+      showError('Could not connect items', error?.message || 'The connection was not saved. Try again.');
+      return false;
+    });
+  };
+  const connectItemsRef = useRef(connectItems);
+  connectItemsRef.current = connectItems;
   
   // Define whether to show empty state overlay (but don't early return)
   const showEmptyStateOverlay = !loading && !error && nodes.length === 0;
@@ -2383,7 +2434,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           delete d._connectedNodes;
           // Check if this is an edge creation attempt (Alt/Option key held)
           if (event.sourceEvent.altKey) {
-            mousedownNodeRef.current = d;
+            altDragSourceRef.current = d;
             return;
           }
           
@@ -2465,39 +2516,23 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           delete d._dragStart;
           delete d._connectedNodes;
           // Check if this is edge creation end
-          if (mousedownNodeRef.current && mousedownNodeRef.current.id !== d.id) {
-            const sourceId = mousedownNodeRef.current.id;
-            const targetId = d.id;
-            
-            // Check if edge already exists
-            if (edgeExists(sourceId, targetId)) {
-                  mousedownNodeRef.current = null;
-              return;
-            }
-            
-            
-            // Create edge using GraphQL mutation
-            createEdgeMutation({
-              variables: {
-                input: [{
-                  type: 'DEFAULT_EDGE',
-                  weight: 0.8,
-                  source: { connect: { where: { node: { id: sourceId } } } },
-                  target: { connect: { where: { node: { id: targetId } } } },
-                }]
-              }
-            }).then(() => {
-              }).catch(() => {
-            });
-            
-            mousedownNodeRef.current = null;
+          // Alt-drag ends on whichever item is under the pointer; D3 reports the
+          // dragged (source) item as `d`, so read the drop target from the screen.
+          if (altDragSourceRef.current && altDragSourceRef.current.id === d.id) {
+            const src = event.sourceEvent as MouseEvent & TouchEvent;
+            const point = src?.changedTouches?.[0] ?? src;
+            const hit = point && typeof point.clientX === 'number'
+              ? (document.elementFromPoint(point.clientX, point.clientY) as Element | null)?.closest('g.node') as any
+              : null;
+            const target = hit?.__data__;
+            if (target?.id && target.id !== d.id) void connectItemsRef.current(d.id, target.id);
+            altDragSourceRef.current = null;
             return;
           }
-          
-          if (!dragged) {
-            mousedownNodeRef.current = null;
-            return;
-          }
+
+          // A press without a drag is a click: the click handler owns it
+          // (Shift-click keeps its first item until the second click).
+          if (!dragged) return;
           // Keep the dropped snapshot authoritative during polls and rebuilds.
           if (!event.active) {
             const needsLayout = simulation.nodes().some((n: any) => n.fx == null || n.fy == null);
@@ -2517,8 +2552,6 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
             d.positionY = d.fy;
             positionSaveQueueRef.current.flush();
           }
-          
-          mousedownNodeRef.current = null;
         }));
 
     // LIVE-8: wake-up entrance — nodes float in by recency on first open.
@@ -3305,29 +3338,16 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           const sourceNode = mousedownNodeRef.current;
           const targetNode = d;
           
-          // Check if edge already exists
-          if (edgeExists(sourceNode.id, targetNode.id)) {
-              // Remove source node highlight
-            nodeElements.selectAll('rect')
-              .style('stroke', null)
-              .style('stroke-width', null);
-            mousedownNodeRef.current = null;
-            return;
-          }
-          
-          
           // Remove source node highlight
           nodeElements.selectAll('rect')
             .style('stroke', null)
             .style('stroke-width', null);
-          
-          // Create temporary dotted edge for animation
-          const tempEdgeId = `temp-edge-${sourceNode.id}-${targetNode.id}`;
-          const edgeContainer = svg.select('.edges-group');
-          
-          const tempEdge = edgeContainer
+
+          // Dotted preview while the connection saves; the write starts now (a
+          // long animation before it let a reload or navigation lose the link).
+          const tempEdge = svg.select('.edges-group')
             .append('line')
-            .attr('id', tempEdgeId)
+            .attr('id', `temp-edge-${sourceNode.id}-${targetNode.id}`)
             .attr('class', 'temp-edge')
             .attr('x1', sourceNode.x)
             .attr('y1', sourceNode.y)
@@ -3337,49 +3357,22 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
             .style('stroke-width', 2)
             .style('stroke-dasharray', '8,4')
             .style('opacity', 0);
-          
-          // Fade in dotted edge smoothly
-          tempEdge
-            .transition()
-            .duration(3000)
-            .ease(d3.easeQuadInOut)
-            .style('opacity', 1)
-            .on('end', () => {
-              // After fade in, animate to solid smoothly
-              tempEdge
-                .transition()
-                .duration(12000)
-                .ease(d3.easeQuadInOut)
-                .style('stroke-dasharray', '0,0')
-                .style('stroke-width', 3)
-                .on('end', () => {
-                  // Create actual edge in database
-                  createEdgeMutation({
-                    variables: {
-                      input: [{
-                        type: 'DEFAULT_EDGE',
-                        weight: 0.8,
-                        source: { connect: { where: { node: { id: sourceNode.id } } } },
-                        target: { connect: { where: { node: { id: targetNode.id } } } },
-                      }]
-                    }
-                  }).then(() => {
-                            // Remove temporary edge after real edge is added
-                    setTimeout(() => {
-                      tempEdge.remove();
-                    }, 200);
-                  }).catch(() => {
-                          // Remove temp edge on error
-                    tempEdge.remove();
-                  });
-                });
-            });
-          
+          tempEdge.transition().duration(250).style('opacity', 1);
+          void connectItemsRef.current(sourceNode.id, targetNode.id).finally(() => {
+            setTimeout(() => tempEdge.remove(), 200);
+          });
+
           mousedownNodeRef.current = null;
         }
         return;
       }
       
+      // A plain click after a single Shift-click cancels that pending connection.
+      if (mousedownNodeRef.current) {
+        mousedownNodeRef.current = null;
+        nodeElements.selectAll('rect').style('stroke', null).style('stroke-width', null);
+      }
+
       // Some touch browsers deliver a compatibility click after D3 consumes
       // touchstart. Keep that path identical to a direct touchend tap.
       const pointer = event as MouseEvent & { pointerType?: string; sourceCapabilities?: { firesTouchEvents?: boolean } };
@@ -3437,6 +3430,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         applyNodeGlowImmediately(d);
       }
     })
+    // Touch handlers listen in the capture phase: where cards can be dragged
+    // (tablets), d3-drag stops the event in the bubble phase, which left iPad
+    // with no long-press menu and no deterministic tap (#262).
     .on('touchstart', function(event: TouchEvent, d: any) {
       // Track touch for long-press detection
       const element = d3.select(this);
@@ -3447,8 +3443,12 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         startX: touch.clientX,
         startY: touch.clientY,
         timeout: null as any,
-        moved: false
+        // A second finger means a pinch, not a long-press (#262).
+        moved: event.touches.length > 1 || activeTouchesRef.current > 1,
+        multiTouchAtStart: multiTouchCountRef.current,
+        longPressed: false
       };
+
 
       // Store touch data on the element
       (element.node() as any).__touchData = touchData;
@@ -3473,8 +3473,11 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
       // Set timeout for long-press
       touchData.timeout = setTimeout(() => {
+        // A second finger landed (anywhere) while this one was held: a pinch.
+        if (activeTouchesRef.current > 1 || multiTouchCountRef.current !== touchData.multiTouchAtStart) touchData.moved = true;
         if (!touchData.moved) {
           // Long press detected - show context menu
+          touchData.longPressed = true;
           event.preventDefault();
           const containerRect = containerRef.current?.getBoundingClientRect();
           if (containerRect) {
@@ -3500,13 +3503,17 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         }
         feedbackCircle.remove();
       }, 500);
-    })
+    }, { capture: true })
     .on('touchmove', function(event: TouchEvent) {
       // Track movement to cancel long-press if user is dragging
       const element = d3.select(this);
       const touchData = (element.node() as any).__touchData;
 
-      if (touchData) {
+      if (touchData && event.touches.length > 1) {
+        touchData.moved = true;
+        if (touchData.timeout) clearTimeout(touchData.timeout);
+        element.select('.long-press-feedback').remove();
+      } else if (touchData) {
         const touch = event.touches[0];
         const deltaX = touch.clientX - touchData.startX;
         const deltaY = touch.clientY - touchData.startY;
@@ -3522,7 +3529,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           element.select('.long-press-feedback').remove();
         }
       }
-    })
+    }, { capture: true })
     .on('touchend', function(event: TouchEvent, d: any) {
       // Clean up long-press detection
       const element = d3.select(this);
@@ -3532,6 +3539,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         if (touchData.timeout) {
           clearTimeout(touchData.timeout);
         }
+        // Lifting the finger after a long-press must not also "click" the menu
+        // item that opened under it (#262).
+        if (touchData.longPressed) event.preventDefault();
         // TAP-TO-OPEN (#29): a quick touch that didn't move = a tap → select/open
         // the node, deterministically. preventDefault suppresses the flaky
         // synthetic mouse-click so the tap doesn't double-fire (open then toggle
@@ -3556,7 +3566,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
       // Remove visual feedback
       element.select('.long-press-feedback').remove();
-    })
+    }, { capture: true })
     .on('touchcancel', function() {
       // Clean up on touch cancel
       const element = d3.select(this);
@@ -3569,7 +3579,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
       // Remove visual feedback
       element.select('.long-press-feedback').remove();
-    });
+    }, { capture: true });
 
     let nodePresentationScales = new WeakMap<WorkItem, number>();
     const compactFocusOrigins = new WeakMap<SVGGElement, string>();
@@ -4196,7 +4206,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     }
   }, [semanticOverviewActive, currentGraph?.id]);
 
-  const mousedownNodeRef = useRef<any>(null);
+  const mousedownNodeRef = useRef<any>(null); // Shift-click: first item chosen
+  const altDragSourceRef = useRef<any>(null); // Alt-drag: item being dragged from
   const organizationZoomFloorRef = useRef(0);
   const organizationFocusRef = useRef<string>();
   useEffect(() => {
@@ -5657,6 +5668,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
             rootTestId="node-expand-inspector"
             onClose={closeExpandedNode}
             onEdit={() => { expandedReturnFocusIdRef.current = null; setQuickEditNode(expandedNode); setExpandedNode(null); }}
+            onConnect={() => { expandedReturnFocusIdRef.current = null; const from = expandedNode; setExpandedNode(null); setConnectionSource(from.id); setIsConnecting(true); }}
           />
         </div>,
         document.body
@@ -5735,14 +5747,21 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         >
           <div
             data-testid="node-context-menu"
-            className="absolute bg-black/90 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl overflow-hidden animate-fadeIn"
-            style={{
-              left: nodeMenu.position.x,
-              top: nodeMenu.position.y,
-              minWidth: '320px',
-              maxHeight: '500px',
-              cursor: menuDragState.isDragging ? 'grabbing' : 'default'
-            }}
+            className="absolute bg-black/90 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl overflow-x-hidden overflow-y-auto animate-fadeIn"
+            style={(() => {
+              // Keep the whole menu on screen: a long-press near a phone's edge
+              // used to open it half off screen (#262).
+              const pad = 8;
+              const width = Math.min(320, window.innerWidth - pad * 2);
+              const maxHeight = Math.min(500, window.innerHeight - pad * 2);
+              return {
+                left: Math.max(pad, Math.min(nodeMenu.position.x, window.innerWidth - width - pad)),
+                top: Math.max(pad, Math.min(nodeMenu.position.y, window.innerHeight - maxHeight - pad)),
+                width,
+                maxHeight,
+                cursor: menuDragState.isDragging ? 'grabbing' : 'default'
+              };
+            })()}
             onClick={(e) => e.stopPropagation()}
         >
           <div
@@ -6163,6 +6182,16 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           />
         );
       })()}
+
+      {/* Connect / Disconnect: opened from the item menu and from the details modal */}
+      {showConnectModal && selectedNode && (
+        <ConnectWorkItemModal
+          isOpen={showConnectModal}
+          onClose={handleCloseConnectModal}
+          sourceNode={{ id: selectedNode.id, title: selectedNode.title, type: selectedNode.type }}
+          initialTab={connectModalInitialTab}
+        />
+      )}
 
       {/* Create Work Item Modal */}
       {showCreateNodeModal && (

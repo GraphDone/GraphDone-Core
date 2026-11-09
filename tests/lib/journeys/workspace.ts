@@ -60,8 +60,10 @@ export async function createItem(page: Page, title: string): Promise<Item> {
   const modal = page.getByPlaceholder('Enter a descriptive title for your work item');
   // Exact: the Welcome graph has a card titled "Create your first work item" too.
   const first = page.getByRole('button', { name: 'Create Your First Work Item', exact: true });
-  if (await first.isVisible().catch(() => false)) await first.click();
-  else await page.locator('button[aria-label="New work item"]:visible').first().click();
+  // The empty-graph button can vanish between seeing and clicking it (the
+  // Welcome items arrive); then the toolbar's "New work item" is the way.
+  const usedFirst = await first.isVisible().catch(() => false) && await first.click({ timeout: 3000 }).then(() => true, () => false);
+  if (!usedFirst) await page.locator('button[aria-label="New work item"]:visible').first().click();
   const opened = await inline.or(modal).first().waitFor({ timeout: 8000 }).then(() => true, () => false);
   if (!opened) throw new SetupError('"New work item" did not open a title field within 8 s');
   if (await inline.isVisible().catch(() => false)) { await inline.fill(title); await inline.press('Enter'); }

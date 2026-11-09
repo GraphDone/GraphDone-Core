@@ -110,6 +110,8 @@ export function DeleteWorkItemModal({ isOpen, onClose, nodeId, nodeTitle, nodeTy
 
   const [deleteEdge, { loading: deletingConnection }] = useMutation(DELETE_EDGE, {
     refetchQueries: [
+      // Every open item/connection list, whatever its filter (#262).
+      'GetEdges', 'GetWorkItems',
       { 
         query: GET_EDGES,
         variables: {

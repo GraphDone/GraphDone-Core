@@ -104,6 +104,8 @@ export function DisconnectWorkItemModal({ isOpen, onClose, sourceNode, onAllConn
 
   const [deleteEdgeMutation, { loading: deletingConnection }] = useMutation(DELETE_EDGE, {
     refetchQueries: [
+      // Every open item/connection list, whatever its filter, incl. the canvas (#262).
+      'GetEdges', 'GetWorkItems',
       { 
         query: GET_EDGES,
         variables: {
@@ -729,6 +731,8 @@ export function ConnectWorkItemModal({ isOpen, onClose, sourceNode, initialTab =
 
   const [createEdgeMutation, { loading: creatingConnection }] = useMutation(CREATE_EDGE, {
     refetchQueries: [
+      // Every open item/connection list, whatever its filter, incl. the canvas (#262).
+      'GetEdges', 'GetWorkItems',
       // Refetch edges for the source node
       { 
         query: GET_EDGES,
@@ -761,6 +765,8 @@ export function ConnectWorkItemModal({ isOpen, onClose, sourceNode, initialTab =
 
   const [deleteEdgeMutation, { loading: deletingConnection }] = useMutation(DELETE_EDGE, {
     refetchQueries: [
+      // Every open item/connection list, whatever its filter, incl. the canvas (#262).
+      'GetEdges', 'GetWorkItems',
       // Refetch edges for the source node
       { 
         query: GET_EDGES,

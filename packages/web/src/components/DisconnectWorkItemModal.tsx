@@ -62,6 +62,8 @@ export function DisconnectWorkItemModal({ isOpen, onClose, sourceNode }: Disconn
 
   const [deleteEdgeMutation, { loading: deletingConnection }] = useMutation(DELETE_EDGE, {
     refetchQueries: [
+      // Every open item/connection list, whatever its filter, incl. the canvas (#262).
+      'GetEdges', 'GetWorkItems',
       { 
         query: GET_EDGES,
         variables: {

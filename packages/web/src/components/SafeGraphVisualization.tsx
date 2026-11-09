@@ -13,17 +13,19 @@ interface SafeGraphVisualizationProps {
   interactionLocked?: boolean;
   quickEditRequest?: WorkItem | null;
   onQuickEditRequestHandled?: () => void;
+  connectRequest?: WorkItem | null;
+  onConnectRequestHandled?: () => void;
   undoStack?: UndoStack;
 }
 
-export function SafeGraphVisualization({ onNodeSelected, interactionLocked, quickEditRequest, onQuickEditRequestHandled, undoStack }: SafeGraphVisualizationProps = {}) {
+export function SafeGraphVisualization({ onNodeSelected, interactionLocked, quickEditRequest, onQuickEditRequestHandled, connectRequest, onConnectRequestHandled, undoStack }: SafeGraphVisualizationProps = {}) {
   return (
     <GraphErrorBoundary
       onError={() => {
         // Error logged by boundary for debugging
       }}
     >
-      <InteractiveGraphVisualization onNodeSelected={onNodeSelected} interactionLocked={interactionLocked} quickEditRequest={quickEditRequest} onQuickEditRequestHandled={onQuickEditRequestHandled} undoStack={undoStack} />
+      <InteractiveGraphVisualization onNodeSelected={onNodeSelected} interactionLocked={interactionLocked} quickEditRequest={quickEditRequest} onQuickEditRequestHandled={onQuickEditRequestHandled} connectRequest={connectRequest} onConnectRequestHandled={onConnectRequestHandled} undoStack={undoStack} />
     </GraphErrorBoundary>
   );
 }

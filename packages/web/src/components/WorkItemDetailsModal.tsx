@@ -333,7 +333,7 @@ export function WorkItemDetailsModal({
   } : { where: {} };
 
   const [createEdge] = useMutation(CREATE_EDGE, {
-    refetchQueries: [{ query: GET_EDGES, variables: edgeQueryVariables }],
+    refetchQueries: ['GetEdges', 'GetWorkItems', { query: GET_EDGES, variables: edgeQueryVariables }],
     awaitRefetchQueries: true,
     // Remove individual success messages - we'll show a batch message instead
     onError: (error) => {
@@ -342,7 +342,7 @@ export function WorkItemDetailsModal({
   });
 
   const [deleteEdge] = useMutation(DELETE_EDGE, {
-    refetchQueries: [{ query: GET_EDGES, variables: edgeQueryVariables }],
+    refetchQueries: ['GetEdges', 'GetWorkItems', { query: GET_EDGES, variables: edgeQueryVariables }],
     awaitRefetchQueries: true,
     // Remove individual success messages - we'll show a batch message instead
     onError: (error) => {

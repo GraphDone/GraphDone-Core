@@ -17,6 +17,8 @@ interface NodeInspectorProps {
   node: any;
   onClose: () => void;
   onEdit?: () => void;
+  /** Start connecting this item to another (shown at every zoom level). */
+  onConnect?: () => void;
   compact?: boolean;
   /** Override the root data-testid so an anchored instance is distinguishable
    * from the docked one when both are mounted. */
@@ -31,7 +33,7 @@ interface NodeInspectorProps {
  * toggle — not a side effect of zooming in. Used both docked (Workspace) and
  * anchored on-canvas (the expand-in-place peek), the latter via `compact`.
  */
-export function NodeInspector({ node, onClose, onEdit, compact = false, rootTestId = 'node-inspector', maxHeight }: NodeInspectorProps) {
+export function NodeInspector({ node, onClose, onEdit, onConnect, compact = false, rootTestId = 'node-inspector', maxHeight }: NodeInspectorProps) {
   const { descendInto } = useGraph();
   useLayoutEffect(() => {
     const trigger = document.activeElement;
@@ -67,6 +69,7 @@ export function NodeInspector({ node, onClose, onEdit, compact = false, rootTest
           </div>
           <div className="mt-0.5"><CopyableId id={node.id} /></div>
         </div>
+        {onConnect && <button onClick={onConnect} aria-label={`Connect ${node.title} to another item`} title="Connect to another item" className="min-h-[44px] px-3 rounded-lg text-sky-300 hover:bg-gray-800">Connect</button>}
         {onEdit && <button onClick={onEdit} className="min-h-[44px] px-3 rounded-lg text-emerald-300 hover:bg-gray-800">Edit</button>}
         <button onClick={onClose} className="min-h-[44px] min-w-[44px] flex items-center justify-center text-gray-400 hover:text-white rounded hover:bg-gray-700/50" title="Close">
           <X className="h-4 w-4" />
