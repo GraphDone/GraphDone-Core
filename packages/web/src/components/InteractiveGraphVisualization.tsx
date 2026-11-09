@@ -3449,7 +3449,6 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         longPressed: false
       };
 
-
       // Store touch data on the element
       (element.node() as any).__touchData = touchData;
 

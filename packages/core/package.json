@@ -1,6 +1,6 @@
 {
   "name": "@graphdone/core",
-  "version": "0.4.2-alpha",
+  "version": "0.4.3-alpha",
   "description": "Core graph engine for GraphDone",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
