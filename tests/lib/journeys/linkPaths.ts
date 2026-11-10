@@ -50,9 +50,16 @@ async function frameAll(page: Page) {
   await page.waitForTimeout(700);
 }
 
+/** The card's box when a press at its centre reaches the card and stays so:
+ * checked twice, 350 ms apart, so a sliding bar or moving camera (e.g. the
+ * connect-mode hint rising from the bottom) cannot cover it between look and tap. */
 async function onScreen(page: Page, item: Item) {
+  const first = await cardBox(page, item.id);
+  if (!first || !(await clickable(page, item.id, first.cx, first.cy))) return null;
+  await page.waitForTimeout(350);
   const box = await cardBox(page, item.id);
-  return box && (await clickable(page, item.id, box.cx, box.cy)) ? box : null;
+  const still = box && Math.abs(box.cx - first.cx) < 2 && Math.abs(box.cy - first.cy) < 2;
+  return still && (await clickable(page, item.id, box!.cx, box!.cy)) ? box : null;
 }
 
 /** Drag empty canvas so (x, y) moves to the middle of the graph: a one-finger
