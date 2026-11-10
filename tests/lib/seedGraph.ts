@@ -1,4 +1,4 @@
-import { Page } from '@playwright/test';
+import { expect, Page } from '@playwright/test';
 import { TEST_GRAPH_PREFIX } from './dbHealing';
 
 /**
@@ -14,6 +14,31 @@ import { TEST_GRAPH_PREFIX } from './dbHealing';
  * limits, and cleanup deletes edges before nodes (orphan edges break the whole
  * edges query).
  */
+
+/**
+ * A first sign-in makes the app build the user's Welcome graph in the
+ * background (GraphContext: graph, items, edges, then the counts). Seeding at
+ * the same time made both writes take ~19 s on a cold CI database (UI Fit, run
+ * 42750745652), so wait until that work is done: the user has a graph, and any
+ * Welcome graph has its counts, which the app writes last. Returns at once for
+ * a user who already had graphs.
+ */
+export async function waitForStarterGraph(page: Page, timeoutMs = 60_000) {
+  const me = await gql<{ me: { id: string } }>(page, '{ me { id } }');
+  await expect
+    .poll(
+      async () => {
+        const { graphs } = await gql<{ graphs: { name: string; nodeCount: number | null }[] }>(
+          page,
+          'query($id: String!) { graphs(where: { createdBy: $id }) { name nodeCount } }',
+          { id: me.me.id }
+        );
+        return graphs.length > 0 && graphs.every(g => g.name !== 'Welcome' || (g.nodeCount ?? 0) > 0);
+      },
+      { message: 'the app should finish creating the Welcome graph after the first sign-in', timeout: timeoutMs }
+    )
+    .toBe(true);
+}
 
 export interface SeededGraph {
   graphId: string;
