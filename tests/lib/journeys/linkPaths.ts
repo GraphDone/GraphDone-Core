@@ -50,16 +50,32 @@ async function frameAll(page: Page) {
   await page.waitForTimeout(700);
 }
 
+/** What a press at (x, y) would land on, for failure messages. */
+async function landsOn(page: Page, x: number, y: number) {
+  return page.evaluate(({ x, y }) => {
+    const hit = document.elementFromPoint(x, y);
+    if (!hit) return 'nothing (off screen)';
+    const tagged = hit.closest('[data-testid]');
+    if (tagged) return `[data-testid=${tagged.getAttribute('data-testid')}]`;
+    const cls = typeof hit.className === 'string' ? hit.className.trim().split(/\s+/).slice(0, 2).join('.') : '';
+    return `${hit.tagName.toLowerCase()}${hit.id ? `#${hit.id}` : ''}${cls ? `.${cls}` : ''}`;
+  }, { x, y });
+}
+
 /** The card's box when a press at its centre reaches the card and stays so:
- * checked twice, 350 ms apart, so a sliding bar or moving camera (e.g. the
- * connect-mode hint rising from the bottom) cannot cover it between look and tap. */
-async function onScreen(page: Page, item: Item) {
+ * checked twice, 350 ms apart, so something appearing over the card or a camera
+ * still moving cannot come between look and tap. Otherwise, why it is not. */
+async function onScreen(page: Page, item: Item): Promise<{ box: NonNullable<Awaited<ReturnType<typeof cardBox>>> } | { why: string }> {
   const first = await cardBox(page, item.id);
-  if (!first || !(await clickable(page, item.id, first.cx, first.cy))) return null;
+  if (!first) return { why: 'card not drawn' };
+  if (!(await clickable(page, item.id, first.cx, first.cy))) return { why: `a press at its centre lands on ${await landsOn(page, first.cx, first.cy)}` };
   await page.waitForTimeout(350);
   const box = await cardBox(page, item.id);
-  const still = box && Math.abs(box.cx - first.cx) < 2 && Math.abs(box.cy - first.cy) < 2;
-  return still && (await clickable(page, item.id, box!.cx, box!.cy)) ? box : null;
+  if (!box) return { why: 'card disappeared within 350 ms' };
+  const moved = Math.hypot(box.cx - first.cx, box.cy - first.cy);
+  if (moved >= 2) return { why: `card moved ${moved.toFixed(0)} px in 350 ms` };
+  if (!(await clickable(page, item.id, box.cx, box.cy))) return { why: `covered within 350 ms by ${await landsOn(page, box.cx, box.cy)}` };
+  return { box };
 }
 
 /** Drag empty canvas so (x, y) moves to the middle of the graph: a one-finger
@@ -122,13 +138,15 @@ async function revealControl(page: Page, item: Item, control: string) {
 
 /** Bring the target into view the way a person would: zoom out over the canvas (max 6). */
 async function findOnScreen(page: Page, item: Item) {
+  let why = '';
   for (let step = 0; step <= 6; step++) {
-    const box = await onScreen(page, item);
-    if (box) return { box, zoomOut: step };
+    const seen = await onScreen(page, item);
+    if ('box' in seen) return { box: seen.box, zoomOut: step };
+    why = seen.why;
     const frame = await page.locator('.graph-container').boundingBox();
     await zoomStep(page, frame!.x + frame!.width / 2, frame!.y + frame!.height / 2, 'out');
   }
-  throw new Error(`${item.title} could not be brought on screen to click`);
+  throw new Error(`${item.title} could not be brought on screen to click after 6 zoom-outs (last check: ${why})`);
 }
 
 export const LINK_PATHS: (LinkPath & { desktopOnly?: boolean })[] = [
