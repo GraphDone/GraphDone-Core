@@ -7,7 +7,7 @@ import {
   type OwnedGraphs,
 } from '../../lib/ownedGraphIdsFixture';
 import type { SeededGraph } from '../../lib/seedGraph';
-import { measureGraphZoom } from '../../lib/graphZoomReady';
+import { measureGraphZoom, measureRunnerSpeed } from '../../lib/graphZoomReady';
 import {
   inspectLocalItemNeighborhood,
   readCanonicalItemPositions,
@@ -497,20 +497,43 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
         .filter(id => id !== denseTarget.id)
     ).size
   ).toBeGreaterThanOrEqual(107);
-  const denseTimings: { scale: number; ms: number; wallMs: number }[] = [];
+  // Dense local zoom has a 5 s budget on a reference-speed runner. Shared CI
+  // runners are sometimes slow for a whole job (run 42756334084: the sequence
+  // took 408 s instead of ~283 s and this zoom 5.9 s), so the budget scales with
+  // a fixed workload timed in the page just before each zoom: never below 5 s,
+  // at most twice that. RUNNER_REFERENCE_MS is that workload's time on a
+  // normal CI runner; until it is set the budget is a plain 5 s.
+  const DENSE_ZOOM_BUDGET_MS = 5000;
+  const RUNNER_REFERENCE_MS = Number.POSITIVE_INFINITY;
+  const denseTimings: {
+    scale: number;
+    ms: number;
+    wallMs: number;
+    calibrationMs: number;
+    budgetMs: number;
+  }[] = [];
+  const denseEvidence = async () => {
+    const path = info.outputPath('two-thousand-dense-local-calibration.json');
+    await writeFile(path, JSON.stringify({ RUNNER_REFERENCE_MS, timings: denseTimings }));
+    await info.attach('two-thousand-dense-local-calibration.json', { path, contentType: 'application/json' });
+  };
   let denseOriginals: string[] = [];
   for (const scale of [1.2, 0.1, 1.2]) {
+    const calibrationMs = await page.evaluate(measureRunnerSpeed);
+    const slowdown = Math.min(2, Math.max(1, calibrationMs / RUNNER_REFERENCE_MS));
+    const budgetMs = DENSE_ZOOM_BUDGET_MS * slowdown;
     const started = Date.now();
     const ms = await page.evaluate(measureGraphZoom, {
       x: denseTarget.positionX,
       y: denseTarget.positionY,
       scale,
     });
-    denseTimings.push({ scale, ms, wallMs: Date.now() - started });
+    denseTimings.push({ scale, ms, wallMs: Date.now() - started, calibrationMs, budgetMs });
+    if (ms >= budgetMs) await denseEvidence();
     expect(
       ms,
-      'Dense local zoom must finish within the unchanged five-second CI budget'
-    ).toBeLessThan(5000);
+      `Dense local zoom must finish within 5 s on a reference-speed runner (${Math.round(budgetMs)} ms here: workload ${Math.round(calibrationMs)} ms vs reference ${RUNNER_REFERENCE_MS} ms)`
+    ).toBeLessThan(budgetMs);
     if (scale > 1) {
       const local = await inspectLocalItemNeighborhood(
         page,
@@ -554,6 +577,7 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
     path: densePath,
     contentType: 'application/json',
   });
+  await denseEvidence();
   expect(await snapshot()).toEqual(before);
   expect(writes).toEqual([]);
   expect(errors).toEqual([]);
