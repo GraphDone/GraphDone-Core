@@ -23,7 +23,7 @@ flowchart LR
 | [`vm/`](vm/README.md) | Multipass VM launch, base image and VM end-to-end runs |
 | `install.sh` | Public one-line installer (`curl … /main/scripts/install.sh \| sh`) |
 | `setup_docker.sh`, `setup_git.sh`, `setup_nodejs.sh` | Prerequisite installers; `install.sh` and `./start` call them by these paths, so they stay here |
-| `setup-git-hooks.sh`, `setup-mcp.sh`, `setup-oauth.sh` | One-off developer setup |
+| `setup-mcp.sh`, `setup-oauth.sh` | One-off developer setup |
 | `manage-certificates.sh` (`generate-dev-certs.sh` links to it), `generate-ssl-certs.sh`, `generate-multi-host-certs.sh`, `test-tls.sh` | Development TLS certificates |
 | `self-host.sh` | Source-based self-host install (see `deployment/self-host/`) |
 | `test-installation-simple.sh`, `generate-clean-report.sh`, `fresh-test.sh`, `verify-fresh.sh`, `github-actions-test.sh` | Installer and fresh-checkout checks |

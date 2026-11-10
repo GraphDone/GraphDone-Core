@@ -350,7 +350,6 @@ flowchart LR
 | [`.github/`](.github/README.md) | CI and release workflows, pull request template |
 | [`.agents/`](.agents/README.md) | Guidance for the AI agents that maintain this repo: skills, policy, lessons |
 | [`.claude/`](.claude/README.md) | Claude Code settings; links Claude to the shared skills in `.agents/skills` |
-| [`.githooks/`](.githooks/README.md) | Optional local git hooks |
 
 ## Documentation
 

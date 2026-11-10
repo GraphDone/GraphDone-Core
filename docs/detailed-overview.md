@@ -507,7 +507,6 @@ graph LR
     START[./scripts/stack/setup.sh] --> DEV[./scripts/stack/run.sh]
     DEV --> TEST[./scripts/stack/test.sh]
     TEST --> BUILD[./scripts/stack/build.sh]
-    BUILD --> DEPLOY[./scripts/stack/deploy.sh]
     
     DEV -.-> CODE[Code Changes]
     CODE -.-> DEV
