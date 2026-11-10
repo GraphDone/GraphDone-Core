@@ -32,17 +32,19 @@ export function foldersOf(paths) {
 
 export function relativeLinks(text) {
   const prose = text.replace(/```[\s\S]*?```/g, '').replace(/`[^`\n]*`/g, '');
-  return [...prose.matchAll(/\]\(([^)\s]+)\)/g)]
+  return [...prose.matchAll(/\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g)]
     .map((match) => match[1].split('#')[0])
     .filter((target) => target && !/^[a-z]+:/i.test(target));
 }
 
 export function mermaidBlocks(text) {
-  return [...text.matchAll(/```mermaid\n([\s\S]*?)```/g)].map((match) => match[1]);
+  return [...text.replace(/\r\n/g, '\n').matchAll(/```mermaid\n([\s\S]*?)```/g)].map((match) => match[1]);
 }
 
 function trackedPaths() {
-  const result = spawnSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z'], { cwd: root, encoding: 'utf8' });
+  // Committed and staged files only: local untracked folders (editor settings,
+  // scratch output) are not part of the repository and need no README.
+  const result = spawnSync('git', ['ls-files', '--cached', '-z'], { cwd: root, encoding: 'utf8' });
   assert.equal(result.status, 0, `git ls-files failed: ${result.stderr}`);
   return result.stdout.split('\0').filter(Boolean).filter((path) => existsSync(resolve(root, path)));
 }

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
-import { existsSync, lstatSync, readFileSync, readdirSync, readlinkSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { existsSync, lstatSync, readFileSync, readlinkSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
@@ -8,7 +9,18 @@ import test from 'node:test';
 // rules; the improve-agents-folder skill has the procedure). Budgets here may
 // only tighten.
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const read = (path) => readFileSync(resolve(root, path), 'utf8');
+const read = (path) => readFileSync(resolve(root, path), 'utf8').replace(/\r\n/g, '\n');
+
+// Committed and staged files only, so local junk (.DS_Store, editor swap files,
+// ignored output) never fails the contract.
+function tracked() {
+  const result = spawnSync('git', ['ls-files', '--cached', '-z'], { cwd: root, encoding: 'utf8' });
+  assert.equal(result.status, 0, `git ls-files failed: ${result.stderr}`);
+  return result.stdout.split('\0').filter(Boolean);
+}
+const files = tracked();
+const childrenOf = (dir) => [...new Set(files.filter((path) => path.startsWith(`${dir}/`)).map((path) => path.slice(dir.length + 1).split('/')[0]))];
+const filesIn = (dir) => files.filter((path) => path.startsWith(`${dir}/`) && !path.slice(dir.length + 1).includes('/'));
 
 export const AGENTS_ENTRIES = ['README.md', 'inbox', 'issues', 'playbooks', 'skills'];
 export const AGENTS_MD_MAX_LINES = 200;
@@ -16,12 +28,18 @@ export const SKILL_MAX_LINES = 150;
 export const LESSON_NAME = /^\d{4}-\d{2}-\d{2}-[a-z0-9]+(?:-[a-z0-9]+)*\.md$/;
 
 export function parseFrontmatter(text) {
-  const match = /^---\n([\s\S]*?)\n---\n/.exec(text);
+  const match = /^---\n([\s\S]*?)\n---\n/.exec(text.replace(/\r\n/g, '\n'));
   if (!match) return null;
   const fields = {};
+  let key = null;
   for (const line of match[1].split('\n')) {
     const field = /^([a-z][a-z0-9_-]*):\s*(.*)$/.exec(line);
-    if (field) fields[field[1]] = field[2].trim();
+    if (field) {
+      key = field[1];
+      fields[key] = /^[>|][+-]?$/.test(field[2].trim()) ? '' : field[2].trim();
+    } else if (key && /^\s+\S/.test(line)) {
+      fields[key] = `${fields[key]} ${line.trim()}`.trim();
+    }
   }
   return fields;
 }
@@ -41,38 +59,29 @@ export function skillProblems(dirName, text) {
 
 export function relativeLinks(text) {
   const prose = text.replace(/```[\s\S]*?```/g, '').replace(/`[^`\n]*`/g, '');
-  return [...prose.matchAll(/\]\(([^)\s]+)\)/g)]
+  return [...prose.matchAll(/\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g)]
     .map((match) => match[1].split('#')[0])
     .filter((target) => target && !/^[a-z]+:/i.test(target));
 }
 
-function markdownUnder(dir) {
-  const out = [];
-  for (const entry of readdirSync(resolve(root, dir), { withFileTypes: true })) {
-    const path = join(dir, entry.name);
-    if (entry.isDirectory()) out.push(...markdownUnder(path));
-    else if (entry.name.endsWith('.md')) out.push(path);
-  }
-  return out;
-}
 
 test('.agents holds only its four kinds of guidance', () => {
-  const extra = readdirSync(resolve(root, '.agents')).filter((name) => !AGENTS_ENTRIES.includes(name));
+  const extra = childrenOf('.agents').filter((name) => !AGENTS_ENTRIES.includes(name));
   assert.deepEqual(extra, [], `Unexpected .agents entries: ${extra.join(', ')}. See .agents/README.md for where things go.`);
 });
 
 test('every lesson is dated and reachable from a symptom index', () => {
-  const lessons = readdirSync(resolve(root, '.agents/inbox')).filter((name) => name !== 'README.md');
+  const lessons = childrenOf('.agents/inbox').filter((name) => name !== 'README.md');
   const badNames = lessons.filter((name) => !LESSON_NAME.test(name));
   assert.deepEqual(badNames, [], `Lesson names must be YYYY-MM-DD-<rule>.md: ${badNames.join(', ')}`);
-  const indexes = readdirSync(resolve(root, '.agents/issues')).map((name) => read(`.agents/issues/${name}`)).join('\n');
+  const indexes = filesIn('.agents/issues').filter((path) => path.endsWith('.md')).map(read).join('\n');
   const orphans = lessons.filter((name) => !indexes.includes(`inbox/${name}`));
   assert.deepEqual(orphans, [], `Lessons no index links to (add an index row, merge or delete them): ${orphans.join(', ')}`);
 });
 
 test('every skill is well-formed, within budget and listed in AGENTS.md', () => {
   const agentsMd = read('AGENTS.md');
-  const skills = readdirSync(resolve(root, '.agents/skills'), { withFileTypes: true }).filter((entry) => entry.isDirectory());
+  const skills = childrenOf('.agents/skills').filter((name) => name !== 'README.md').map((name) => ({ name }));
   assert.ok(skills.length > 0, 'expected at least one skill');
   const problems = [];
   for (const { name } of skills) {
@@ -99,9 +108,9 @@ test('.claude is a real folder whose skills link to .agents/skills', () => {
 });
 
 test('links in agent guidance resolve', () => {
-  const files = ['AGENTS.md', ...markdownUnder('.agents')];
+  const guidance = ['AGENTS.md', ...files.filter((path) => path.startsWith('.agents/') && path.endsWith('.md'))];
   const broken = [];
-  for (const file of files) {
+  for (const file of guidance) {
     for (const target of relativeLinks(read(file))) {
       if (!existsSync(resolve(root, dirname(file), target))) broken.push(`${file} -> ${target}`);
     }
@@ -117,5 +126,6 @@ test('the rules catch what they are meant to catch', () => {
   assert.equal(skillProblems('x', 'no frontmatter').length, 1);
   assert.ok(skillProblems('a-skill', '---\nname: other\ndescription: short\n---\n').length >= 2);
   assert.ok(skillProblems('long', `---\nname: long\ndescription: ${'d'.repeat(50)}\n---\n${'line\n'.repeat(SKILL_MAX_LINES)}`).some((p) => p.includes('budget')));
-  assert.deepEqual(relativeLinks('[a](x.md) `[b](y.md)` [c](https://e.x) [d](#top)\n```\n[e](z.md)\n```'), ['x.md']);
+  assert.deepEqual(relativeLinks('[a](x.md) `[b](y.md)` [c](https://e.x) [d](#top) [t](w.md "title")\n```\n[e](z.md)\n```'), ['x.md', 'w.md']);
+  assert.equal(parseFrontmatter('---\r\nname: a\r\ndescription: >\r\n  folded text\r\n  continues\r\n---\r\nbody').description, 'folded text continues');
 });

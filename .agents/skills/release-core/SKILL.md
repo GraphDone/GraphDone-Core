@@ -18,6 +18,9 @@ flowchart LR
   tag --> rel["release.yml: verify, publish images, GitHub release"]
 ```
 
+On `main` and for tags: no `--admin` merges, no bypasses and no protection
+changes. If a check, review or ruleset blocks you, stop and report to the owner.
+
 ## 1. Bump the version (PR into dev)
 
 ```bash

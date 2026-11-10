@@ -18,7 +18,7 @@ flowchart LR
 
 Search by what you see, not by file name: start at the
 [symptom index](../issues/INDEX.md), or search this folder for an error message,
-test name or file path. The 72 lessons so far (October–November 2026) cover:
+test name or file path. Lessons so far cover:
 
 | Topic | Example lessons |
 | --- | --- |

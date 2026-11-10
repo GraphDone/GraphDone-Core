@@ -28,8 +28,9 @@ TEST_URL=https://graphdone.com JOURNEY_BACKEND=hosted-guest \
 ```
 
 - `JOURNEY_REPEAT` sets trials per path and device (default 10). 10/10 proves
-  at least ~72% with 95% confidence; about 300 clean runs are needed to show
-  under 1% failure. Use 30 or more before claiming a release is reliable.
+  at least ~72% with 95% confidence; about 380 clean runs are needed to show
+  under 1% failure. Use 30 or more before claiming a fix or a release is
+  reliable.
 - Projects: `journeys` (desktop), `journeys-ipad`, `journeys-iphone` (Chromium
   touch emulation; WebKit cannot pinch).
 - To rerun one cell: `npx playwright test tests/e2e/journeys/link.spec.ts

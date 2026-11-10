@@ -64,8 +64,10 @@ Patterns the existing code follows; new UI should match them.
 - **Overlays** (dialogs, menus, popovers) render with
   `createPortal(element, document.body)` so no parent's stacking context clips
   them, and register with `useDialog(isOpen, onClose)` from
-  `src/hooks/useDialogManager.ts`. Clicking empty graph space calls
-  `closeAllDialogs()`, so people do not have to hunt for a close button.
+  `src/hooks/useDialogManager.ts`. Opening an exclusive dialog closes the others
+  (pass `{ exclusive: false }` for a dialog inside a dialog), and Escape closes
+  the top one. The manager also offers `closeAllDialogs()`, but nothing in the
+  app calls it yet, so click-outside behaviour is up to each component.
 - **Top bar**: `pages/Workspace.tsx` uses three sections: left for the graph
   selector and search, centre for view-mode buttons, right for status and
   secondary actions, on a translucent `backdrop-blur-sm` bar. New pages with a

@@ -9,6 +9,9 @@ private hostnames, IPs, home paths, private repo names or secrets.
 
 ## Authority
 
+This section and [Contributor tiers](#contributor-tiers) change only on the
+owner's explicit instruction; agents improving guidance must not edit them.
+
 The repository owner's standing authorization dated 2026-10-23 permits
 administrative integration into **`dev` only** under the
 [admin integration playbook](.agents/playbooks/dev-admin-integration.md).
@@ -35,18 +38,21 @@ and browser work.
    a library is available; check that the package already uses it. Do not add
    code comments unless asked.
 4. Branch from `dev`, open the PR into `dev`. Never delete `dev` or use
-   `--delete-branch` on a release merge.
+   `--delete-branch` on a release merge. Product work starts from a story in
+   [`docs/USER_STORIES.md`](docs/USER_STORIES.md) or a GitHub issue, with its
+   test written first.
 
 ## Run, build, test
 
 ```bash
-cp .env.example .env              # without it the server uses the wrong Neo4j password
-./start dev                       # Neo4j + web :3127 + API :4127 (or: npm run dev)
+./start dev                       # first run writes packages/{server,web}/.env, starts Neo4j, web :3127, API :4127
+./start stop                      # stop it (./start remove also deletes containers and volumes)
+npm run db:seed                   # sample work items; Neo4j browser on :7474 (neo4j / graphdone_password)
 npm run build && npm run typecheck && npm run lint
 npm test                          # package unit tests only (Turbo); no browser
 TEST_URL=http://localhost:3127 npm run test:smoke        # THE GATE, see below
 TEST_URL=http://localhost:3127 npm run test:unified:smoke
-npm run test:toolchain            # repository contracts (root, content, versions, READMEs, .agents)
+npm run test:toolchain            # every tests/toolchain/*-contract.mjs (root, content, versions, READMEs, .agents, ...)
 ```
 
 **THE GATE:** before claiming anything works, run `npm run test:smoke` against
@@ -67,13 +73,15 @@ and untested behaviour. Test guide: [`docs/testing/`](docs/testing/README.md).
   ['GetWorkItems', 'GetEdges']`) so every open list updates, not only the
   query you passed.
 - The web app calls `/api/graphql`; Vite (dev) and nginx (production) map it.
-- Neo4j's first boot downloads plugins and can take minutes; the server retries
-  and falls back to an auth-only mode while Neo4j is down.
+- The server reads `packages/server/.env`, not the root `.env`; a bare
+  `npm run dev` needs `./start setup` first and a running Neo4j. Neo4j's first
+  boot downloads plugins and can take minutes; meanwhile the server runs in an
+  auth-only mode.
 - `packages/mcp-server` tests run one file at a time on purpose (chaos suites
   exhaust file descriptors and CPU).
 - Overlays render with `createPortal(..., document.body)` and register with
-  `useDialog` for click-outside-to-close; see the
-  [web UI guide](docs/guides/web-ui-architecture.md#ui-conventions).
+  `useDialog`: one exclusive dialog at a time, Escape closes the top one; see
+  the [web UI guide](docs/guides/web-ui-architecture.md#ui-conventions).
 - Version numbers: `scripts/update-version-minimal.sh <version>`; the version
   contract fails CI if a copy is missed.
 

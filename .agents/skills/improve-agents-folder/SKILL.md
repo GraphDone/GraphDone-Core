@@ -45,6 +45,10 @@ that now guards it) instead of adding a near-duplicate.
 - Public repository: no private hostnames, IPs, home paths or private repo
   names (`tests/toolchain/public-content-contract.mjs`).
 
+Never change the **Authority** or **Contributor tiers** sections of `AGENTS.md`,
+or the playbooks, except on the owner's explicit instruction. They are the
+owner's rules, not guidance you maintain.
+
 ## 4. Remove as much as you add
 
 In the same PR:
