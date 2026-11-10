@@ -17,7 +17,8 @@ const read = (path) => readFileSync(resolve(root, path), 'utf8').replace(/\r\n/g
 function tracked() {
   const result = spawnSync('git', ['ls-files', '--cached', '-z'], { cwd: root, encoding: 'utf8' });
   assert.equal(result.status, 0, `git ls-files failed: ${result.stderr}`);
-  return result.stdout.split('\0').filter(Boolean);
+  // A tracked file deleted in the working tree is skipped, not an ENOENT crash.
+  return result.stdout.split('\0').filter((path) => path && existsSync(resolve(root, path)));
 }
 const files = tracked();
 const childrenOf = (dir) => [...new Set(files.filter((path) => path.startsWith(`${dir}/`)).map((path) => path.slice(dir.length + 1).split('/')[0]))];
@@ -60,7 +61,7 @@ export function skillProblems(dirName, text) {
 
 export function relativeLinks(text) {
   const prose = text.replace(/```[\s\S]*?```/g, '').replace(/`[^`\n]*`/g, '');
-  return [...prose.matchAll(/\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g)]
+  return [...prose.matchAll(/\]\(([^)\s]+)(?:\s+(?:"[^"]*"|'[^']*'|\([^)]*\)))?\)/g)]
     .map((match) => match[1].split('#')[0])
     .filter((target) => target && !/^[a-z]+:/i.test(target));
 }
@@ -127,7 +128,7 @@ test('the rules catch what they are meant to catch', () => {
   assert.equal(skillProblems('x', 'no frontmatter').length, 1);
   assert.ok(skillProblems('a-skill', '---\nname: other\ndescription: short\n---\n').length >= 2);
   assert.ok(skillProblems('long', `---\nname: long\ndescription: ${'d'.repeat(50)}\n---\n${'line\n'.repeat(SKILL_MAX_LINES)}`).some((p) => p.includes('budget')));
-  assert.deepEqual(relativeLinks('[a](x.md) `[b](y.md)` [c](https://e.x) [d](#top) [t](w.md "title")\n```\n[e](z.md)\n```'), ['x.md', 'w.md']);
+  assert.deepEqual(relativeLinks('[a](x.md) `[b](y.md)` [c](https://e.x) [d](#top) [t](w.md "title") [s](v.md \'t\')\n```\n[e](z.md)\n```'), ['x.md', 'w.md', 'v.md']);
   assert.equal(parseFrontmatter('---\r\nname: a\r\ndescription: >\r\n  folded text\r\n  continues\r\n---\r\nbody').description, 'folded text continues');
 });
 
@@ -148,6 +149,25 @@ test('the Claude Code guard hook blocks forbidden git and GitHub operations', ()
     'gh api -X DELETE repos/o/r/branches/dev/protection/enforce_admins',
     'gh api repos/o/r/branches/dev/protection/enforce_admins --method POST',
     'gh api repos/o/r/rulesets/7 -X PUT --input r.json',
+    'gh pr merge 12 -d',
+    'gh pr merge 12 --merge --delete-branch=true',
+    'gh pr merge 12 -md',
+    'gh api -X DELETE repos/o/r/git/refs/heads/dev',
+    'GH_TOKEN=x gh api --method DELETE repos/o/r/git/refs/heads/main',
+    'gh api -X PATCH repos/o/r/git/refs/heads/dev -F sha=abc -F force=true',
+    'gh api graphql -f query=\'mutation { deleteBranchProtectionRule(input: {}) { clientMutationId } }\'',
+    'gh repo edit --delete-branch-on-merge',
+    'git push --mirror origin',
+    'git push --prune origin "refs/heads/*:refs/heads/*"',
+    'git --no-pager push --force',
+    'git --git-dir=.git push --force',
+    '/usr/bin/git push --force',
+    'git -C repo -c a=b push -f',
+    'git push origin :"dev"',
+    '(git push -f origin feature)',
+    'echo $(git push -f origin feature)',
+    'bash -c "git push --force origin feature"',
+    'git commit -m x\ngit push -f origin feature',
   ];
   const allowed = [
     'git push -u origin feature',
@@ -158,6 +178,16 @@ test('the Claude Code guard hook blocks forbidden git and GitHub operations', ()
     'gh api repos/o/r/branches/dev/protection',
     'gh api repos/o/r/branches/dev/protection --jq .enforce_admins.enabled',
     'npm run test:toolchain',
+    'git commit -m "docs: say why; git push -f origin dev is banned"',
+    'gh pr create --body "The hook blocks force pushes && git push --force to dev"',
+    'git commit -m "a" -m "b\ngit push --force is blocked now"',
+    'gh pr create --title t --body "$(cat <<\'EOF\'\ngit push -f origin feature\nEOF\n)"',
+    'git commit -F - <<\'EOF\'\nnever run git push -f origin dev; or gh pr merge 1 -d\nEOF\ngit push origin feature',
+    'git commit -m "mention gh pr merge --delete-branch | rule"',
+    'grep -rn "git push --force" docs',
+    'git fetch -f origin',
+    'gh api repos/o/r/git/refs/heads/dev',
+    'gh pr merge 12 --merge --delete-branch=false',
   ];
   for (const command of blocked) assert.ok(blockReason(command), `should block: ${command}`);
   for (const command of allowed) assert.equal(blockReason(command), null, `should allow: ${command}`);

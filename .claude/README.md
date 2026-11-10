@@ -19,9 +19,15 @@ flowchart LR
 | Path | What it is |
 | --- | --- |
 | `skills` | A symlink to [`../.agents/skills/`](../.agents/skills/README.md), so Claude Code lists the shared skills natively |
-| [`settings.json`](settings.json) | Shared settings: blocks reading real secret files (`.env`, `.env.local`, `.env.test.local`, the self-host `.env`, certificate keys) and runs the guard hook on every Bash call |
+| [`settings.json`](settings.json) | Shared settings: denies the Read tool on local secret files at any depth (`.env`, `.env.local`, `.env.*.local`, `.env.vm`, `deployment/certs/`; `./start` writes OAuth and JWT secrets into `packages/server/.env`) and runs the guard hook on every Bash call. Use the `.env.example` files to learn what a setting is |
 | [`hooks/`](hooks/README.md) | `guard-git.mjs`: blocks force-pushes, deleting `dev`/`main`, `--delete-branch` merges and branch-protection changes |
 | [`agents/`](agents/README.md) | `pr-reviewer`: the independent, read-only PR reviewer, built on the `review-pr` skill |
+
+**Start Claude Code at the repository root.** Claude Code 2.1.322 loads
+`settings.json` only for a session started in this folder's parent; a session
+started in a subfolder (say `packages/web`) gets neither the denies nor the hook.
+Both are guard rails, not a sandbox: Bash can still `cat` a file the Read tool may
+not read, so the rules in [`AGENTS.md`](../AGENTS.md) still apply.
 
 Only `skills` is a link. `.claude/` itself must stay a real folder, because
 Claude Code refuses to create worktrees under a symlinked `.claude`. Everything

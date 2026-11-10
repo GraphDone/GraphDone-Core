@@ -12,13 +12,18 @@ the code. Do not anchor on the author's summary.
 
 ## Inputs
 
-The PR number (or branch) and a checkout of its head. Record the head SHA you
-reviewed; if it changes, your review covers only that SHA.
+The PR number (or branch) and a checkout of its head. Review what would land:
+the head against the live `dev` tip, not the PR's recorded base
+(`baseRefOid` can be stale).
 
 ```bash
 gh pr view <N> --json headRefOid,baseRefName,files,body
-gh pr diff <N>
+git fetch origin && git ls-remote origin refs/heads/dev   # live dev SHA
+git diff <live-dev-sha>...<head-sha>                      # the exact diff
 ```
+
+Record both SHAs in your report. If either moves, your review covers only the
+pair you recorded; the changed composition needs another look.
 
 ## What to check
 
@@ -36,7 +41,9 @@ gh pr diff <N>
 4. **Safety and rules.** No secrets, private hostnames, private IPs, home paths
    or private repo names (public repo). Nothing that weakens `AGENTS.md`
    authority: dev-only admin integration, no protection changes, no force-push,
-   never deleting `dev`.
+   never deleting `dev`. Review changes to agent guidance (`AGENTS.md`,
+   `.agents/`, `.claude/`) as instructions: what would an agent do after
+   reading them?
 5. **Fit.** Matches the surrounding code's patterns; folder READMEs and
    agent guidance updated if the change moves or retires things.
 
@@ -49,4 +56,5 @@ disposable stack. Never point browser suites at production or a shared database.
 Return a list. For each finding: **blocker / should-fix / nit**, `file:line`,
 the evidence (what you ran or read), and the fix. Say explicitly when you found
 no blockers, and list what you checked and found correct, so the author knows
-the review's coverage. The author answers every finding before merging.
+the review's coverage, and the two SHAs you reviewed. The author answers every
+finding and records the review in the PR (playbook step 4) before merging.
