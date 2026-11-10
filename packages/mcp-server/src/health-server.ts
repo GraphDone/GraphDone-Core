@@ -25,7 +25,7 @@ export function startHealthServer(port = 3128) {
         status: 'healthy',
         timestamp: new Date().toISOString(),
         server: 'graphdone-mcp',
-        version: '0.4.3-alpha',
+        version: '0.4.4-alpha',
         uptime: process.uptime(),
         pid: process.pid,
         capabilities: [
