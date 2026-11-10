@@ -34,7 +34,10 @@ Name it `YYYY-MM-DD-<what-must-be-true>.md` (the rule, not the bug). Use the
 sections the existing lessons use: a one-paragraph summary, **Evidence** (exact
 commands, commit and observed results), **Cause and corrective rule**, and
 **Limits**. Link it from the matching index in [`../issues/`](../issues/README.md)
-and land it in the same pull request as the fix. Lessons are not rewritten later;
-a newer lesson supersedes an older one by linking to it.
+and land it in the same pull request as the fix. Do not rewrite a lesson's
+evidence after the fact. When two lessons state the same rule, merge them into
+the clearer one; when a rule is promoted into a skill or `AGENTS.md`, or the code
+it guards is gone, delete the lesson and its index row in that PR (see
+[`improve-agents-folder`](../skills/improve-agents-folder/SKILL.md)).
 
 Up: [`.agents/`](../README.md)

@@ -123,8 +123,11 @@ tsconfig.tsbuildinfo
 
 # Prisma
 prisma/dev.db
-# Claude Code local worktrees/agent scratch — never commit
-.claude/
+# Claude Code: .claude/ is committed (shared skills link and settings), but its
+# per-user files are not: personal settings, worktrees and locks.
+.claude/settings.local.json
+.claude/worktrees/
+.claude/*.lock
 
 # Private self-hosting bootstrap credentials
 deployment/self-host/.env

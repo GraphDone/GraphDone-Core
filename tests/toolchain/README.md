@@ -24,15 +24,17 @@ flowchart LR
 | [`turbo-contract.mjs`](turbo-contract.mjs) | Installed Turbo keeps dependency order, environment, cache invalidation and task failures. |
 | [`vite-contract.mjs`](vite-contract.mjs) | Installed Vite serves React hot reload, forwards API routes, denies secret files and builds an offline shell. Opens Chromium. |
 | [`mermaid-contract.mjs`](mermaid-contract.mjs) | Installed Mermaid renders exported diagram syntax and KaTeX ignores inherited `trust`. Opens Chromium. |
+| [`readme-contract.mjs`](readme-contract.mjs) | Every tracked folder has a `README.md` with a Mermaid diagram that parses and links that resolve (except `packages/web/public/`, which is served publicly, and skill folders). Opens Chromium. |
+| [`agents-contract.mjs`](agents-contract.mjs) | Agent guidance stays small and linked: `.agents/` holds only its four folders, lessons are dated and indexed, skills are well-formed and listed, `AGENTS.md` stays under 200 lines, `CLAUDE.md` imports it, and `.claude/skills` links to `.agents/skills`. |
 
 ## How to run
 
 ```bash
-npm run test:toolchain                                  # all seven contracts
+npm run test:toolchain                                  # all nine contracts
 node --test tests/toolchain/version-contract.mjs        # one contract
 ```
 
-The Vite and Mermaid contracts need Playwright's Chromium installed. The
+The Vite, Mermaid and README contracts need Playwright's Chromium installed. The
 installer's end-to-end container check is in
 [`tests/integration/`](../integration/README.md).
 

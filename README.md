@@ -348,7 +348,8 @@ flowchart LR
 | [`deployment/`](deployment/README.md) | Dockerfiles and compose stacks, including the self-host stack |
 | [`scripts/`](scripts/README.md) | Installer, `./start` stack scripts, VM scripts and release checks |
 | [`.github/`](.github/README.md) | CI and release workflows, pull request template |
-| [`.agents/`](.agents/README.md) | Lessons and procedures written by the agents that maintain this repo |
+| [`.agents/`](.agents/README.md) | Guidance for the AI agents that maintain this repo: skills, policy, lessons |
+| [`.claude/`](.claude/README.md) | Claude Code settings; links Claude to the shared skills in `.agents/skills` |
 | [`.githooks/`](.githooks/README.md) | Optional local git hooks |
 
 ## Documentation

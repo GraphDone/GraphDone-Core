@@ -57,6 +57,31 @@ graph TD
   - Grow mode's hint sits in the bottom bar with Cancel.
 - **Tablet & desktop (`≥md`)** — sidebar rail + full top view-strip + all filters.
 
+## UI conventions
+
+Patterns the existing code follows; new UI should match them.
+
+- **Overlays** (dialogs, menus, popovers) render with
+  `createPortal(element, document.body)` so no parent's stacking context clips
+  them, and register with `useDialog(isOpen, onClose)` from
+  `src/hooks/useDialogManager.ts`. Clicking empty graph space calls
+  `closeAllDialogs()`, so people do not have to hunt for a close button.
+- **Top bar**: `pages/Workspace.tsx` uses three sections: left for the graph
+  selector and search, centre for view-mode buttons, right for status and
+  secondary actions, on a translucent `backdrop-blur-sm` bar. New pages with a
+  top bar follow the same layout.
+- **Contextual editors over modals**: edit next to the thing being edited (as
+  the relationship-type picker on the graph does) rather than in a full-screen
+  modal, and update local state and GraphQL together so the change shows at once.
+- **Colours by type and status** come from the static Tailwind class maps in
+  `src/constants/workItemConstants.tsx` (`getTypeGradientBackground`,
+  `getStatusGradientBackground`). Tailwind only ships classes it can see, so
+  never build class names by string interpolation.
+- **Animation** uses `transform` and `opacity`, not layout properties; motion is
+  removed for `prefers-reduced-motion`.
+- **D3 in React**: stop force simulations and remove listeners in the
+  `useEffect` cleanup, or they keep running after the view unmounts.
+
 ## Quality gate
 
 `tests/e2e/mobile-audit.spec.ts` + `mobile-dialogs.spec.ts` run the

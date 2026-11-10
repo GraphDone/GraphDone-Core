@@ -11,7 +11,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 // remove an entry here when its file leaves the root. Growing it needs the
 // owner's explicit approval in the PR.
 const ROOT_ALLOWLIST = [
-  '.agents', '.dockerignore', '.env.example', '.env.test.example', '.eslintrc.js',
+  '.agents', '.claude', '.dockerignore', '.env.example', '.env.test.example', '.eslintrc.js',
   '.githooks', '.github', '.gitignore', '.prettierignore', '.prettierrc',
   'AGENTS.md', 'CLAUDE.md', 'LICENSE', 'Makefile', 'README.md',
   'deployment', 'docs', 'package-lock.json', 'package.json', 'packages',
