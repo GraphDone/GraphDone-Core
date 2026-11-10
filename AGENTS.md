@@ -89,13 +89,15 @@ and untested behaviour. Test guide: [`docs/testing/`](docs/testing/README.md).
 
 Procedures for recurring tasks live in [`.agents/skills/`](.agents/skills/README.md)
 (Claude Code also lists them via `.claude/skills`). Before a matching task, read
-its `SKILL.md` and follow it.
+its `SKILL.md` and follow it. In Claude Code, `.claude/settings.json` also runs a
+guard hook that blocks force-pushes, deleting `dev`/`main` and protection changes.
 
 | Skill | Use when |
 | --- | --- |
 | [`improve-agents-folder`](.agents/skills/improve-agents-folder/SKILL.md) | Adding, changing or retiring agent guidance, or guidance misled you |
 | [`folder-readme`](.agents/skills/folder-readme/SKILL.md) | Creating or changing a folder, or a README is missing or stale |
 | [`run-journeys`](.agents/skills/run-journeys/SKILL.md) | Measuring how reliably basic tasks work per path and device |
+| [`review-pr`](.agents/skills/review-pr/SKILL.md) | A PR needs the independent review the playbook requires (Claude Code: the `pr-reviewer` subagent) |
 | [`release-core`](.agents/skills/release-core/SKILL.md) | The owner has asked for a Core release |
 
 ## Writing things down

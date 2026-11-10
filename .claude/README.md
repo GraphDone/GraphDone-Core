@@ -10,6 +10,7 @@ flowchart LR
   claude["Claude Code"] --> claudemd["CLAUDE.md: @AGENTS.md"]
   claude --> skills[".claude/skills"]
   skills -->|"symlink"| shared[".agents/skills/"]
+  claude --> settings["settings.json: secret-file denies + guard hook"]
   codex["Codex"] --> shared
 ```
 
@@ -18,12 +19,16 @@ flowchart LR
 | Path | What it is |
 | --- | --- |
 | `skills` | A symlink to [`../.agents/skills/`](../.agents/skills/README.md), so Claude Code lists the shared skills natively |
+| [`settings.json`](settings.json) | Shared settings: blocks reading real secret files (`.env`, `.env.local`, `.env.test.local`, the self-host `.env`, certificate keys) and runs the guard hook on every Bash call |
+| [`hooks/`](hooks/README.md) | `guard-git.mjs`: blocks force-pushes, deleting `dev`/`main`, `--delete-branch` merges and branch-protection changes |
+| [`agents/`](agents/README.md) | `pr-reviewer`: the independent, read-only PR reviewer, built on the `review-pr` skill |
 
 Only `skills` is a link. `.claude/` itself must stay a real folder, because
-Claude Code refuses to create worktrees under a symlinked `.claude`. Shared
-Claude-only configuration, such as `settings.json`, subagents in `agents/`
-or path-scoped `rules/`, can be committed here when it is needed. Per-user
-files (`settings.local.json`, `worktrees/`, `*.lock`) are git-ignored.
+Claude Code refuses to create worktrees under a symlinked `.claude`. Everything
+else Claude writes here (personal `settings.local.json`, `worktrees/`, locks,
+local memory) is git-ignored: `.gitignore` allowlists the shared entries, so a
+new shared entry must be added there first. Put procedures in `.agents/skills/`,
+not here, so every harness can use them.
 
 On Windows, git creates symlinks only with Developer Mode or `core.symlinks`
 enabled; otherwise use the [`AGENTS.md` skills table](../AGENTS.md#skills).

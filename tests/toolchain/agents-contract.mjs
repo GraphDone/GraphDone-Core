@@ -4,6 +4,7 @@ import { existsSync, lstatSync, readFileSync, readlinkSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
+import { blockReason } from '../../.claude/hooks/guard-git.mjs';
 
 // Keeps the agent guidance small, linked and current (.agents/README.md has the
 // rules; the improve-agents-folder skill has the procedure). Budgets here may
@@ -128,4 +129,36 @@ test('the rules catch what they are meant to catch', () => {
   assert.ok(skillProblems('long', `---\nname: long\ndescription: ${'d'.repeat(50)}\n---\n${'line\n'.repeat(SKILL_MAX_LINES)}`).some((p) => p.includes('budget')));
   assert.deepEqual(relativeLinks('[a](x.md) `[b](y.md)` [c](https://e.x) [d](#top) [t](w.md "title")\n```\n[e](z.md)\n```'), ['x.md', 'w.md']);
   assert.equal(parseFrontmatter('---\r\nname: a\r\ndescription: >\r\n  folded text\r\n  continues\r\n---\r\nbody').description, 'folded text continues');
+});
+
+test('the Claude Code guard hook blocks forbidden git and GitHub operations', () => {
+  const settings = JSON.parse(read('.claude/settings.json'));
+  const hook = settings.hooks.PreToolUse.find((entry) => entry.matcher === 'Bash').hooks[0];
+  assert.equal(hook.command, '${CLAUDE_PROJECT_DIR}/.claude/hooks/guard-git.mjs');
+  assert.ok(lstatSync(resolve(root, '.claude/hooks/guard-git.mjs')).mode & 0o111, 'guard-git.mjs must be executable');
+  const blocked = [
+    'git push --force origin feature',
+    'git push -f',
+    'git push --force-with-lease origin agents-sweep',
+    'git -C repo push origin +feature',
+    'git push origin --delete dev',
+    'git push origin :main',
+    'cd x && git push origin --delete refs/heads/dev',
+    'gh pr merge 12 --merge --delete-branch',
+    'gh api -X DELETE repos/o/r/branches/dev/protection/enforce_admins',
+    'gh api repos/o/r/branches/dev/protection/enforce_admins --method POST',
+    'gh api repos/o/r/rulesets/7 -X PUT --input r.json',
+  ];
+  const allowed = [
+    'git push -u origin feature',
+    'git push origin HEAD',
+    'git push origin --delete old-feature',
+    'git commit -m "explain why --delete-branch and --force are banned"',
+    'gh pr merge 12 --merge --admin --match-head-commit abc123',
+    'gh api repos/o/r/branches/dev/protection',
+    'gh api repos/o/r/branches/dev/protection --jq .enforce_admins.enabled',
+    'npm run test:toolchain',
+  ];
+  for (const command of blocked) assert.ok(blockReason(command), `should block: ${command}`);
+  for (const command of allowed) assert.equal(blockReason(command), null, `should allow: ${command}`);
 });

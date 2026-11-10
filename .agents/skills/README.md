@@ -22,6 +22,7 @@ flowchart LR
 | [`improve-agents-folder`](improve-agents-folder/SKILL.md) | Adding, changing or retiring agent guidance |
 | [`folder-readme`](folder-readme/SKILL.md) | Creating or changing a folder, or a README is missing or stale |
 | [`run-journeys`](run-journeys/SKILL.md) | Measuring how reliably basic tasks work per path and device |
+| [`review-pr`](review-pr/SKILL.md) | A PR needs an independent review before merging |
 | [`release-core`](release-core/SKILL.md) | The owner has asked for a Core release |
 
 Add a skill only for a task agents repeat; see
