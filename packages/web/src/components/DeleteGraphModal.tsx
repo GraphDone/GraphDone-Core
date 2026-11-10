@@ -96,6 +96,7 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
   const [deleteEdge] = useMutation(DELETE_EDGE, {
     awaitRefetchQueries: true,
     refetchQueries: [
+      'GetEdges', 'GetWorkItems',
       {
         query: GET_EDGES,
         variables: currentGraph ? {

@@ -46,9 +46,9 @@ export const RelationshipEditorWindow: React.FC<RelationshipEditorWindowProps> =
   const windowRef = useRef<HTMLDivElement>(null);
 
   // GraphQL mutations
-  const [updateEdgeMutation] = useMutation(UPDATE_EDGE);
-  const [createEdgeMutation] = useMutation(CREATE_EDGE);
-  const [deleteEdgeMutation] = useMutation(DELETE_EDGE);
+  const [updateEdgeMutation] = useMutation(UPDATE_EDGE, { refetchQueries: ['GetEdges', 'GetWorkItems'] });
+  const [createEdgeMutation] = useMutation(CREATE_EDGE, { refetchQueries: ['GetEdges', 'GetWorkItems'] });
+  const [deleteEdgeMutation] = useMutation(DELETE_EDGE, { refetchQueries: ['GetEdges', 'GetWorkItems'] });
 
   // Calculate content-based height
   const calculateContentHeight = () => {

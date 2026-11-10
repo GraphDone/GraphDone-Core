@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { rollupStatus, statusFromCounts, sumCounts, buildReport, STATUS } from './aggregate.mjs';
+import { rollupStatus, statusFromCounts, sumCounts, buildReport, STATUS, wilsonLower, reliability } from './aggregate.mjs';
 
 test('rollupStatus: failure dominates', () => {
   assert.equal(rollupStatus(['passed', 'failed', 'warn']), 'failed');
@@ -64,4 +64,35 @@ test('buildReport rolls up status + duration', () => {
   assert.equal(r.rollup.status, 'warn');
   assert.equal(r.rollup.totals.sequences, 2);
   assert.equal(r.target, 'http://x');
+});
+
+test('wilsonLower: 30/30 bounds the success rate near 89%, 0/n at 0', () => {
+  assert.equal(wilsonLower(30, 30).toFixed(3), '0.886');
+  assert.equal(wilsonLower(0, 5), 0);
+  assert.equal(wilsonLower(0, 0), 0);
+  assert.ok(wilsonLower(299, 300) > 0.98);
+});
+
+test('reliability: repeats of one path on one device are trials; setup failures and skips are not', () => {
+  const c = (status, project = 'desk', error) => ({ title: 'link plus', project, status, error });
+  const rows = reliability([c('passed'), c('passed'), c('failed', 'desk', 'Error: the connection must be saved'),
+    c('failed', 'desk', 'Error: SETUP: no title field'), c('skipped'), c('passed', 'phone'), c('passed', 'phone'),
+    { title: 'runner exit', status: 'failed', error: 'exit 1' }]);
+  const desk = rows.find((r) => r.project === 'desk');
+  assert.deepEqual([desk.passes, desk.trials, desk.setupFailures], [2, 3, 1]);
+  assert.deepEqual(desk.failures, { 'Error: the connection must be saved': 1 });
+  const colored = reliability([{ title: 't', status: 'failed', error: '\u001b[31mTest timeout\u001b[39m' }, { title: 't', status: 'passed' }]);
+  assert.deepEqual(colored[0].failures, { 'Test timeout': 1 });
+  assert.equal(rows.find((r) => r.project === 'phone').trials, 2);
+  assert.ok(!rows.some((r) => r.title === 'runner exit'), 'one-off cases are not rates');
+});
+
+test('reliability: a sequence that ran each case once has no rollup', () => {
+  assert.equal(reliability([{ title: 'a', status: 'passed' }, { title: 'b', status: 'failed' }]), null);
+});
+
+test('buildReport attaches per-path reliability to repeated sequences', () => {
+  const report = buildReport({ sequences: [{ id: 'journeys', status: 'failed', counts: { passed: 1, failed: 1 },
+    cases: [{ title: 'p', status: 'passed' }, { title: 'p', status: 'failed', error: 'x' }] }] });
+  assert.equal(report.sequences[0].reliability[0].trials, 2);
 });
