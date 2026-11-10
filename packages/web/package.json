@@ -1,6 +1,6 @@
 {
   "name": "@graphdone/web",
-  "version": "0.4.3-alpha",
+  "version": "0.4.4-alpha",
   "description": "React web application for GraphDone",
   "type": "module",
   "scripts": {

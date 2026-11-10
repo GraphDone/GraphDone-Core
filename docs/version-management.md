@@ -51,7 +51,6 @@ The script only updates files that **cannot** import from package.json:
 
 ### Configuration Files
 - `packages/web/.env.example`
-- `CLAUDE.md`
 
 ## Future Improvements
 

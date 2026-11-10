@@ -21,16 +21,43 @@ or isolate that stack. Database-backed MCP suites additionally require their
 explicit disposable-fixture configuration; see
 [the MCP guide](../packages/mcp-server/README.md).
 
-The test tree is organized as follows:
+## How the folders fit together
 
-- `e2e/<domain>/`: user workflows; `e2e/smoke/user-smoke.spec.ts` is the focused gate.
-- `lib/`: authentication, API, report adapters, runner, and dashboard helpers.
-- `sequences/unified.config.mjs`: profile and sequence definitions.
-- `diagnostics/` and `perf/`: specialized geometry and performance checks.
-- `integration/`: infrastructure checks outside the default browser project.
-- Single-purpose Playwright configs sit beside their specs
-  (`visual/playwright.schematic.config.ts`, `integration/playwright.captcha.config.ts`);
-  the default `playwright.config.ts` stays at the repo root.
+`tests/run-unified.mjs` is the single entry for browser and package suites: it
+runs the sequences named in [`sequences/`](sequences/README.md), which call
+Playwright projects and the package unit tests, and writes one HTML + JSON report.
+The repository contracts in `toolchain/` run with `npm run test:toolchain`; the
+image contracts in `runtime/` run in CI's `runtime-images` job against a built image.
+
+```mermaid
+flowchart LR
+  cmd["npm run test:unified"] --> run["run-unified.mjs"]
+  run --> seq["sequences/unified.config.mjs"]
+  seq --> pw["Playwright: e2e/, diagnostics/, devices/, perf/, visual/"]
+  pw --> lib["lib/ helpers and fixtures/"]
+  run --> report["test-artifacts/unified/ report.html + report.json"]
+  ci["CI"] --> contracts["toolchain/ and runtime/ contracts"]
+  ci --> run
+```
+
+| Folder | What it holds |
+| --- | --- |
+| [`e2e/`](e2e/README.md) | Browser user workflows by domain; `e2e/smoke/user-smoke.spec.ts` is the focused gate, `e2e/journeys/` measures reliability per path and device |
+| [`lib/`](lib/README.md) | Reusable helpers (auth, API, seeding) and the unified harness: reporting, adapters, runner |
+| [`sequences/`](sequences/README.md) | Profile and sequence definitions for the harness |
+| [`devices/`](devices/README.md) | UI fit gate: every screen on iPhone, iPad and desktop |
+| [`diagnostics/`](diagnostics/README.md) | Graph geometry, layout, physics and inspector measurements |
+| [`perf/`](perf/README.md) | Performance budgets and the scale sweep |
+| [`visual/`](visual/README.md) | Schematic wire-routing checks, with their own Playwright config |
+| [`integration/`](integration/README.md) | Installer, TLS and captcha checks outside the default browser project |
+| [`toolchain/`](toolchain/README.md) | Repository contracts: root allowlist, public content, versions, Mermaid |
+| [`runtime/`](runtime/README.md) | Production image contract |
+| [`agents/`](agents/README.md) | Helpers for driving real AI agent CLIs in tests |
+| [`fixtures/`](fixtures/README.md) | Static test data |
+
+Single-purpose Playwright configs sit beside their specs
+(`visual/playwright.schematic.config.ts`, `integration/playwright.captcha.config.ts`);
+the default `playwright.config.ts` stays at the repo root.
 
 An authenticated test under `tests/e2e/<domain>/` imports helpers with:
 
@@ -41,3 +68,5 @@ import { login, navigateToWorkspace, TEST_USERS } from '../../lib/auth';
 Use the current helper and fixture configuration as the source of test account
 details. A successful unit run or test listing is not evidence that a browser
 workflow works. Report skipped, flaky, failed, and untested behavior explicitly.
+
+Up: [repository root](../README.md)

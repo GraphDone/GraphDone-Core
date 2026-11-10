@@ -9,6 +9,16 @@ This MCP (Model Context Protocol) server acts as a bridge between Claude Code an
 - *"What's blocking the user authentication feature?"*
 - *"Add a dependency between task A and task B"*
 
+```mermaid
+flowchart LR
+  agent["Claude Code or another MCP client"] -->|"stdio"| index["src/index.ts: tool routing"]
+  index --> service["src/services/graph-service.ts"]
+  service -->|"Cypher over bolt"| neo4j[("Neo4j")]
+  index --> health["src/health-server.ts: health endpoint"]
+```
+
+Code map: [`src/`](src/README.md) (tools and services) and [`tests/`](tests/README.md).
+
 ## What You Get
 
 Transform how you interact with your management graph:
@@ -180,3 +190,5 @@ npm run test:contract:local
 Both commands fail before connecting when the disposable marker, URI, or
 credentials are missing, and they reject non-loopback database addresses. Do
 not point either command at a development, shared, or production database.
+
+Up: [`packages/`](../README.md)

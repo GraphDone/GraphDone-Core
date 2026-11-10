@@ -10,7 +10,7 @@
 ![GraphDone's living graph — priority glow, breathing nodes, energy flowing along dependencies](./docs/graphdone_ui.png)
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/version-0.4.3--alpha-orange.svg)
+![Version](https://img.shields.io/badge/version-0.4.4--alpha-orange.svg)
 ![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
 
 > 🔒 **SECURITY NOTE**: GraphDone supports both HTTP (development) and HTTPS/TLS (production) modes. For production deployment, enable TLS encryption and use production-grade authentication. See [TLS/SSL Setup Guide](./docs/tls-ssl-setup.md) for configuration details.
@@ -322,6 +322,34 @@ Work is organized in interconnected graphs at different levels of detail. Browse
 
 ### Democratic Prioritization
 Anyone can propose ideas and assign personal priority. The community validates through anonymous rating. Ideas that gain support naturally migrate toward higher priority and more resources—no executive approval required.
+
+## Repository layout
+
+Every folder has a `README.md` that says what it holds and why, so you can browse
+the code from GitHub. The four npm workspaces in `packages/` are the product:
+
+```mermaid
+flowchart LR
+  browser["Browser"] --> web["packages/web: React app"]
+  web -->|"GraphQL"| server["packages/server: API"]
+  server --> neo4j[("Neo4j: graph data")]
+  server --> sqlite[("SQLite: users, teams, folders, settings")]
+  agent["AI agents"] -->|"MCP"| mcp["packages/mcp-server"]
+  mcp --> neo4j
+  core["packages/core: shared code"] -.imported by.-> server
+  core -.imported by.-> web
+```
+
+| Folder | What it holds |
+| --- | --- |
+| [`packages/`](packages/README.md) | The product code and its unit tests: `core`, `server`, `web`, `mcp-server` |
+| [`tests/`](tests/README.md) | End-to-end and cross-package suites, and the unified test harness |
+| [`docs/`](docs/README.md) | Guides, design, architecture, API and quality records |
+| [`deployment/`](deployment/README.md) | Dockerfiles and compose stacks, including the self-host stack |
+| [`scripts/`](scripts/README.md) | Installer, `./start` stack scripts, VM scripts and release checks |
+| [`.github/`](.github/README.md) | CI and release workflows, pull request template |
+| [`.agents/`](.agents/README.md) | Guidance for the AI agents that maintain this repo: skills, policy, lessons |
+| [`.claude/`](.claude/README.md) | Claude Code settings; links Claude to the shared skills in `.agents/skills` |
 
 ## Documentation
 

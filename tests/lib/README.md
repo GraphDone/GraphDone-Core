@@ -3,6 +3,15 @@
 Everything reusable across the test suite lives here. Specs import from it via
 `../../lib/<module>` (specs sit in depth-2 domain folders like `tests/e2e/auth/`).
 
+```mermaid
+flowchart LR
+  specs["specs in tests/e2e, diagnostics, ..."] -->|"import ../../lib/..."| helpers["auth.ts, api.ts, seedGraph.ts, journeys/"]
+  run["tests/run-unified.mjs"] --> runner["runner/"]
+  runner --> adapters["adapters/"]
+  adapters --> reporting["reporting/"]
+  reporting --> out["report.html + report.json"]
+```
+
 ## Helpers (consumed by specs)
 - `auth.ts` — battle-tested `login` / `navigateToWorkspace` / `TEST_USERS` (the
   foundation for every authenticated E2E spec)
@@ -33,4 +42,22 @@ sequences from `tests/sequences/unified.config.mjs` and emits DUAL output to
 Profiles: `smoke` (fast blocking) · `pr` (broader blocking) · `full` (everything
 incl. capture-heavy report sequences + cloud audit) · `report` (captures only).
 
+## Subfolders
+
+| Folder | What it holds |
+| --- | --- |
+| [`reporting/`](reporting/README.md) | The unified report: rollup, HTML and JSON writers, reliability statistics, galleries |
+| [`adapters/`](adapters/README.md) | Turn Playwright, Vitest and other runs into unified sequences |
+| [`runner/`](runner/README.md) | Process, output and source-provenance safety for the harness |
+| [`journeys/`](journeys/README.md) | Building blocks for the basic-journey suite (workspace setup, connect paths) |
+| [`ui-fit/`](ui-fit/README.md) | Measuring and rules for the UI fit gate |
+| [`perf/`](perf/README.md) | Evidence rules for the performance gate |
+| [`metrics/`](metrics/README.md) | Image metrics for graph layout (OpenCV balance) |
+| [`production/`](production/README.md) | Helpers for the production-stack smoke |
+| [`release/`](release/README.md) | Release and workflow guards |
+| [`dependencies/`](dependencies/README.md) | Dependency security guards |
+| [`dashboard/`](dashboard/README.md) | The live test dashboard |
+
 Run the lib's own unit tests with `npm run test:unified:lib` (`node --test "tests/lib/**/*.test.mjs"`).
+
+Up: [`tests/`](../README.md)
