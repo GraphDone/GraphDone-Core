@@ -5,6 +5,16 @@ test health and performance as you work. It watches every `graphdone.unified-rep
 run produced across both repos, accumulates trend history, and **updates itself
 live** (Server-Sent Events) the instant a new run lands — no zip, no manual refresh.
 
+```mermaid
+flowchart LR
+  runs["unified report.json runs"] --> ingest["ingest.mjs: find and parse"]
+  ingest --> history["history.mjs: append-only trend store"]
+  ingest --> metrics["metrics.mjs: perf points"]
+  history --> server["server.mjs: JSON API + SSE"]
+  metrics --> server
+  server --> app["Browser: page.mjs shell + app.mjs"]
+```
+
 ```bash
 npm run dashboard        # serve at http://localhost:3199
 npm run dashboard:open   #   …and open the browser
@@ -102,3 +112,5 @@ A `flock` lock prevents overlap; the agent prompt has hard constraints (never
 deploy, never touch secrets, never merge a failing gate). Run mechanical-only with
 `NO_AGENT=1 bash scripts/dashboard-loop.sh once`. Disable the loop by removing the
 `graphdone-dashboard-loop` lines from `crontab -e`. Logs: `test-artifacts/dashboard/loop.log`.
+
+Up: [`tests/lib/`](../README.md)
