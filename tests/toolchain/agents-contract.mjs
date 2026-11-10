@@ -189,6 +189,32 @@ test('the Claude Code guard hook blocks forbidden git and GitHub operations', ()
     'gh api repos/o/r/git/refs/heads/dev',
     'gh pr merge 12 --merge --delete-branch=false',
   ];
-  for (const command of blocked) assert.ok(blockReason(command), `should block: ${command}`);
-  for (const command of allowed) assert.equal(blockReason(command), null, `should allow: ${command}`);
+  // PR bases for --admin merges, instead of asking GitHub: 13 targets main, 14 cannot be looked up.
+  const bases = { 13: 'main', 14: null };
+  const baseOf = ({ pr }) => (pr in bases ? bases[pr] : 'dev');
+  for (const command of blocked) assert.ok(blockReason(command, { baseOf }), `should block: ${command}`);
+  for (const command of allowed) assert.equal(blockReason(command, { baseOf }), null, `should allow: ${command}`);
+  for (const command of ['gh pr merge 13 --merge --admin', 'gh pr merge 14 --admin', 'gh pr merge --repo o/r -b "msg 12" 13 --admin']) {
+    assert.ok(blockReason(command, { baseOf }), `should block an --admin merge not into dev: ${command}`);
+  }
+});
+
+test('the pr-reviewer subagent may only read', () => {
+  const baseOf = () => 'dev';
+  const agent = 'pr-reviewer';
+  const blocked = [
+    'git commit -m "fix"', 'git push origin feature', 'git checkout -b x', 'git reset --hard', 'git branch -D x',
+    'git config user.name x', 'gh pr review 12 --approve', 'gh pr comment 12 --body hi', 'gh pr merge 12 --merge',
+    'gh issue comment 1 --body hi', 'gh api -X POST repos/o/r/issues/1/comments -f body=x',
+    'gh api graphql -f query=\'mutation { addComment(input: {}) { clientMutationId } }\'', 'bash -c "git push origin x"',
+  ];
+  const allowed = [
+    'git status', 'git log --oneline -5', 'git diff abc...def', 'git fetch origin', 'git ls-remote origin refs/heads/dev',
+    'git -C repo show HEAD:AGENTS.md', 'git branch -a', 'git worktree add ../review abc', 'git config --get remote.origin.url',
+    'gh pr view 12 --json files', 'gh pr diff 12', 'gh pr checks 12', 'gh api repos/o/r/pulls/12/files',
+    'gh api graphql -f query=\'query { viewer { login } }\'', 'npm run test:toolchain', 'node --test tests/toolchain/agents-contract.mjs',
+  ];
+  for (const command of blocked) assert.ok(blockReason(command, { agent, baseOf }), `pr-reviewer should not run: ${command}`);
+  for (const command of allowed) assert.equal(blockReason(command, { agent, baseOf }), null, `pr-reviewer should run: ${command}`);
+  assert.equal(blockReason('git commit -m "fix"', { baseOf }), null, 'the main session may commit');
 });

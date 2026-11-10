@@ -20,7 +20,7 @@ flowchart LR
 | --- | --- |
 | `skills` | A symlink to [`../.agents/skills/`](../.agents/skills/README.md), so Claude Code lists the shared skills natively |
 | [`settings.json`](settings.json) | Shared settings: denies the Read tool on local secret files at any depth (`.env`, `.env.local`, `.env.*.local`, `.env.vm`, `deployment/certs/`; `./start` writes OAuth and JWT secrets into `packages/server/.env`) and runs the guard hook on every Bash call. Use the `.env.example` files to learn what a setting is |
-| [`hooks/`](hooks/README.md) | `guard-git.mjs`: blocks force-pushes, deleting `dev`/`main`, `--delete-branch` merges and branch-protection changes |
+| [`hooks/`](hooks/README.md) | `guard-git.mjs`: blocks force-pushes, deleting `dev`/`main`, `--delete-branch` merges, `--admin` merges outside `dev` and branch-protection changes, and keeps `pr-reviewer` read-only |
 | [`agents/`](agents/README.md) | `pr-reviewer`: the independent, read-only PR reviewer, built on the `review-pr` skill |
 
 **Start Claude Code at the repository root.** Claude Code 2.1.322 loads

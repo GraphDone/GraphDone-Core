@@ -15,7 +15,7 @@ flowchart LR
 
 | File | What it blocks |
 | --- | --- |
-| [`guard-git.mjs`](guard-git.mjs) | Force-pushes (`--force`, `-f`, `--force-with-lease`, `+` refspecs, `--mirror`, `--prune`), deleting or rewriting `dev` or `main` (by push or `gh api`), `gh pr merge --delete-branch`/`-d`, `gh repo edit`, and branch-protection or ruleset writes (REST or GraphQL) |
+| [`guard-git.mjs`](guard-git.mjs) | Force-pushes (`--force`, `-f`, `--force-with-lease`, `+` refspecs, `--mirror`, `--prune`), deleting or rewriting `dev` or `main` (by push or `gh api`), `gh pr merge --delete-branch`/`-d`, `gh repo edit`, branch-protection or ruleset writes (REST or GraphQL), and `--admin` merges into anything but `dev` (it asks GitHub for the PR's base; if it cannot tell, it blocks). For the read-only `pr-reviewer` subagent it also blocks every git and gh command that writes |
 
 The hook reads a command the way a shell splits it: text inside quotes or a
 here-document (a commit message, a PR body) is never treated as a command, while
