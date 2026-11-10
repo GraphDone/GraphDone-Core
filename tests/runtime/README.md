@@ -22,8 +22,9 @@ flowchart LR
 | [`image-contract.mjs`](image-contract.mjs) | Runs inside the image: refuses weak production secrets, starts the server, uses GraphQL and the MCP server against the disposable Neo4j, and checks that data and sign-in survive a container replacement. |
 | [`check-scan.mjs`](check-scan.mjs) | Reads a Trivy JSON scan and asserts it covered both OS and npm packages, then prints the finding counts by severity. |
 
-All scripts require `GRAPHDONE_DISPOSABLE_NEO4J=1` and a local Neo4j address, so
-they cannot touch a real database. See the `runtime-images` job in
+`run-image.mjs` and `image-contract.mjs`, the two that use a database, require
+`GRAPHDONE_DISPOSABLE_NEO4J=1` and a local Neo4j address, so they cannot touch a
+real database. See the `runtime-images` job in
 [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) for the exact steps.
 
 Up: [`tests/`](../README.md)

@@ -36,7 +36,7 @@ flowchart LR
   seq --> pw["Playwright: e2e/, diagnostics/, devices/, perf/, visual/"]
   pw --> lib["lib/ helpers and fixtures/"]
   run --> report["test-artifacts/unified/ report.html + report.json"]
-  ci["CI"] --> contracts["node: toolchain/, runtime/"]
+  ci["CI"] --> contracts["toolchain/ and runtime/ contracts"]
   ci --> run
 ```
 
