@@ -23,7 +23,6 @@ flowchart LR
 | [`build.sh`](build.sh) | `./start build` |
 | [`test.sh`](test.sh) | `./start test` |
 | [`cleanup.sh`](cleanup.sh) | `./start clean`: stop stray processes before a fresh setup |
-| [`deploy.sh`](deploy.sh) | Run directly; staging/production deploy helper |
 
 Docker modes use the compose files in [`deployment/`](../../deployment/README.md).
 
