@@ -2,6 +2,38 @@
 
 Welcome to the GraphDone documentation! This directory contains comprehensive guides, API references, and deployment information for working with GraphDone.
 
+## 🗂️ Folders
+
+Every folder has its own README with a map of what is inside.
+
+```mermaid
+flowchart LR
+  product["product/ and design/: why and how it should feel"] --> arch["architecture/: how the graph view works"]
+  guides["guides/: run it and find your way"] --> api["api/ and agents/: connect programs"]
+  arch --> quality["quality/: gates and evidence"]
+  testing["testing/: how to test"] --> quality
+  deploy["deployment/ and security/: run it for real"]
+```
+
+| Folder | What it holds |
+| --- | --- |
+| [`guides/`](guides/README.md) | Getting started, architecture overview, web UI structure, VM and hooks setup |
+| [`features/`](features/README.md) | User-side walkthroughs: creating graphs, the admin pages |
+| [`product/`](product/README.md) | The product decision: what Core is and how it relates to the hosted build |
+| [`design/`](design/README.md) | Interaction rules and designs, each with its status |
+| [`architecture/`](architecture/README.md) | Level of detail, layout and wire routing for large graphs |
+| [`api/`](api/README.md) | GraphQL, MCP quickstart and the operations API |
+| [`agents/`](agents/README.md) | Connecting your own AI agent, and its OpenAPI description |
+| [`formats/`](formats/README.md) | Project export/import format, with an example file |
+| [`testing/`](testing/README.md) | How to run the test suites and what each one proves |
+| [`quality/`](quality/README.md) | Release gates, runbooks and dated validation records |
+| [`deployment/`](deployment/README.md) | Deployment and self-hosting guides |
+| [`security/`](security/README.md) | Authentication, OAuth and TLS |
+| [`reviews/`](reviews/README.md) | Dated state-of-the-project reviews |
+| [`img/`](img/README.md) | Shared artwork, such as the README banner |
+
+Agent lessons and procedures live outside `docs/`, in [`.agents/`](../.agents/README.md).
+
 ## 📚 Documentation Structure
 
 ### [API Reference](./api/)

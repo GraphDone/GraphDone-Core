@@ -17,6 +17,28 @@ local stack with test accounts and seeded data. `TEST_URL` selects an existing
 stack; it does not make that stack disposable. `npm test` runs package unit tests,
 not these browser workflows.
 
+## In this folder
+
+```mermaid
+flowchart LR
+  guide["This README: how to run tests"] --> tests["tests/ suites"]
+  tests --> evidence["Dated evidence here and in ../quality/"]
+  heavy["local-vlm-and-scale.md"] -.report-only suites.-> tests
+```
+
+| File | What it covers |
+| --- | --- |
+| This README | The unified harness, profiles, the test tree and how to add tests |
+| [`local-vlm-and-scale.md`](local-vlm-and-scale.md) | Two heavier report-only suites: visual review by a local vision model, and large-scale performance sweeps |
+| [`e2e-admin-graph-creation.md`](e2e-admin-graph-creation.md) | End-to-end test specification for the admin pages and graph creation |
+| [`OPERATIONS_RELEASE.md`](OPERATIONS_RELEASE.md) | Quality gate evidence for the operations release (2026-09-08) |
+| [`e2e-test-summary.md`](e2e-test-summary.md) | Summary of the Multipass VM end-to-end testing, 2025-11-13 |
+
+The suites live in [`tests/`](../../tests/README.md); release gates and dated
+validation records are in [`../quality/`](../quality/README.md).
+
+Up: [`docs/`](../README.md)
+
 ## Disposable production stack
 
 With Node 22 dependencies, Chromium, Docker Compose, OpenSSL and Xvfb installed,
