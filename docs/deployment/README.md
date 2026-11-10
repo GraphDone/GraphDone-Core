@@ -2,6 +2,25 @@
 
 This guide covers various deployment options for GraphDone, from local development to production environments.
 
+## In this folder
+
+```mermaid
+flowchart LR
+  readme["README.md: all deployment options"] --> selfhost["SELF_HOSTING.md: production on your server"]
+  selfhost --> stack["deployment/self-host/ stack"]
+  devops["devops-integration.md: test data out to monitoring"]
+```
+
+| File | What it covers |
+| --- | --- |
+| This README | Every way to run GraphDone, from local development to production containers |
+| [`SELF_HOSTING.md`](SELF_HOSTING.md) | The recommended production install: `./scripts/self-host.sh` and the [`deployment/self-host/`](../../deployment/self-host/README.md) stack |
+| [`devops-integration.md`](devops-integration.md) | The pipeline that sends test results to a separate monitoring and alerting service |
+
+The compose files and Dockerfiles themselves are in [`deployment/`](../../deployment/README.md).
+
+Up: [`docs/`](../README.md)
+
 ## Quick Deployment Options
 
 ### Development (Local)
