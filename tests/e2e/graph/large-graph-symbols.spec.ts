@@ -497,6 +497,17 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
         .filter(id => id !== denseTarget.id)
     ).size
   ).toBeGreaterThanOrEqual(107);
+  // The calibration runs in a blank page of the same browser, so it measures
+  // this machine, not the app's own styles or pending work.
+  const runnerSpeed = async () => {
+    const probe = await page.context().newPage();
+    try {
+      await probe.setContent('<!doctype html><html><body></body></html>');
+      return await probe.evaluate(measureRunnerSpeed);
+    } finally {
+      await probe.close();
+    }
+  };
   // Dense local zoom has a 5 s budget on a reference-speed runner. Shared CI
   // runners are sometimes slow for a whole job (run 42756334084: the sequence
   // took 408 s instead of ~283 s and this zoom 5.9 s), so the budget scales with
@@ -514,21 +525,52 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
   }[] = [];
   const denseEvidence = async () => {
     const path = info.outputPath('two-thousand-dense-local-calibration.json');
-    await writeFile(path, JSON.stringify({ RUNNER_REFERENCE_MS, timings: denseTimings }));
-    await info.attach('two-thousand-dense-local-calibration.json', { path, contentType: 'application/json' });
+    await writeFile(
+      path,
+      JSON.stringify({
+        RUNNER_REFERENCE_MS: String(RUNNER_REFERENCE_MS),
+        timings: denseTimings,
+      })
+    );
+    await info.attach('two-thousand-dense-local-calibration.json', {
+      path,
+      contentType: 'application/json',
+    });
   };
   let denseOriginals: string[] = [];
   for (const scale of [1.2, 0.1, 1.2]) {
-    const calibrationMs = await page.evaluate(measureRunnerSpeed);
-    const slowdown = Math.min(2, Math.max(1, calibrationMs / RUNNER_REFERENCE_MS));
+    const calibrationMs = await runnerSpeed();
+    const slowdown = Math.min(
+      2,
+      Math.max(1, calibrationMs / RUNNER_REFERENCE_MS)
+    );
     const budgetMs = DENSE_ZOOM_BUDGET_MS * slowdown;
     const started = Date.now();
-    const ms = await page.evaluate(measureGraphZoom, {
-      x: denseTarget.positionX,
-      y: denseTarget.positionY,
+    const ms = await page
+      .evaluate(measureGraphZoom, {
+        x: denseTarget.positionX,
+        y: denseTarget.positionY,
+        scale,
+      })
+      .catch(async error => {
+        // The zoom gave up (its own cap): keep the calibration evidence.
+        denseTimings.push({
+          scale,
+          ms: Number.NaN,
+          wallMs: Date.now() - started,
+          calibrationMs,
+          budgetMs,
+        });
+        await denseEvidence();
+        throw error;
+      });
+    denseTimings.push({
       scale,
+      ms,
+      wallMs: Date.now() - started,
+      calibrationMs,
+      budgetMs,
     });
-    denseTimings.push({ scale, ms, wallMs: Date.now() - started, calibrationMs, budgetMs });
     if (ms >= budgetMs) await denseEvidence();
     expect(
       ms,
