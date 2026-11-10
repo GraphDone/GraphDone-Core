@@ -498,23 +498,37 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
     ).size
   ).toBeGreaterThanOrEqual(107);
   // The calibration runs in a blank page of the same browser, so it measures
-  // this machine, not the app's own styles or pending work. This sequence is
-  // headless, where the extra page never hides the app's page. In a headed
-  // local run the new window could, and a hidden page saves item positions
-  // (a write this test forbids), so the app's page is brought back to the
-  // front and must be visible before the zoom.
+  // this machine, not the app's own styles or pending work. The extra page does
+  // not hide the app's page headless or headed under xvfb (checked with
+  // Chromium 153). On a desktop its window can cover the app's, and a page
+  // that goes hidden saves item positions at once (a write this test forbids).
+  // Bringing the page back afterwards cannot undo that, so the app's page
+  // records any hide from here on and the test stops with the reason instead
+  // of a puzzling write.
+  await page.evaluate(() => {
+    const w = window as Window & { __graphHidden?: boolean };
+    w.__graphHidden = false;
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') w.__graphHidden = true;
+    });
+  });
   const runnerSpeed = async () => {
     const probe = await page.context().newPage();
+    let calibrationMs: number;
     try {
       await probe.setContent('<!doctype html><html><body></body></html>');
-      return await probe.evaluate(measureRunnerSpeed);
+      calibrationMs = await probe.evaluate(measureRunnerSpeed);
     } finally {
-      await probe.close();
-      await page.bringToFront();
-      expect(await page.evaluate(() => document.visibilityState)).toBe(
-        'visible'
-      );
+      await probe.close().catch(() => {}); // never hide the probe's own error
     }
+    await page.bringToFront();
+    expect(
+      await page.evaluate(
+        () => (window as Window & { __graphHidden?: boolean }).__graphHidden
+      ),
+      'The app page went hidden (in a headed run the calibration page can cover it), which makes the app save item positions: run this sequence headless'
+    ).toBe(false);
+    return calibrationMs;
   };
   // Dense local zoom has a 5 s budget on a reference-speed runner. Shared CI
   // runners are sometimes slow for a whole job (run 42756334084: the sequence
@@ -585,7 +599,8 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
       calibrationMs,
       budgetMs,
     });
-    if (ms >= budgetMs) await denseEvidence();
+    // never let an evidence write replace the budget failure below
+    if (ms >= budgetMs) await denseEvidence().catch(() => {});
     expect(
       ms,
       `Dense local zoom must finish within 5 s on a reference-speed runner (${Math.round(budgetMs)} ms here: workload ${Math.round(calibrationMs)} ms vs reference ${RUNNER_REFERENCE_MS} ms)`
