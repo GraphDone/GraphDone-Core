@@ -1,4 +1,4 @@
-import { Page } from '@playwright/test';
+import { expect, Page } from '@playwright/test';
 import { TEST_GRAPH_PREFIX } from './dbHealing';
 
 /**
@@ -14,6 +14,44 @@ import { TEST_GRAPH_PREFIX } from './dbHealing';
  * limits, and cleanup deletes edges before nodes (orphan edges break the whole
  * edges query).
  */
+
+/**
+ * A first sign-in makes the app build the user's Welcome graph in the
+ * background (GraphContext: graph, items, edges, then the counts) when the user
+ * can see no graphs at all, own or shared. Seeding at the same time made both
+ * writes take ~19 s on a cold CI database (UI Fit, run 42750745652), so wait
+ * until that work is done: the user can see a graph, and any Welcome graph of
+ * theirs has its counts, which the app writes last. Returns at once when the
+ * user could already see graphs. A failed read is retried, not fatal.
+ */
+export async function waitForStarterGraph(page: Page, timeoutMs = 60_000) {
+  const me = await gql<{ me: { id: string } }>(page, '{ me { id } }');
+  let last = 'no answer yet';
+  const done = expect
+    .poll(
+      async () => {
+        try {
+          const { own, shared } = await gql<{ own: { name: string; nodeCount: number | null }[]; shared: { id: string }[] }>(
+            page,
+            'query($id: String!) { own: graphs(where: { createdBy: $id }) { name nodeCount } shared: graphs(where: { isShared: true }) { id } }',
+            { id: me.me.id }
+          );
+          const unfinished = own.filter(g => g.name === 'Welcome' && !(g.nodeCount ?? 0));
+          last = `${own.length} own and ${shared.length} shared graphs; ${unfinished.length} Welcome graph(s) still at 0 items`;
+          return own.length + shared.length > 0 && unfinished.length === 0;
+        } catch (error) {
+          last = `read failed: ${(error as Error).message}`;
+          return false;
+        }
+      },
+      { timeout: timeoutMs }
+    )
+    .toBe(true);
+  // The message is built after the wait, so it reports the final state.
+  await done.catch(() => {
+    throw new Error(`The app did not finish creating the Welcome graph within ${timeoutMs / 1000} s of the first sign-in (last check: ${last})`);
+  });
+}
 
 export interface SeededGraph {
   graphId: string;
