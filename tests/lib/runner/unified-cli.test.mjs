@@ -329,6 +329,13 @@ test('every Smoke Gate shard warms up with THE GATE, and the summary job keeps t
     assert.deepEqual(first, ['smoke', 'ci-smoke'], `${shard.name} must start with THE GATE on its fresh database`);
   }
   assert.equal(runs.smoke.length, shards.length);
+  // Everything the single Smoke Gate job ran (before #274), so a sequence
+  // dropped from every shard fails here. Change this list on purpose only.
+  assert.deepEqual(Object.keys(runs).sort(), [
+    'agent-connection', 'inspector-readability', 'item-wires', 'large-symbols', 'layout-recovery',
+    'living-graph-effects', 'mobile', 'nested-lod', 'new-user', 'perf-budgets', 'router-navigation',
+    'semantic-lod', 'smoke',
+  ]);
   for (const [sequence, entries] of Object.entries(runs)) {
     if (sequence !== 'smoke') assert.equal(entries.length, 1, `${sequence} runs in exactly one shard`);
   }

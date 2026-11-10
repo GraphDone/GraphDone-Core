@@ -498,7 +498,11 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
     ).size
   ).toBeGreaterThanOrEqual(107);
   // The calibration runs in a blank page of the same browser, so it measures
-  // this machine, not the app's own styles or pending work.
+  // this machine, not the app's own styles or pending work. This sequence is
+  // headless, where the extra page never hides the app's page. In a headed
+  // local run the new window could, and a hidden page saves item positions
+  // (a write this test forbids), so the app's page is brought back to the
+  // front and must be visible before the zoom.
   const runnerSpeed = async () => {
     const probe = await page.context().newPage();
     try {
@@ -506,26 +510,31 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
       return await probe.evaluate(measureRunnerSpeed);
     } finally {
       await probe.close();
+      await page.bringToFront();
+      expect(await page.evaluate(() => document.visibilityState)).toBe(
+        'visible'
+      );
     }
   };
   // Dense local zoom has a 5 s budget on a reference-speed runner. Shared CI
   // runners are sometimes slow for a whole job (run 42756334084: the sequence
   // took 408 s instead of ~283 s and this zoom 5.9 s), so the budget scales with
-  // a fixed workload timed in the page just before each zoom: never below 5 s,
-  // at most twice that. RUNNER_REFERENCE_MS is the 75th percentile of the
-  // workload on normal GitHub-hosted runners: 36 samples from 12 runners of
+  // a fixed workload timed in a blank page of the same browser just before
+  // each zoom: never below 5 s, at most twice that. RUNNER_REFERENCE_MS is the
+  // slowest normal GitHub-hosted runner seen: 36 samples from 12 runners of
   // this sequence (run 42764510479) took 98-255 ms, in hardware classes near
-  // 100, 160, 210 and 250 ms; p75 = 251 ms. So every normal runner gets a
-  // plain 5 s, and only one measurably slower than the slowest normal class
-  // gets more. The same runs zoomed in 1.1-3.1 s.
+  // 100, 160, 210 and 250 ms. So every sampled runner gets a plain 5 s, and
+  // only one slower than all of them gets more. The same runs zoomed in
+  // 1.1-3.1 s.
   const DENSE_ZOOM_BUDGET_MS = 5000;
-  const RUNNER_REFERENCE_MS = 251;
+  const RUNNER_REFERENCE_MS = 255;
   const denseTimings: {
     scale: number;
     ms: number;
     wallMs: number;
     calibrationMs: number;
     budgetMs: number;
+    zoomError?: string;
   }[] = [];
   const denseEvidence = async () => {
     const path = info.outputPath('two-thousand-dense-local-calibration.json');
@@ -560,12 +569,13 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
         // The zoom gave up (its own cap): keep the calibration evidence.
         denseTimings.push({
           scale,
-          ms: Number.NaN,
+          ms: Number.NaN, // written as null; zoomError says why
+          zoomError: String(error),
           wallMs: Date.now() - started,
           calibrationMs,
           budgetMs,
         });
-        await denseEvidence();
+        await denseEvidence().catch(() => {}); // never hide the zoom's own error
         throw error;
       });
     denseTimings.push({
