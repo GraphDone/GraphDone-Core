@@ -170,3 +170,47 @@ export async function measureGraphZoom({
     requestAnimationFrame(check);
   });
 }
+
+/**
+ * Times a fixed workload of the kind a zoom does (script, then building and
+ * laying out a few thousand elements), so a latency budget can tell a slow test
+ * machine from slow code. Run it in a blank page of the same browser
+ * (runnerSpeed in large-graph-symbols.spec.ts), so the app's styles and
+ * pending work cannot feed into it. Returns the median of five rounds, in ms.
+ */
+export async function measureRunnerSpeed() {
+  const host = document.createElement('div');
+  host.style.cssText =
+    'position:absolute;left:-10000px;top:0;width:800px;contain:layout style;';
+  document.body.appendChild(host);
+  const rounds: number[] = [];
+  try {
+    for (let round = 0; round < 5; round++) {
+      const start = performance.now();
+      let acc = 0;
+      for (let i = 0; i < 15_000_000; i++)
+        acc += Math.sqrt(i * (round + 1)) % 7;
+      const fragment = document.createDocumentFragment();
+      for (let i = 0; i < 2000; i++) {
+        const element = document.createElement('div');
+        element.textContent = `item ${i} ${Math.round(acc) % 10}`;
+        element.style.width = `${40 + (i % 50)}px`;
+        fragment.appendChild(element);
+      }
+      host.replaceChildren(fragment);
+      let height = 0;
+      for (const child of Array.from(host.children).slice(
+        0,
+        200
+      ) as HTMLElement[]) {
+        child.style.paddingLeft = `${height % 9}px`;
+        height += child.offsetHeight; // forces a layout of all 2000 elements
+      }
+      rounds.push(performance.now() - start);
+    }
+  } finally {
+    host.remove();
+  }
+  rounds.sort((a, b) => a - b);
+  return rounds[2];
+}

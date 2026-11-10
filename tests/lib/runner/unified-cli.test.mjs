@@ -5,10 +5,35 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync, spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { prepareOutput } from './unified-options.mjs';
 import { SEQUENCES, PROFILES } from '../../sequences/unified.config.mjs';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
+const { load } = createRequire(import.meta.url)('js-yaml');
+
+// How CI's Smoke Gate runs each sequence, read from the shard matrix in
+// ci.yml: one entry per shard line, "<sequence> <output dir> [xvfb]".
+function smokeGateRuns() {
+  const ci = load(readFileSync(join(root, '.github/workflows/ci.yml'), 'utf8'));
+  const runs = {};
+  for (const shard of ci.jobs['smoke-gate-shard'].strategy.matrix.include) {
+    for (const line of shard.sequences.split('\n').map(entry => entry.trim()).filter(Boolean)) {
+      const [sequence, out, display = ''] = line.split(/\s+/);
+      (runs[sequence] ??= []).push({ shard: shard.name, out, display });
+    }
+  }
+  return { ci, runs };
+}
+
+// The sequence runs in exactly one Smoke Gate shard, writing to
+// test-artifacts/<out>, under a virtual display when xvfb is true.
+function assertSmokeGateRuns(sequence, { out, xvfb }) {
+  const entries = smokeGateRuns().runs[sequence] ?? [];
+  assert.equal(entries.length, 1, `${sequence} must run in exactly one Smoke Gate shard`);
+  assert.equal(entries[0].out, out);
+  assert.equal(entries[0].display, xvfb ? 'xvfb' : '');
+}
 
 test('required performance and mobile gates select their bounded suites without retries', () => {
   assert.deepEqual(SEQUENCES['perf-budgets'].args, ['tests/perf/graph-perf.spec.ts', '--project=perf', '--workers=1', '--retries=0', '--trace=retain-on-failure']);
@@ -69,40 +94,39 @@ for (const sequence of ['new-user', 'agent-connection', 'inspector-readability',
       assert.ok(args.includes('--headed'));
       assert.equal(SEQUENCES[sequence].blocking, true);
       for (const profile of ['pr', 'full']) assert.ok(PROFILES[profile].includes(sequence));
-      const workflow = readFileSync(join(root, '.github/workflows/ci.yml'), 'utf8');
-      assert.equal(workflow.split('run: xvfb-run --auto-servernum node tests/run-unified.mjs --sequence agent-connection --out test-artifacts/ci-agent-connection').length, 2);
+      assertSmokeGateRuns(sequence, { out: 'ci-agent-connection', xvfb: true });
     }
     if (sequence === 'inspector-readability') {
       assert.deepEqual(args.filter(arg => arg.endsWith('.spec.ts')), ['tests/e2e/graph/inspector-readability.spec.ts']);
       assert.ok(args.includes('--headed'));
       assert.equal(SEQUENCES[sequence].blocking, true);
       for (const profile of ['pr', 'full']) assert.ok(PROFILES[profile].includes(sequence));
-      const workflow = readFileSync(join(root, '.github/workflows/ci.yml'), 'utf8');
-      assert.equal(workflow.split('run: xvfb-run --auto-servernum node tests/run-unified.mjs --sequence inspector-readability --out test-artifacts/ci-inspector-readability').length, 2);
+      assertSmokeGateRuns(sequence, { out: 'ci-inspector-readability', xvfb: true });
     }
     if (sequence === 'large-symbols') {
       assert.ok(args.includes('tests/e2e/graph/large-graph-symbols.spec.ts'));
       assert.ok(!args.includes('--headed'));
       assert.equal(SEQUENCES[sequence].blocking, true);
       for (const profile of ['pr', 'full']) assert.ok(PROFILES[profile].includes(sequence));
-      const workflow = readFileSync(join(root, '.github/workflows/ci.yml'), 'utf8');
-      assert.equal(workflow.split('run: node tests/run-unified.mjs --sequence large-symbols --out test-artifacts/ci-large-symbols').length, 2);
+      assertSmokeGateRuns(sequence, { out: 'ci-large-symbols', xvfb: false });
     }
     if (sequence === 'schematic-visual') {
       assert.ok(args.includes('--config=tests/visual/playwright.schematic.config.ts'));
       assert.equal(SEQUENCES[sequence].blocking, true);
       for (const profile of ['pr', 'full']) assert.ok(PROFILES[profile].includes(sequence));
-      const workflow = readFileSync(join(root, '.github/workflows/ci.yml'), 'utf8');
-      assert.equal(workflow.split('run: node tests/run-unified.mjs --sequence schematic-visual --out test-artifacts/ci-schematic-visual').length, 2);
+      // Runs before the dev stack, in the one shard that also runs the toolchain contracts.
+      const { ci } = smokeGateRuns();
+      const steps = ci.jobs['smoke-gate-shard'].steps.filter(step => step.run === 'node tests/run-unified.mjs --sequence schematic-visual --out test-artifacts/ci-schematic-visual');
+      assert.equal(steps.length, 1);
+      assert.equal(steps[0].if, 'matrix.toolchain');
+      assert.equal(ci.jobs['smoke-gate-shard'].strategy.matrix.include.filter(shard => shard.toolchain).length, 1);
     }
     if (sequence === 'item-wires' || sequence === 'nested-lod' || sequence === 'semantic-lod' || sequence === 'layout-recovery' || sequence === 'router-navigation') {
       const spec = sequence === 'item-wires' ? 'tests/e2e/graph/item-wire-consumers.spec.ts' : sequence === 'nested-lod' ? 'tests/e2e/graph/nested-semantic-lod.spec.ts' : sequence === 'semantic-lod' ? 'tests/e2e/graph/semantic-lod.spec.ts' : sequence === 'layout-recovery' ? 'tests/e2e/graph/layout-recovery.spec.ts' : 'tests/e2e/auth/router-navigation.spec.ts';
       assert.ok(args.includes(spec));
       if (sequence === 'item-wires') assert.ok(args.includes('tests/e2e/graph/item-symbols.spec.ts'));
       assert.equal(SEQUENCES[sequence].blocking, true);
-      const workflow = readFileSync(join(root, '.github/workflows/ci.yml'), 'utf8');
-      const command = `run: xvfb-run --auto-servernum node tests/run-unified.mjs --sequence ${sequence} --out test-artifacts/ci-${sequence}`;
-      assert.equal(workflow.split(command).length, 2);
+      assertSmokeGateRuns(sequence, { out: `ci-${sequence}`, xvfb: true });
     }
     assert.deepEqual(args.filter(arg => arg.startsWith('--trace=')), ['--trace=retain-on-failure']);
     assert.deepEqual(args.filter(arg => arg.startsWith('--retries=')), ['--retries=0']);
@@ -296,3 +320,19 @@ for (const location of ['git-dir', 'git-common-dir', 'symlink']) {
     assert.ok(!existsSync(output));
   });
 }
+
+test('every Smoke Gate shard warms up with THE GATE, and the summary job keeps the Smoke Gate name', () => {
+  const { ci, runs } = smokeGateRuns();
+  const shards = ci.jobs['smoke-gate-shard'].strategy.matrix.include;
+  for (const shard of shards) {
+    const first = shard.sequences.trim().split('\n')[0].trim().split(/\s+/);
+    assert.deepEqual(first, ['smoke', 'ci-smoke'], `${shard.name} must start with THE GATE on its fresh database`);
+  }
+  assert.equal(runs.smoke.length, shards.length);
+  for (const [sequence, entries] of Object.entries(runs)) {
+    if (sequence !== 'smoke') assert.equal(entries.length, 1, `${sequence} runs in exactly one shard`);
+  }
+  assert.equal(ci.jobs['smoke-gate'].name, 'Smoke Gate');
+  assert.deepEqual(ci.jobs['smoke-gate'].needs, ['smoke-gate-shard']);
+  assert.ok(ci.jobs['ci-success'].needs.includes('smoke-gate'));
+});

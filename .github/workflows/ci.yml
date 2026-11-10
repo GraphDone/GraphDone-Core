@@ -146,10 +146,48 @@ jobs:
   # container and runs the user-smoke suite (login → nodes AND edges render →
   # no GraphQL errors → no orphan edges → grow + undo work). ~3-4 min vs the
   # ~45 min cold prod-image build, so it's a gate people actually keep green.
-  smoke-gate:
-    name: Smoke Gate
+  # The Smoke Gate's sequences run as four parallel shards, each on its own
+  # GitHub-hosted VM with its own Neo4j and dev stack (the single job took
+  # ~42 min; the slowest shard is ~14 min plus setup). Each line of
+  # `sequences` is "<sequence> <output dir> [xvfb]"; "living-graph-effects" is
+  # the LIVE-* Playwright spec. Every shard starts with THE GATE (smoke), as
+  # the single job did, so later sequences never meet a cold database or a
+  # first sign-in. Sequences keep the single job's order. A shard runs all its
+  # sequences and fails if any failed. The "Smoke Gate" job below sums the
+  # shards up under the old name.
+  smoke-gate-shard:
+    name: Smoke Gate (${{ matrix.name }})
     runs-on: ubuntu-latest
     needs: [quality, unit-tests, build]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: new user
+            sequences: |
+              smoke ci-smoke
+              new-user ci-new-user xvfb
+          - name: 2000 items, nested LOD, routes, mobile
+            sequences: |
+              smoke ci-smoke
+              large-symbols ci-large-symbols
+              nested-lod ci-nested-lod xvfb
+              router-navigation ci-router-navigation xvfb
+              mobile ci-mobile
+          - name: wires, agents, inspector, effects, perf
+            sequences: |
+              smoke ci-smoke
+              item-wires ci-item-wires xvfb
+              agent-connection ci-agent-connection xvfb
+              inspector-readability ci-inspector-readability xvfb
+              living-graph-effects - -
+              perf-budgets ci-perf
+          - name: toolchain, schematic, LOD, layout
+            toolchain: true
+            sequences: |
+              smoke ci-smoke
+              semantic-lod ci-semantic-lod xvfb
+              layout-recovery ci-layout-recovery xvfb
     services:
       neo4j:
         image: neo4j:5.26.12
@@ -183,8 +221,10 @@ jobs:
       - name: Install Playwright (chromium)
         run: npx playwright install --with-deps chromium
       - name: Vite proxy, hot reload and offline-shell contract
+        if: matrix.toolchain
         run: npm run test:toolchain
       - name: Schematic fixture visual acceptance
+        if: matrix.toolchain
         run: node tests/run-unified.mjs --sequence schematic-visual --out test-artifacts/ci-schematic-visual
       - name: Start GraphDone (dev stack)
         run: |
@@ -194,71 +234,30 @@ jobs:
           echo "Dev stack healthy."
       - name: Seed demo data
         run: npm run db:seed
-      - name: THE GATE — user smoke suite
-        run: node tests/run-unified.mjs --sequence smoke --out test-artifacts/ci-smoke
+      - name: Run this shard's sequences
         env:
           TEST_URL: http://localhost:3127
           CI: true
-      - name: Item wire consumer acceptance
-        run: xvfb-run --auto-servernum node tests/run-unified.mjs --sequence item-wires --out test-artifacts/ci-item-wires
-        env:
-          TEST_URL: http://localhost:3127
-          CI: true
-      - name: Two thousand item headless zoom acceptance
-        run: node tests/run-unified.mjs --sequence large-symbols --out test-artifacts/ci-large-symbols
-        env:
-          TEST_URL: http://localhost:3127
-          CI: true
-      - name: Agent connection and handoff acceptance
-        run: xvfb-run --auto-servernum node tests/run-unified.mjs --sequence agent-connection --out test-artifacts/ci-agent-connection
-        env:
-          TEST_URL: http://localhost:3127
-          CI: true
-      - name: Inspector readability acceptance
-        run: xvfb-run --auto-servernum node tests/run-unified.mjs --sequence inspector-readability --out test-artifacts/ci-inspector-readability
-        env:
-          TEST_URL: http://localhost:3127
-          CI: true
-      - name: New-user quality gate (headed under virtual display)
-        run: xvfb-run --auto-servernum node tests/run-unified.mjs --sequence new-user --out test-artifacts/ci-new-user
-        env:
-          TEST_URL: http://localhost:3127
-          CI: true
-      - name: Semantic LOD acceptance
-        run: xvfb-run --auto-servernum node tests/run-unified.mjs --sequence semantic-lod --out test-artifacts/ci-semantic-lod
-        env:
-          TEST_URL: http://localhost:3127
-          CI: true
-      - name: Nested semantic LOD acceptance
-        run: xvfb-run --auto-servernum node tests/run-unified.mjs --sequence nested-lod --out test-artifacts/ci-nested-lod
-        env:
-          TEST_URL: http://localhost:3127
-          CI: true
-      - name: Durable layout recovery acceptance
-        run: xvfb-run --auto-servernum node tests/run-unified.mjs --sequence layout-recovery --out test-artifacts/ci-layout-recovery
-        env:
-          TEST_URL: http://localhost:3127
-          CI: true
-      - name: Route compatibility acceptance
-        run: xvfb-run --auto-servernum node tests/run-unified.mjs --sequence router-navigation --out test-artifacts/ci-router-navigation
-        env:
-          TEST_URL: http://localhost:3127
-          CI: true
-      - name: Mobile UI audit (layout / contrast / dialogs across every screen)
-        run: node tests/run-unified.mjs --sequence mobile --out test-artifacts/ci-mobile
-        env:
-          TEST_URL: http://localhost:3127
-          CI: true
-      - name: Living-graph effects render (LIVE-*)
-        run: npx playwright test tests/e2e/graph/living-graph-effects.spec.ts --project="GraphDone-Core/dev-neo4j/chromium" --reporter=line
-        env:
-          TEST_URL: http://localhost:3127
-          CI: true
-      - name: Performance budgets (ADAPT-8)
-        run: node tests/run-unified.mjs --sequence perf-budgets --out test-artifacts/ci-perf
-        env:
-          TEST_URL: http://localhost:3127
-          CI: true
+          SEQUENCES: ${{ matrix.sequences }}
+        run: |
+          failed=()
+          while read -r sequence out display; do
+            [[ -z "$sequence" ]] && continue
+            echo "::group::$sequence"
+            if [[ "$sequence" == living-graph-effects ]]; then
+              cmd=(npx playwright test tests/e2e/graph/living-graph-effects.spec.ts --project="GraphDone-Core/dev-neo4j/chromium" --reporter=line)
+            else
+              cmd=(node tests/run-unified.mjs --sequence "$sequence" --out "test-artifacts/$out")
+              [[ "$display" == xvfb ]] && cmd=(xvfb-run --auto-servernum "${cmd[@]}")
+            fi
+            "${cmd[@]}" < /dev/null || failed+=("$sequence")  # keep the loop's stdin
+            echo "::endgroup::"
+          done <<< "$SEQUENCES"
+          if (( ${#failed[@]} )); then
+            for sequence in "${failed[@]}"; do echo "::error title=Smoke Gate::$sequence failed"; done
+            exit 1
+          fi
+          echo "All sequences in this shard passed."
       - name: Dump dev log on failure
         if: failure()
         run: tail -100 /tmp/dev.log || true
@@ -266,11 +265,22 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: smoke-results-${{ github.sha }}
+          name: smoke-results-${{ github.sha }}-${{ strategy.job-index }}
           path: |
             test-results/
             test-artifacts/
           retention-days: 7
+
+  smoke-gate:
+    name: Smoke Gate
+    runs-on: ubuntu-latest
+    needs: [smoke-gate-shard]
+    if: always()
+    steps:
+      - name: Every shard passed
+        run: |
+          echo "Shards: ${{ needs.smoke-gate-shard.result }}"
+          [[ "${{ needs.smoke-gate-shard.result }}" == "success" ]] || { echo "A Smoke Gate shard did not pass; see the 'Smoke Gate (...)' jobs."; exit 1; }
 
   # ── UI fit: every screen on iPhone, iPad and desktop Chrome/Safari ─────────
   # Measures every visible control on every screen in tests/devices/screens.ts
