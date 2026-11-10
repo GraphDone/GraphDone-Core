@@ -123,8 +123,16 @@ tsconfig.tsbuildinfo
 
 # Prisma
 prisma/dev.db
-# Claude Code local worktrees/agent scratch — never commit
-.claude/
+# Claude Code: only the shared parts of .claude/ are committed; everything else
+# Claude writes there (personal settings, worktrees, locks, local memory) stays
+# local. Add a path here before committing a new shared .claude/ entry.
+.claude/*
+!.claude/README.md
+!.claude/skills
+!.claude/settings.json
+!.claude/agents/
+!.claude/hooks/
+!.claude/rules/
 
 # Private self-hosting bootstrap credentials
 deployment/self-host/.env

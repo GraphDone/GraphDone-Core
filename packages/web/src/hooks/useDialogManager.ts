@@ -10,7 +10,8 @@ import { useEffect, useRef } from 'react';
  *  - ONE thing open at a time: opening an exclusive dialog closes whatever
  *    was open before it. Conflicting overlays are a bug, not a feature.
  *    (Pass { exclusive: false } for layered UI like confirm-inside-modal.)
- *  - Escape always closes the top-most dialog. Click-outside closes all.
+ *  - Escape always closes the top-most dialog. closeAll() exists for
+ *    click-outside, but nothing calls it yet; each component handles its own.
  *  - Users never hunt for X buttons.
  */
 

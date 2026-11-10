@@ -101,6 +101,6 @@ AINAT-1..3 in [USER_STORIES.md](./USER_STORIES.md).
 
 ## Where the rules live
 
-- **[CLAUDE.md](../CLAUDE.md)** — working agreement, THE GATE, dev gotchas, story workflow
+- **[AGENTS.md](../AGENTS.md)** — agent instructions for every harness (CLAUDE.md imports it): authority, THE GATE, dev gotchas, skills
 - **[USER_STORIES.md](./USER_STORIES.md)** — the backlog that drives development; every story maps to tests
 - **[TESTING_AND_REFINEMENT_PLAN.md](./TESTING_AND_REFINEMENT_PLAN.md)** — the never-done improvement loop
