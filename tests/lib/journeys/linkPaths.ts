@@ -50,17 +50,44 @@ async function frameAll(page: Page) {
   await page.waitForTimeout(700);
 }
 
-async function onScreen(page: Page, item: Item) {
+/** What a press at (x, y) would land on, for failure messages. */
+async function landsOn(page: Page, x: number, y: number) {
+  return page.evaluate(({ x, y }) => {
+    const hit = document.elementFromPoint(x, y);
+    if (!hit) return 'nothing (off screen)';
+    const tagged = hit.closest('[data-testid]');
+    if (tagged) return `[data-testid=${tagged.getAttribute('data-testid')}]`;
+    const cls = typeof hit.className === 'string' ? hit.className.trim().split(/\s+/).slice(0, 2).join('.') : '';
+    return `${hit.tagName.toLowerCase()}${hit.id ? `#${hit.id}` : ''}${cls ? `.${cls}` : ''}`;
+  }, { x, y });
+}
+
+/** The card's box when a press at its centre reaches the card and stays so:
+ * checked twice, 350 ms apart, so something appearing over the card or a camera
+ * still moving cannot come between look and tap. Otherwise, why it is not. */
+async function onScreen(page: Page, item: Item): Promise<{ box: NonNullable<Awaited<ReturnType<typeof cardBox>>> } | { why: string }> {
+  const first = await cardBox(page, item.id);
+  if (!first) return { why: 'card not drawn' };
+  if (!(await clickable(page, item.id, first.cx, first.cy))) return { why: `a press at its centre lands on ${await landsOn(page, first.cx, first.cy)}` };
+  await page.waitForTimeout(350);
   const box = await cardBox(page, item.id);
-  return box && (await clickable(page, item.id, box.cx, box.cy)) ? box : null;
+  if (!box) return { why: 'card disappeared within 350 ms' };
+  const moved = Math.hypot(box.cx - first.cx, box.cy - first.cy);
+  if (moved >= 2) return { why: `card moved ${moved.toFixed(0)} px in 350 ms` };
+  if (!(await clickable(page, item.id, box.cx, box.cy))) return { why: `covered within 350 ms by ${await landsOn(page, box.cx, box.cy)}` };
+  return { box };
 }
 
 /** Drag empty canvas so (x, y) moves to the middle of the graph: a one-finger
- * swipe on touch, a mouse drag on desktop. Returns false if already in view. */
-async function panIntoView(page: Page, x: number, y: number) {
+ * swipe on touch, a mouse drag on desktop. Returns false if already in view, or
+ * with `toCentre`, if already near the middle (used when something on screen,
+ * such as the floating zoom buttons, covers the point). */
+async function panIntoView(page: Page, x: number, y: number, toCentre = false) {
   const f = (await page.locator('.graph-container').boundingBox())!;
   const margin = 40;
-  if (x > f.x + margin && x < f.x + f.width - margin && y > f.y + margin && y < f.y + f.height - margin) return false;
+  if (toCentre) {
+    if (Math.hypot(x - (f.x + f.width / 2), y - (f.y + f.height / 2)) < 30) return false;
+  } else if (x > f.x + margin && x < f.x + f.width - margin && y > f.y + margin && y < f.y + f.height - margin) return false;
   const sx = f.x + f.width * 0.5, sy = f.y + f.height * 0.25; // start on canvas, above where cards land
   const dx = Math.max(-f.width * 0.8, Math.min(f.width * 0.8, f.x + f.width / 2 - x));
   const dy = Math.max(-f.height * 0.6, Math.min(f.height * 0.6, f.y + f.height / 2 - y));
@@ -84,6 +111,7 @@ async function panIntoView(page: Page, x: number, y: number) {
 async function revealControl(page: Page, item: Item, control: string) {
   const touch = await isTouch(page);
   let pans = 0;
+  let why = '';
   const find = () => page.evaluate(({ id, control }) => {
     for (const e of Array.from(document.querySelectorAll(`${control}[data-node-id="${id}"]`))) {
       const r = e.getBoundingClientRect();
@@ -100,28 +128,32 @@ async function revealControl(page: Page, item: Item, control: string) {
     if (!box) throw new Error(`${item.title} is not drawn`);
     if (!touch) { await page.mouse.move(box.cx, box.cy); await page.waitForTimeout(250); }
     let found = await find();
-    // Shown but off screen (zoomed past it): drag it into view, as a person would.
-    for (let p = 0; found && !found.hit && p < 3 && (await panIntoView(page, found.x, found.y)); p++) {
+    // Shown but off screen or covered (e.g. by the floating zoom buttons): drag it
+    // toward the middle, as a person would.
+    for (let p = 0; found && !found.hit && p < 3 && (await panIntoView(page, found.x, found.y, true)); p++) {
       pans++;
       if (!touch) { const b2 = await cardBox(page, item.id); if (b2) await page.mouse.move(b2.cx, b2.cy); await page.waitForTimeout(250); }
       found = await find();
     }
     if (found?.hit) return { x: found.x, y: found.y, zoomIn: step, pans };
+    why = found ? `a press on it lands on ${await landsOn(page, found.x, found.y)}` : 'not shown at this zoom';
     // Zoom toward the card's header, where its controls live.
     await zoomStep(page, box.cx, box.y + Math.min(box.height * 0.25, 30), 'in');
   }
-  throw new Error(`no clickable ${control} on ${item.title}, even after zooming in 6 steps`);
+  throw new Error(`no clickable ${control} on ${item.title}, even after zooming in 6 steps (last check: ${why})`);
 }
 
 /** Bring the target into view the way a person would: zoom out over the canvas (max 6). */
 async function findOnScreen(page: Page, item: Item) {
+  let why = '';
   for (let step = 0; step <= 6; step++) {
-    const box = await onScreen(page, item);
-    if (box) return { box, zoomOut: step };
+    const seen = await onScreen(page, item);
+    if ('box' in seen) return { box: seen.box, zoomOut: step };
+    why = seen.why;
     const frame = await page.locator('.graph-container').boundingBox();
     await zoomStep(page, frame!.x + frame!.width / 2, frame!.y + frame!.height / 2, 'out');
   }
-  throw new Error(`${item.title} could not be brought on screen to click`);
+  throw new Error(`${item.title} could not be brought on screen to click after 6 zoom-outs (last check: ${why})`);
 }
 
 export const LINK_PATHS: (LinkPath & { desktopOnly?: boolean })[] = [
