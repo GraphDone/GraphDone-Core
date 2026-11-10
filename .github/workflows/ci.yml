@@ -148,10 +148,13 @@ jobs:
   # ~45 min cold prod-image build, so it's a gate people actually keep green.
   # The Smoke Gate's sequences run as four parallel shards, each on its own
   # GitHub-hosted VM with its own Neo4j and dev stack (the single job took
-  # ~42 min; the slowest shard is ~12 min plus setup). Each line of
+  # ~42 min; the slowest shard is ~14 min plus setup). Each line of
   # `sequences` is "<sequence> <output dir> [xvfb]"; "living-graph-effects" is
-  # the LIVE-* Playwright spec. A shard runs all its sequences and fails if any
-  # failed. The "Smoke Gate" job below sums the shards up under the old name.
+  # the LIVE-* Playwright spec. Every shard starts with THE GATE (smoke), as
+  # the single job did, so later sequences never meet a cold database or a
+  # first sign-in. Sequences keep the single job's order. A shard runs all its
+  # sequences and fails if any failed. The "Smoke Gate" job below sums the
+  # shards up under the old name.
   smoke-gate-shard:
     name: Smoke Gate (${{ matrix.name }})
     runs-on: ubuntu-latest
@@ -162,14 +165,16 @@ jobs:
         include:
           - name: new user
             sequences: |
+              smoke ci-smoke
               new-user ci-new-user xvfb
-          - name: mobile, 2000 items, routes
+          - name: 2000 items, nested LOD, routes, mobile
             sequences: |
-              mobile ci-mobile
+              smoke ci-smoke
               large-symbols ci-large-symbols
               nested-lod ci-nested-lod xvfb
               router-navigation ci-router-navigation xvfb
-          - name: smoke, wires, inspector, effects, perf
+              mobile ci-mobile
+          - name: wires, agents, inspector, effects, perf
             sequences: |
               smoke ci-smoke
               item-wires ci-item-wires xvfb
@@ -180,6 +185,7 @@ jobs:
           - name: toolchain, schematic, LOD, layout
             toolchain: true
             sequences: |
+              smoke ci-smoke
               semantic-lod ci-semantic-lod xvfb
               layout-recovery ci-layout-recovery xvfb
     services:
