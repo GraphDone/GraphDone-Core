@@ -122,7 +122,7 @@ knowledge.
 | `deployment/` | Dockerfiles and compose stacks ([map](deployment/README.md)). |
 | `.agents/` | Agent guidance: skills, playbooks, lessons (`inbox/`), symptom indexes (`issues/`) ([map](.agents/README.md)). |
 | `.claude/` | Claude Code project settings; `skills` links to `.agents/skills` ([map](.claude/README.md)). |
-| `.github/`, `.githooks/` | CI workflows and PR template ([map](.github/README.md)); local git hooks ([map](.githooks/README.md)). |
+| `.github/` | CI workflows and PR template ([map](.github/README.md)). |
 | `README.md`, `AGENTS.md`, `CLAUDE.md`, `LICENSE` | The only root docs: overview, agent instructions, the Claude Code import of this file, licence. |
 | `start`, `Makefile` | The one-command launcher and its make shortcuts. |
 | root config | `package.json`, lockfile, `turbo.json`, `tsconfig.json`, `playwright.config.ts`, lint/format/ignore files, `.env*.example`. Only what a tool must find at the root. |
