@@ -26,8 +26,8 @@ explicit disposable-fixture configuration; see
 `tests/run-unified.mjs` is the single entry for browser and package suites: it
 runs the sequences named in [`sequences/`](sequences/README.md), which call
 Playwright projects and the package unit tests, and writes one HTML + JSON report.
-The repository and image contracts in `toolchain/` and `runtime/` are plain Node
-scripts that CI runs directly (`npm run test:toolchain`).
+The repository contracts in `toolchain/` run with `npm run test:toolchain`; the
+image contracts in `runtime/` run in CI's `runtime-images` job against a built image.
 
 ```mermaid
 flowchart LR
