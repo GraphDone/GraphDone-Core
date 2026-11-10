@@ -8,7 +8,6 @@ flowchart LR
   start["getting-started.md"] --> arch["architecture-overview.md"]
   arch --> webui["web-ui-architecture.md"]
   start -.optional.-> vm["vm-setup.md"]
-  start -.optional.-> hooks["git-hooks.md"]
 ```
 
 ## What's here
@@ -21,7 +20,6 @@ flowchart LR
 | [`user-flows.md`](user-flows.md) | How people first meet GraphDone and work with it day to day |
 | [`sqlite-deployment-modes.md`](sqlite-deployment-modes.md) | Where the SQLite authentication database lives in local development versus Docker |
 | [`vm-setup.md`](vm-setup.md) | Running GraphDone in a throwaway Multipass VM (scripts in [`scripts/vm/`](../../scripts/vm/README.md)) |
-| [`git-hooks.md`](git-hooks.md) | The optional git hooks in [`.githooks/`](../../.githooks/README.md) |
 | [`ai-agents-integration.md`](ai-agents-integration.md) | Early ideas for playful AI companions. Superseded by the [product decision](../product/CORE_HOSTED_STRATEGY.md); for connecting an agent today, see [`../agents/`](../agents/README.md) |
 
 Testing has its own guide: [`../testing/`](../testing/README.md) and

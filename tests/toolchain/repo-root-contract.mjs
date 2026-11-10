@@ -12,7 +12,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 // owner's explicit approval in the PR.
 const ROOT_ALLOWLIST = [
   '.agents', '.claude', '.dockerignore', '.env.example', '.env.test.example', '.eslintrc.js',
-  '.githooks', '.github', '.gitignore', '.prettierignore', '.prettierrc',
+  '.github', '.gitignore', '.prettierignore', '.prettierrc',
   'AGENTS.md', 'CLAUDE.md', 'LICENSE', 'Makefile', 'README.md',
   'deployment', 'docs', 'package-lock.json', 'package.json', 'packages',
   'playwright.config.ts', 'scripts', 'start', 'tests',
