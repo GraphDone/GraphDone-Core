@@ -512,10 +512,14 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
   // runners are sometimes slow for a whole job (run 42756334084: the sequence
   // took 408 s instead of ~283 s and this zoom 5.9 s), so the budget scales with
   // a fixed workload timed in the page just before each zoom: never below 5 s,
-  // at most twice that. RUNNER_REFERENCE_MS is that workload's time on a
-  // normal CI runner; until it is set the budget is a plain 5 s.
+  // at most twice that. RUNNER_REFERENCE_MS is the 75th percentile of the
+  // workload on normal GitHub-hosted runners: 36 samples from 12 runners of
+  // this sequence (run 42764510479) took 98-255 ms, in hardware classes near
+  // 100, 160, 210 and 250 ms; p75 = 251 ms. So every normal runner gets a
+  // plain 5 s, and only one measurably slower than the slowest normal class
+  // gets more. The same runs zoomed in 1.1-3.1 s.
   const DENSE_ZOOM_BUDGET_MS = 5000;
-  const RUNNER_REFERENCE_MS = Number.POSITIVE_INFINITY;
+  const RUNNER_REFERENCE_MS = 251;
   const denseTimings: {
     scale: number;
     ms: number;
