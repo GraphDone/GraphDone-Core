@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { GraphSelector } from './GraphSelector';
+import { onGraphRequests, requestGraph } from '../lib/graphRequests';
 
 const graph = (id: string, name: string, extra: Record<string, unknown> = {}) => ({
   id, name, type: 'SUBGRAPH', createdBy: 'me', parentGraphId: null, depth: 0, path: [id], nodeCount: 1, edgeCount: 0, isShared: false, ...extra,
@@ -58,7 +59,8 @@ describe('the graph selector edit and delete buttons', () => {
     const { onDeleteGraph, actions } = open();
     const own = actions('Welcome', 0);
     fireEvent.mouseEnter(own.trash);
-    expect(screen.queryByText(/System graph/)).toBeNull();
+    expect(screen.queryByRole('tooltip')).toBeNull();
+    expect(own.trash.getAttribute('aria-describedby')).toBeNull();
     fireEvent.click(own.trash);
     expect(onDeleteGraph).toHaveBeenCalledWith(expect.objectContaining({ id: 'w', createdBy: 'me' }));
   });
@@ -67,8 +69,54 @@ describe('the graph selector edit and delete buttons', () => {
     const { onDeleteGraph, actions } = open();
     const shared = actions('Welcome', 1);
     fireEvent.mouseEnter(shared.trash);
-    expect(screen.getByText("🔒 System graph — can't be deleted")).toBeTruthy();
+    expect(screen.getByRole('tooltip').textContent).toBe("🔒 System graph — can't be deleted");
     fireEvent.click(shared.trash);
     expect(onDeleteGraph).not.toHaveBeenCalled();
+  });
+
+  it('explain a locked button when it is tapped, on screen and to screen readers', () => {
+    const { actions } = open();
+    const shared = actions('Welcome', 1);
+    fireEvent.click(shared.trash);
+    expect(screen.getByRole('tooltip').textContent).toBe("🔒 System graph — can't be deleted");
+    expect(document.getElementById(shared.trash.getAttribute('aria-describedby')!)?.textContent).toBe("🔒 System graph — can't be deleted");
+    expect(shared.trash.getAttribute('aria-disabled')).toBe('true');
+  });
+
+  it('put the reason on the left of a button near the right edge, as on a phone', () => {
+    const { actions } = open();
+    const shared = actions('Welcome', 1);
+    shared.trash.getBoundingClientRect = () => ({ left: window.innerWidth - 40, right: window.innerWidth - 10, top: 100, height: 30, width: 30, bottom: 130, x: 0, y: 0, toJSON: () => ({}) });
+    fireEvent.click(shared.trash);
+    const tip = screen.getByRole('tooltip');
+    expect(tip.className).toContain('-translate-x-full');
+    expect(parseFloat(tip.style.left)).toBe(window.innerWidth - 48);
+  });
+});
+
+describe('the phone top bar graph selector', () => {
+  it('asks the workspace to create, rename and delete a graph, by name', () => {
+    const answer = { create: vi.fn(), edit: vi.fn(), delete: vi.fn() };
+    const stop = onGraphRequests(answer);
+    render(
+      <GraphSelector
+        testId="graph-selector-mobile"
+        onCreateGraph={() => requestGraph('create')}
+        onEditGraph={graph => requestGraph('edit', graph)}
+        onDeleteGraph={graph => requestGraph('delete', graph)}
+      />
+    );
+    const list = () => {
+      fireEvent.click(screen.getByTestId('graph-selector-mobile'));
+      return within(screen.getByTestId('graph-selector-dropdown'));
+    };
+    fireEvent.click(list().getByRole('button', { name: 'Edit Ideas' }));
+    fireEvent.click(list().getByRole('button', { name: 'Delete Ideas' }));
+    fireEvent.click(list().getByTitle('Create New Graph'));
+    stop();
+
+    expect(answer.edit).toHaveBeenCalledWith(expect.objectContaining({ id: 'i', name: 'Ideas' }));
+    expect(answer.delete).toHaveBeenCalledWith(expect.objectContaining({ id: 'i', name: 'Ideas' }));
+    expect(answer.create).toHaveBeenCalledTimes(1);
   });
 });

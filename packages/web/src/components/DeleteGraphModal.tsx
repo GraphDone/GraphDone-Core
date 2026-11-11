@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import { X, Trash2, GitBranch, Shield } from 'lucide-react';
 import { AlertTriangle, CheckCircle, WORK_ITEM_TYPES } from '../constants/workItemConstants';
@@ -8,6 +8,8 @@ import { GET_WORK_ITEMS, GET_EDGES, DELETE_WORK_ITEM, DELETE_EDGE } from '../lib
 import { GET_CHILD_GRAPHS } from '../graphql/graph';
 import { projectDeleteBlock } from '../lib/workspaceRules';
 import type { Graph } from '../types/graph';
+import { createPortal } from 'react-dom';
+import { useModalA11y } from '../hooks/useModalA11y';
 
 interface DeleteGraphModalProps {
   isOpen: boolean;
@@ -17,6 +19,8 @@ interface DeleteGraphModalProps {
 }
 
 export function DeleteGraphModal({ isOpen, onClose, graph }: DeleteGraphModalProps) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  useModalA11y(panelRef, { isOpen, label: 'Delete graph' });
   const { currentGraph, deleteGraph } = useGraph();
   const targetGraph = graph ?? currentGraph;
   // Asked of the backend each time: another tab may have added a graph inside since this tab's list was read.
@@ -239,7 +243,9 @@ export function DeleteGraphModal({ isOpen, onClose, graph }: DeleteGraphModalPro
     }
   };
 
-  return (
+  // In document.body: inside the layout's content wrapper the phone's top bar
+  // and bottom nav (z-30, outside it) would draw over the dialog and take its taps.
+  return createPortal((
     <div className="fixed inset-0 z-[9999] overflow-y-auto backdrop-blur-sm">
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
         {/* Enhanced Backdrop with gradient */}
@@ -249,7 +255,7 @@ export function DeleteGraphModal({ isOpen, onClose, graph }: DeleteGraphModalPro
         />
 
         {/* Enhanced Modal with better styling */}
-        <div className="inline-block align-bottom bg-gradient-to-br from-gray-800 via-gray-800 to-gray-900 rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full border border-red-600/30 animate-in slide-in-from-bottom-4 duration-300 relative z-10">
+        <div ref={panelRef} data-modal-panel className="inline-block align-bottom bg-gradient-to-br from-gray-800 via-gray-800 to-gray-900 rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full border border-red-600/30 animate-in slide-in-from-bottom-4 duration-300 relative z-10">
           {/* Gradient accent line at top - red for danger */}
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-red-500 via-orange-500 via-pink-500 to-red-600"></div>
 
@@ -807,5 +813,5 @@ export function DeleteGraphModal({ isOpen, onClose, graph }: DeleteGraphModalPro
         </div>
       </div>
     </div>
-  );
+  ), document.body);
 }

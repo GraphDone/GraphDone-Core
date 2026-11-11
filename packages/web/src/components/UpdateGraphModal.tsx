@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, Folder, FolderOpen, Plus, FileText, Save } from 'lucide-react';
 import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
+import { createPortal } from 'react-dom';
+import { useModalA11y } from '../hooks/useModalA11y';
 
 interface UpdateGraphModalProps {
   isOpen: boolean;
@@ -11,6 +13,8 @@ interface UpdateGraphModalProps {
 }
 
 export function UpdateGraphModal({ isOpen, onClose, graphToEdit }: UpdateGraphModalProps) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  useModalA11y(panelRef, { isOpen, label: 'Edit graph' });
   const { updateGraph, availableGraphs } = useGraph();
   const { currentTeam } = useAuth();
   const { showSuccess, showError } = useNotifications();
@@ -189,7 +193,9 @@ export function UpdateGraphModal({ isOpen, onClose, graphToEdit }: UpdateGraphMo
     }
   };
 
-  return (
+  // In document.body: inside the layout's content wrapper the phone's top bar
+  // and bottom nav (z-30, outside it) would draw over the dialog and take its taps.
+  return createPortal((
     <div className="fixed inset-0 z-[9999] overflow-y-auto backdrop-blur-sm" style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0}}>
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
         {/* Enhanced Backdrop with gradient */}
@@ -199,7 +205,7 @@ export function UpdateGraphModal({ isOpen, onClose, graphToEdit }: UpdateGraphMo
         />
 
         {/* Enhanced Modal with better styling */}
-        <div className="inline-block align-bottom bg-gradient-to-br from-gray-800 via-gray-800 to-gray-900 rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full border border-gray-600/50 animate-in slide-in-from-bottom-4 duration-300 relative">
+        <div ref={panelRef} data-modal-panel className="inline-block align-bottom bg-gradient-to-br from-gray-800 via-gray-800 to-gray-900 rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full border border-gray-600/50 animate-in slide-in-from-bottom-4 duration-300 relative">
           {/* Gradient accent line at top */}
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-purple-500 via-pink-500 to-green-500"></div>
 
@@ -485,5 +491,5 @@ export function UpdateGraphModal({ isOpen, onClose, graphToEdit }: UpdateGraphMo
         </div>
       </div>
     </div>
-  );
+  ), document.body);
 }

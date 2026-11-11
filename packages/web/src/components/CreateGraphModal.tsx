@@ -6,6 +6,7 @@ import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { CreateGraphInput } from '../types/graph';
+import { createPortal } from 'react-dom';
 
 interface CreateGraphModalProps {
   isOpen: boolean;
@@ -212,7 +213,9 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
 
   if (!isOpen) return null;
 
-  return (
+  // In document.body: inside the layout's content wrapper the phone's top bar
+  // and bottom nav (z-30, outside it) would draw over the dialog and take its taps.
+  return createPortal((
     <div data-modal-backdrop className="fixed inset-0 z-[9999] overflow-y-auto backdrop-blur-sm" style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0}}>
       <div className="modal-stage">
         {/* Enhanced Backdrop with gradient */}
@@ -773,5 +776,5 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
         </div>
       </div>
     </div>
-  );
+  ), document.body);
 }

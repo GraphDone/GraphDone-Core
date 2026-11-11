@@ -9,6 +9,9 @@ import { GET_WORK_ITEMS, GET_EDGES } from '../lib/queries';
 import { offlineEnabled, localGuest } from '../lib/offline/engine';
 import { exampleAction, starterHierarchy, systemLocked } from '../lib/workspaceRules';
 
+/** Room the locked-button reason needs beside its button (it is one line, about 200 px). */
+const LOCKED_TIP_WIDTH = 240;
+
 interface GraphSelectorProps {
   onCreateGraph?: () => void;
   onEditGraph?: (graph: any) => void;
@@ -55,7 +58,11 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
     });
   };
   const [buttonPosition, setButtonPosition] = useState<{ top: number; left: number; width: number } | null>(null);
-  const [hoveredTooltip, setHoveredTooltip] = useState<{ message: string; x: number; y: number } | null>(null);
+  const [hoveredTooltip, setHoveredTooltip] = useState<{ message: string; x: number; y: number; left?: boolean } | null>(null);
+  const tooltipTimer = useRef<number | null>(null);
+  useEffect(() => () => {
+    if (tooltipTimer.current !== null) window.clearTimeout(tooltipTimer.current);
+  }, []);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
@@ -155,31 +162,44 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
   const graphActions = (row: any) => {
     const graph = availableGraphs.find(g => g.id === row.id) ?? row;
     const isSystemGraph = systemLocked(graph, currentUser?.id);
-    const action = (run: (graph: any) => void, locked: string, hover: string, icon: ReactNode) => (
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          if (!isSystemGraph) {
-            run(graph);
-            setIsOpen(false);
-          }
-        }}
-        onMouseEnter={(e) => {
-          if (isSystemGraph) {
-            const rect = e.currentTarget.getBoundingClientRect();
-            setHoveredTooltip({ message: locked, x: rect.right + 8, y: rect.top + rect.height / 2 });
-          }
-        }}
-        onMouseLeave={() => setHoveredTooltip(null)}
-        className={`p-1.5 rounded-lg transition-all duration-200 ${isSystemGraph ? 'text-gray-600 cursor-not-allowed' : `text-gray-400 ${hover} hover:scale-110`}`}
-      >
-        {icon}
-      </button>
-    );
+    // Why a locked button does nothing: beside it (on its left when the right
+    // edge is near, as on a phone), on hover or on a tap, and to screen readers.
+    const explain = (target: HTMLElement, message: string, fade: boolean) => {
+      const rect = target.getBoundingClientRect();
+      const left = rect.right + 8 + LOCKED_TIP_WIDTH > window.innerWidth;
+      if (tooltipTimer.current !== null) window.clearTimeout(tooltipTimer.current);
+      tooltipTimer.current = fade ? window.setTimeout(() => setHoveredTooltip(null), 2500) : null;
+      setHoveredTooltip({ message, x: left ? rect.left - 8 : rect.right + 8, y: rect.top + rect.height / 2, left });
+    };
+    const action = (label: string, run: (graph: any) => void, locked: string, hover: string, icon: ReactNode) => {
+      const reasonId = `graph-locked-${label.toLowerCase()}-${graph.id}`;
+      return (
+        <button
+          aria-label={`${label} ${graph.name}`}
+          aria-disabled={isSystemGraph || undefined}
+          aria-describedby={isSystemGraph ? reasonId : undefined}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (!isSystemGraph) {
+              run(graph);
+              setIsOpen(false);
+            } else explain(e.currentTarget, locked, true);
+          }}
+          onMouseEnter={(e) => {
+            if (isSystemGraph) explain(e.currentTarget, locked, false);
+          }}
+          onMouseLeave={() => setHoveredTooltip(null)}
+          className={`p-1.5 [@media(hover:none)]:p-[15px] rounded-lg transition-all duration-200 ${isSystemGraph ? 'text-gray-600 cursor-not-allowed' : `text-gray-400 ${hover} hover:scale-110`}`}
+        >
+          {icon}
+          {isSystemGraph && <span id={reasonId} className="sr-only">{locked}</span>}
+        </button>
+      );
+    };
     return (
-      <div className="shrink-0 flex items-center space-x-1 opacity-0 group-hover/item:opacity-100 transition-opacity ml-2">
-        {onEditGraph && action(onEditGraph, '🔒 System graph — can\'t be edited', 'hover:text-blue-400 hover:bg-blue-500/20', <Edit3 className="h-3.5 w-3.5" />)}
-        {onDeleteGraph && action(onDeleteGraph, '🔒 System graph — can\'t be deleted', 'hover:text-red-400 hover:bg-red-500/20', <Trash2 className="h-3.5 w-3.5" />)}
+      <div className="shrink-0 flex items-center space-x-1 opacity-0 group-hover/item:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity ml-2">
+        {onEditGraph && action('Edit', onEditGraph, '🔒 System graph — can\'t be edited', 'hover:text-blue-400 hover:bg-blue-500/20', <Edit3 className="h-3.5 w-3.5" />)}
+        {onDeleteGraph && action('Delete', onDeleteGraph, '🔒 System graph — can\'t be deleted', 'hover:text-red-400 hover:bg-red-500/20', <Trash2 className="h-3.5 w-3.5" />)}
       </div>
     );
   };
@@ -519,7 +539,8 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
       {/* Tooltip Portal */}
       {hoveredTooltip && createPortal(
         <div
-          className="fixed px-2 py-1 bg-red-600 text-white text-xs rounded whitespace-nowrap pointer-events-none z-[9999999999] -translate-y-1/2"
+          role="tooltip"
+          className={`fixed px-2 py-1 bg-red-600 text-white text-xs rounded whitespace-nowrap pointer-events-none z-[9999999999] -translate-y-1/2 ${hoveredTooltip.left ? '-translate-x-full' : ''}`}
           style={{
             left: hoveredTooltip.x,
             top: hoveredTooltip.y
