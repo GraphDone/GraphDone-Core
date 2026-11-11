@@ -27,6 +27,10 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
   const [expandedGraphs, setExpandedGraphs] = useState<Set<string>>(new Set());
   const [example, setExample] = useState({ busy: false, message: '', error: '' });
   const canAddExample = currentUser?.role === 'USER' || currentUser?.role === 'ADMIN' || (offlineEnabled && localGuest());
+  const exampleNoteRef = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    exampleNoteRef.current?.scrollIntoView?.({ block: 'nearest' });
+  }, [example.message, example.error]);
   const addExample = async () => {
     setExample({ busy: true, message: '', error: '' });
     try {
@@ -509,8 +513,8 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
                     <Sparkles className="h-4 w-4 flex-shrink-0 text-emerald-300" aria-hidden="true" />
                     <span className="flex-1">{example.busy ? 'Adding example project…' : 'Add example project'}</span>
                   </button>
-                  {example.message && <p role="status" className="px-2.5 pt-1 text-xs text-emerald-200 break-words">{example.message}</p>}
-                  {example.error && <p role="alert" className="px-2.5 pt-1 text-xs text-red-200 break-words">{example.error}</p>}
+                  {example.message && <p ref={exampleNoteRef} role="status" className="px-2.5 pt-1 text-xs text-emerald-200 break-words">{example.message}</p>}
+                  {example.error && <p ref={exampleNoteRef} role="alert" className="px-2.5 pt-1 text-xs text-red-200 break-words">{example.error}</p>}
                 </div>
               )}
 
