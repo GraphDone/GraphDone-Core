@@ -3,37 +3,37 @@ import { createPortal } from 'react-dom';
 import { X, Minimize2, Maximize2, Move, Zap } from 'lucide-react';
 import { WorkItemEdge, RelationshipType } from '../types/graph';
 import { getRelationshipConfig, RELATIONSHIP_OPTIONS, getRelationshipIconElement } from '../constants/workItemConstants';
-import { useMutation } from '@apollo/client';
-import { UPDATE_EDGE, CREATE_EDGE, DELETE_EDGE, GET_EDGES } from '../lib/queries';
+import { useApolloClient, useMutation } from '@apollo/client';
+import { UPDATE_EDGE, CREATE_EDGE, DELETE_EDGE, GET_RELATIONSHIP } from '../lib/queries';
+import { editorEdge, flipRelationship, relationshipLine, savedRelationship } from '../lib/relationshipEdit';
 
 interface RelationshipEditorWindowProps {
-  isVisible: boolean;
+  /** The relationship being edited; the window is shown only while there is one. */
   editingEdge: { edge: WorkItemEdge; position: { x: number; y: number } } | null;
-  selectedNodes: Set<string>;
   workItems: any[];
   onClose: () => void;
-  onFlipDirection?: () => void;
+  /** The edited relationship as saved after a type change or a flip (a flip gives it a new id). */
+  onEdgeChange: (edge: WorkItemEdge, previousId: string) => void;
   onDeleteEdge?: (edgeId: string) => void;
-  onCreateEdge?: (sourceId: string, targetId: string, type: RelationshipType) => void;
   showSuccess: (title: string, message: string) => void;
   showError: (title: string, message: string) => void;
-  refetchEdges?: () => void;
-  onClearSelection?: () => void;
 }
 
+type Busy = 'type' | 'flip' | 'delete' | null;
+const REFRESH = ['GetEdges', 'GetWorkItems'];
+const sentence = (error: unknown, fallback: string) => {
+  const text = (error instanceof Error ? error.message : '').trim();
+  return text ? (/[.!?]$/.test(text) ? text : `${text}.`) : fallback;
+};
+
 export const RelationshipEditorWindow: React.FC<RelationshipEditorWindowProps> = ({
-  isVisible,
   editingEdge,
-  selectedNodes,
   workItems,
   onClose,
-  onFlipDirection,
+  onEdgeChange,
   onDeleteEdge,
-  onCreateEdge,
   showSuccess,
   showError,
-  refetchEdges,
-  onClearSelection
 }) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -42,13 +42,17 @@ export const RelationshipEditorWindow: React.FC<RelationshipEditorWindowProps> =
   const [isResizing, setIsResizing] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 });
-  const [isFlippingEdge, setIsFlippingEdge] = useState(false);
+  // One change at a time: a second press while a save is in flight would race
+  // it (two flips would each create a reversed copy).
+  const [busy, setBusy] = useState<Busy>(null);
+  const busyRef = useRef<Busy>(null);
   const windowRef = useRef<HTMLDivElement>(null);
+  const client = useApolloClient();
 
-  // GraphQL mutations
-  const [updateEdgeMutation] = useMutation(UPDATE_EDGE, { refetchQueries: ['GetEdges', 'GetWorkItems'] });
-  const [createEdgeMutation] = useMutation(CREATE_EDGE, { refetchQueries: ['GetEdges', 'GetWorkItems'] });
-  const [deleteEdgeMutation] = useMutation(DELETE_EDGE, { refetchQueries: ['GetEdges', 'GetWorkItems'] });
+  // Every change waits for the refreshed edge lists, so the canvas shows the
+  // saved relationship before the editor accepts the next change.
+  const [updateEdgeMutation] = useMutation(UPDATE_EDGE, { refetchQueries: REFRESH, awaitRefetchQueries: true });
+  const [deleteEdgeMutation] = useMutation(DELETE_EDGE, { refetchQueries: REFRESH, awaitRefetchQueries: true });
 
   // Calculate content-based height
   const calculateContentHeight = () => {
@@ -60,32 +64,20 @@ export const RelationshipEditorWindow: React.FC<RelationshipEditorWindowProps> =
       contentHeight += 24; // Status indicator
       contentHeight += 16; // Spacing
       
-      const canEdit = editingEdge || selectedNodes.size === 2;
-      if (canEdit) {
-        contentHeight += 20; // "Relationship Type" label
-        contentHeight += 12; // margin bottom
-        
-        // Grid: 3 columns, calculate rows needed
-        const totalOptions = RELATIONSHIP_OPTIONS.length;
-        const rows = Math.ceil(totalOptions / 3);
-        contentHeight += rows * (80 + 8); // Each button ~80px height + 8px gap
-        contentHeight -= 8; // Remove last gap
-      }
-      
-      // Actions section for editing mode
-      if (editingEdge) {
-        contentHeight += 16; // Padding top for border
-        contentHeight += 40; // Flip button
-        contentHeight += 8;  // Gap
-        contentHeight += 40; // Delete button
-      }
-      
-      // Actions section for create mode
-      if (!editingEdge && canEdit) {
-        contentHeight += 16; // Padding top for border
-        contentHeight += 40; // Clear selection button
-      }
-      
+      contentHeight += 20; // "Relationship Type" label
+      contentHeight += 12; // margin bottom
+
+      // Grid: 3 columns, calculate rows needed
+      const rows = Math.ceil(RELATIONSHIP_OPTIONS.length / 3);
+      contentHeight += rows * (80 + 8); // Each button ~80px height + 8px gap
+      contentHeight -= 8; // Remove last gap
+
+      // Actions
+      contentHeight += 16; // Padding top for border
+      contentHeight += 40; // Flip button
+      contentHeight += 8;  // Gap
+      contentHeight += 40; // Delete button
+
       // Add some extra padding for safety
       contentHeight += 16;
     }
@@ -124,8 +116,10 @@ export const RelationshipEditorWindow: React.FC<RelationshipEditorWindowProps> =
     }
 
     setSize({ width, height: contentHeight });
+    // Place the window when it opens (a new click position), not after each
+    // change to the relationship it edits.
     // eslint-disable-next-line
-  }, [isExpanded, isVisible, editingEdge, selectedNodes.size]);
+  }, [isExpanded, editingEdge?.position]);
 
   // Handle dragging
   const handleMouseMove = useCallback((e: MouseEvent) => {
@@ -183,123 +177,89 @@ export const RelationshipEditorWindow: React.FC<RelationshipEditorWindowProps> =
     });
   };
 
-  // Get selected node objects
-  const selectedNodeObjects = workItems.filter(item => selectedNodes.has(item.id));
+  const begin = (kind: Exclude<Busy, null>) => {
+    if (busyRef.current) return false;
+    busyRef.current = kind;
+    setBusy(kind);
+    return true;
+  };
+  const end = () => {
+    busyRef.current = null;
+    setBusy(null);
+  };
 
-  // Handle relationship type change
+  // Change the type, then show what was saved: the pressed type and the
+  // canvas follow the saved relationship, never the one the editor opened on.
   const handleRelationshipTypeChange = async (newType: RelationshipType) => {
-    if (editingEdge) {
-      try {
-        await updateEdgeMutation({
-          variables: {
-            where: { id: editingEdge.edge.id },
-            update: { type: newType }
-          }
-        });
-        showSuccess('Relationship Updated', 'Edge type changed successfully');
-        refetchEdges?.();
-      } catch (error: any) {
-        showError('Update Failed', error.message || 'Could not update relationship');
-      }
-    } else if (selectedNodeObjects.length === 2) {
-      // Create new edge
-      const [sourceNode, targetNode] = selectedNodeObjects;
-      try {
-        await createEdgeMutation({
-          variables: {
-            input: [{
-              type: newType,
-              source: { connect: { where: { node: { id: sourceNode.id } } } },
-              target: { connect: { where: { node: { id: targetNode.id } } } },
-              weight: 1.0
-            }]
-          }
-        });
-        showSuccess('Relationship Created', 'New relationship added successfully');
-        refetchEdges?.();
-        onCreateEdge?.(sourceNode.id, targetNode.id, newType);
-      } catch (error: any) {
-        showError('Creation Failed', error.message || 'Could not create relationship');
-      }
+    if (!editingEdge || editingEdge.edge.type === newType || !begin('type')) return;
+    const { edge } = editingEdge;
+    try {
+      const result = await updateEdgeMutation({ variables: { where: { id: edge.id }, update: { type: newType } } });
+      const saved = savedRelationship(result.data?.updateEdges?.edges?.[0]);
+      if (!saved || saved.type !== newType) throw new Error('This relationship no longer exists.');
+      onEdgeChange(editorEdge(saved), edge.id);
+      showSuccess('Relationship Updated', `Now ${getRelationshipConfig(newType).label}`);
+    } catch (error) {
+      showError('Update Failed', `${sentence(error, 'The change could not be saved.')} The relationship was not changed.`);
+    } finally {
+      end();
     }
   };
 
-  // Handle edge flip
+  // Flip from the saved relationship (its current type and weight), creating
+  // the reversed one before removing the original, then keep editing it.
   const handleFlipDirection = async () => {
-    if (!editingEdge) return;
-    
-    setIsFlippingEdge(true);
+    if (!editingEdge || !begin('flip')) return;
+    const { edge } = editingEdge;
     try {
-      // Extract IDs safely - D3 force simulation converts string IDs to node objects
-      const sourceId = typeof editingEdge.edge.source === 'string' 
-        ? editingEdge.edge.source 
-        : (editingEdge.edge.source as any)?.id;
-      const targetId = typeof editingEdge.edge.target === 'string' 
-        ? editingEdge.edge.target 
-        : (editingEdge.edge.target as any)?.id;
-      
-      // Validate that we successfully extracted IDs
-      if (!sourceId || !targetId) {
-        showError('Flip Failed', 'Unable to extract node IDs from edge data');
+      const { data } = await client.query({ query: GET_RELATIONSHIP, variables: { where: { id: edge.id } }, fetchPolicy: 'network-only' });
+      const saved = savedRelationship(data?.edges?.[0]);
+      if (!saved) {
+        showError('Flip Failed', 'This relationship no longer exists. Close the editor to see the current graph.');
         return;
       }
-      
-      // Delete current edge
-      await deleteEdgeMutation({
-        variables: { where: { id: editingEdge.edge.id } }
+      const outcome = await flipRelationship(saved, {
+        create: async input => savedRelationship((await client.mutate({ mutation: CREATE_EDGE, variables: { input: [input] } })).data?.createEdges?.edges?.[0]),
+        remove: async id => { await client.mutate({ mutation: DELETE_EDGE, variables: { where: { id } } }); },
       });
-      
-      // Create new edge with flipped direction
-      await createEdgeMutation({
-        variables: {
-          input: [{
-            type: editingEdge.edge.type,
-            source: { connect: { where: { node: { id: targetId } } } },
-            target: { connect: { where: { node: { id: sourceId } } } },
-            weight: 1.0
-          }]
-        }
-      });
-      
-      showSuccess('Direction Flipped', 'Relationship direction updated successfully');
-      refetchEdges?.();
-      onFlipDirection?.();
-    } catch (error: any) {
-      showError('Flip Failed', error.message || 'Could not flip relationship direction');
+      await client.refetchQueries({ include: REFRESH }).catch(() => undefined);
+      if (outcome.ok) {
+        onEdgeChange(editorEdge(outcome.edge), edge.id);
+        showSuccess('Direction Flipped', relationshipLine(editorEdge(outcome.edge), workItems));
+      } else {
+        showError('Flip Failed', outcome.message);
+      }
+    } catch (error) {
+      showError('Flip Failed', `${sentence(error, 'The relationship could not be read.')} The relationship was not changed.`);
     } finally {
-      setIsFlippingEdge(false);
+      end();
     }
   };
 
   // Handle edge delete
   const handleDeleteEdge = async () => {
-    if (!editingEdge) return;
-    
+    if (!editingEdge || !begin('delete')) return;
+    const { edge } = editingEdge;
     try {
-      await deleteEdgeMutation({
-        variables: { where: { id: editingEdge.edge.id } },
-        refetchQueries: [GET_EDGES],
-        awaitRefetchQueries: true,
-      });
+      await deleteEdgeMutation({ variables: { where: { id: edge.id } } });
       showSuccess('Relationship Deleted', 'Edge removed successfully');
-      refetchEdges?.();
-      onDeleteEdge?.(editingEdge.edge.id);
+      onDeleteEdge?.(edge.id);
       onClose();
-    } catch (error: any) {
-      showError('Delete Failed', error.message || 'Could not delete relationship');
+    } catch (error) {
+      showError('Delete Failed', `${sentence(error, 'Could not delete relationship.')} The relationship was not changed.`);
+    } finally {
+      end();
     }
   };
 
-  if (!isVisible) return null;
-
-  const canEdit = editingEdge || selectedNodeObjects.length === 2;
-  const isEditingMode = !!editingEdge;
+  if (!editingEdge) return null;
 
   return createPortal(
     <div 
       ref={windowRef}
       role="dialog"
-      aria-label={isEditingMode ? 'Edit relationship' : 'Create relationship'}
+      aria-label="Edit relationship"
+      aria-busy={busy !== null}
       className="fixed flex flex-col bg-slate-900/95 backdrop-blur-xl border border-white/20 rounded-xl shadow-lg overflow-hidden z-50"
       style={{
         left: `${position.x}px`,
@@ -319,7 +279,7 @@ export const RelationshipEditorWindow: React.FC<RelationshipEditorWindowProps> =
         <div className="flex items-center space-x-2">
           <Zap className="h-4 w-4 text-amber-400" />
           <span className="text-white font-semibold text-sm">
-            {isEditingMode ? 'Edit Relationship' : 'Create Relationship'}
+            Edit Relationship
           </span>
         </div>
         <div className="flex items-center space-x-1">
@@ -345,49 +305,25 @@ export const RelationshipEditorWindow: React.FC<RelationshipEditorWindowProps> =
         <div className="p-4 space-y-4 min-h-0 flex-1 overflow-y-auto overscroll-contain">
           {/* Status indicator */}
           <div className="text-center">
-            {!canEdit && (
-              <div className="text-gray-400 text-sm">
-                Select two nodes or click on an edge to edit relationships
-              </div>
-            )}
-            {canEdit && !isEditingMode && (
-              <div className="text-green-400 text-sm">
-                Ready to create relationship between {selectedNodeObjects.length} selected nodes
-              </div>
-            )}
-            {isEditingMode && (
-              <div className="text-blue-400 text-sm">
-                Editing relationship: {(() => {
-                  const sourceId = typeof editingEdge?.edge.source === 'string' 
-                    ? editingEdge?.edge.source 
-                    : (editingEdge?.edge.source as any)?.id;
-                  const targetId = typeof editingEdge?.edge.target === 'string' 
-                    ? editingEdge?.edge.target 
-                    : (editingEdge?.edge.target as any)?.id;
-                  
-                  const sourceTitle = workItems.find(item => item.id === sourceId)?.title || 'Unknown';
-                  const targetTitle = workItems.find(item => item.id === targetId)?.title || 'Unknown';
-                  
-                  return `${sourceTitle} → ${targetTitle}`;
-                })()}
-              </div>
-            )}
+            <div className="text-blue-400 text-sm">
+              Editing relationship: {relationshipLine(editingEdge.edge, workItems)}
+            </div>
           </div>
 
           {/* Relationship type grid */}
-          {canEdit && (
-            <div>
+          <div>
               <div className="text-white text-sm font-medium mb-3">Relationship Type</div>
               <div className="grid grid-cols-3 gap-2">
                 {RELATIONSHIP_OPTIONS.map((option) => {
-                  const isSelected = isEditingMode ? editingEdge?.edge.type === option.type : false;
+                  const isSelected = editingEdge.edge.type === option.type;
                   return (
                     <button
                       key={option.type}
                       aria-pressed={isSelected}
+                      disabled={busy !== null}
                       onClick={() => handleRelationshipTypeChange(option.type)}
                       className={`
-                        group relative p-3 rounded-lg border transition-all duration-200
+                        group relative p-3 rounded-lg border transition-all duration-200 disabled:cursor-wait
                         ${isSelected 
                           ? 'border-amber-400 bg-amber-400/10 text-amber-400' 
                           : 'border-white/20 bg-white/5 text-white hover:border-white/40 hover:bg-white/10'
@@ -407,43 +343,28 @@ export const RelationshipEditorWindow: React.FC<RelationshipEditorWindowProps> =
                   );
                 })}
               </div>
-            </div>
-          )}
+          </div>
 
           {/* Actions */}
-          {isEditingMode && (
-            <div className="pt-2 border-t border-white/10 space-y-2">
+          <div className="pt-2 border-t border-white/10 space-y-2">
               <button
                 onClick={handleFlipDirection}
-                disabled={isFlippingEdge}
+                disabled={busy !== null}
                 className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-2 px-3 rounded-lg flex items-center justify-center space-x-2 font-medium transition-all duration-200 shadow-lg hover:shadow-blue-500/25 disabled:opacity-50"
               >
                 <Move className="h-4 w-4" />
-                <span>{isFlippingEdge ? 'Flipping...' : 'Flip Direction'}</span>
+                <span>{busy === 'flip' ? 'Flipping...' : 'Flip Direction'}</span>
               </button>
               
               <button
                 onClick={handleDeleteEdge}
-                className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white py-2 px-3 rounded-lg flex items-center justify-center space-x-2 font-medium transition-all duration-200 shadow-lg hover:shadow-red-500/25"
+                disabled={busy !== null}
+                className="w-full disabled:opacity-50 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white py-2 px-3 rounded-lg flex items-center justify-center space-x-2 font-medium transition-all duration-200 shadow-lg hover:shadow-red-500/25"
               >
                 <X className="h-4 w-4" />
                 <span>Delete Relationship</span>
               </button>
-            </div>
-          )}
-
-          {/* Create mode actions */}
-          {!isEditingMode && canEdit && (
-            <div className="pt-2 border-t border-white/10 space-y-2">
-              <button
-                onClick={() => onClearSelection?.()}
-                className="w-full bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white py-2 px-3 rounded-lg flex items-center justify-center space-x-2 font-medium transition-all duration-200 shadow-lg hover:shadow-gray-500/25"
-              >
-                <X className="h-4 w-4" />
-                <span>Clear Selection</span>
-              </button>
-            </div>
-          )}
+          </div>
         </div>
       )}
 

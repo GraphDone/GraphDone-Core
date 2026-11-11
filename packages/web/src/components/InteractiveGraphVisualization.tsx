@@ -563,6 +563,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const [createNodePosition, setCreateNodePosition] = useState<{ x: number; y: number; z: number } | undefined>(undefined);
   const [currentTransform, setCurrentTransform] = useState({ x: 0, y: 0, scale: 1 });
   const [editingEdge, setEditingEdge] = useState<{ edge: WorkItemEdge; position: { x: number; y: number } } | null>(null);
+  // D3 builds the canvas once per data change; it reads the edited edge here so
+  // a rebuild (after a type change or flip) keeps marking the right wire.
+  const editingEdgeIdRef = useRef<string | null>(null);
+  editingEdgeIdRef.current = editingEdge?.edge.id ?? null;
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -571,7 +575,6 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const contextMenuRef = useRef<HTMLDivElement>(null);
   const [contextMenuPlacement, setContextMenuPlacement] = useState<{ left: number; top: number; maxHeight: number } | null>(null);
   const [isFlippingEdge, setIsFlippingEdge] = useState(false);
-  const [showRelationshipWindow, setShowRelationshipWindow] = useState(false);
   const [selectedNodes, setSelectedNodes] = useState<Set<string>>(new Set());
   // Inline rename: an input floats over the node — no modal (W2)
   const [inlineEdit, setInlineEdit] = useState<{ nodeId: string; value: string; original: string; graphX: number; graphY: number } | null>(null);
@@ -847,21 +850,6 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           .style('filter', `url(#${filterId})`);
       });
     }
-    
-    // Apply relationship-specific glow to active edge if editingEdge is visible
-    if (editingEdge && editingEdge.edge) {
-      const relationshipConfig = getRelationshipConfig(editingEdge.edge.type as RelationshipType);
-      const edgeColor = relationshipConfig.hexColor;
-      const edgeFilterId = `edge-glow-${editingEdge.edge.type.toLowerCase()}`;
-      
-      createGlowFilter(defs, edgeFilterId, edgeColor, { x: '-150%', y: '-150%', width: '400%', height: '400%', stdDeviation: '25', animValues: '15;35;15', dur: '1.5s' });
-
-      svg.selectAll('.edge')
-        .filter((d: any) => d && d.id === editingEdge.edge?.id)
-        .style('filter', `url(#${edgeFilterId})`)
-        .attr('stroke-width', 12); // Also make the edge thicker
-    }
-    
     
   }, [nodeMenu.visible, nodeMenu.node?.id, editingEdge?.edge?.id, selectedEdge?.id, selectedNodes]);
   
@@ -2027,8 +2015,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       const hasOpenDialogs =
         nodeMenu.visible ||
         edgeMenu.visible ||
-        editingEdge !== null ||
-        false; // Removed edge details dialog
+        editingEdgeIdRef.current !== null;
 
       if (hasOpenDialogs) {
         // Close all dialogs and menus - first click
@@ -2256,7 +2243,6 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       const box = event instanceof MouseEvent ? null : (event.currentTarget as Element | null)?.getBoundingClientRect();
       const position = box ? { x: box.left + box.width / 2, y: box.top + box.height / 2 } : { x: (event as MouseEvent).clientX, y: (event as MouseEvent).clientY };
       setSelectedEdge(edge);
-      setShowRelationshipWindow(true);
       setEditingEdge({ edge, position });
       setDragOffset({ x: 0, y: 0 });
     };
@@ -2299,42 +2285,20 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         if (flowClass) {
           classes += ` ${flowClass}`;
         }
-        // Add pulsing class if edge dialog is active
-        if (editingEdge && editingEdge.edge && editingEdge.edge.id === d.id) {
-          classes += ' dialog-active-pulse';
+        // The edited wire keeps its type's colour and glows in it (index.css
+        // .edge-editing); a forced highlight colour hid every type change.
+        if (editingEdgeIdRef.current === d.id) {
+          classes += ' edge-editing';
         }
         return classes;
       })
-      .attr('stroke', (d: WorkItemEdge) => {
-        // Use relationship color for active dialog (same as normal)
-        const config = getRelationshipConfig(d.type as RelationshipType);
-        return config.hexColor;
-      })
-      .attr('stroke-width', (d: WorkItemEdge) => {
-        // Much thicker for active dialog
-        if (editingEdge && editingEdge.edge && editingEdge.edge.id === d.id) {
-          return 10; // Very thick to make it obvious
-        }
-        return ITEM_WIRE_WIDTH;
-      })
-      .attr('stroke-opacity', (d: WorkItemEdge) => {
-        // Full opacity for active dialog
-        if (editingEdge && editingEdge.edge && editingEdge.edge.id === d.id) {
-          return 1;
-        }
-        return 0.9;
-      })
-      .style('filter', (d: WorkItemEdge) => {
-        // Apply pulsing glow to edges with active dialogs
-        if (editingEdge && editingEdge.edge && editingEdge.edge.id === d.id) {
-          return 'url(#dialog-glow)';
-        }
-        return null;
-      })
+      .attr('stroke', (d: WorkItemEdge) => getRelationshipConfig(d.type as RelationshipType).hexColor)
+      .attr('color', (d: WorkItemEdge) => getRelationshipConfig(d.type as RelationshipType).hexColor)
+      .attr('stroke-width', ITEM_WIRE_WIDTH)
+      .attr('stroke-opacity', 0.9)
       .on('mouseenter', function(event: MouseEvent, d: WorkItemEdge) {
-        // Skip hover effect if edge has active dialog (glow is already applied)
-        if ((editingEdge && editingEdge.edge && editingEdge.edge.id === d.id) ||
-            false) { // Removed edge details dialog
+        // The edited wire keeps its glow instead of the hover highlight
+        if (editingEdgeIdRef.current === d.id) {
           return;
         }
         
@@ -2346,9 +2310,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           .style('filter', 'drop-shadow(0 0 4px #ffffff)');
       })
       .on('mouseleave', function(event: MouseEvent, d: WorkItemEdge) {
-        // Skip hover reset if edge has active dialog (glow should remain)
-        if ((editingEdge && editingEdge.edge && editingEdge.edge.id === d.id) ||
-            false) { // Removed edge details dialog
+        if (editingEdgeIdRef.current === d.id) {
           return;
         }
         
@@ -2932,7 +2894,6 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       event.preventDefault();
       setNodeMenu({ node: null, position: { x: 0, y: 0 }, visible: false });
       setEditingEdge(null);
-      setShowRelationshipWindow(false);
       setConnectionSource(d.id);
       setIsConnecting(true);
     };
@@ -3163,7 +3124,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .data(visibleEdges)
       .enter()
       .append('g')
-      .attr('class', 'edge-label-group')
+      .attr('class', (d: WorkItemEdge) => editingEdgeIdRef.current === d.id ? 'edge-label-group edge-editing-label' : 'edge-label-group')
       .attr('data-edge-id', (d: WorkItemEdge) => d.id)
       // Every connection label is a button: it opens the connection editor
       // (or, for a summarized pair, the list of its relationships).
@@ -3220,19 +3181,18 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         // Get the exact same centralized React component as the dropdown
         const { IconComponent } = getRelationshipIconForD3(d.type as RelationshipType);
         
-        // Create a unique container for each icon
-        const uniqueId = `edge-icon-${d.id}`;
-        
         d3.select(this)
           .style('width', '14px')
           .style('height', '14px')
           .style('display', 'flex')
           .style('align-items', 'center')
           .style('justify-content', 'center')
-          .html(`<div id="${uniqueId}" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;"></div>`);
-        
-        // Render the centralized React component in the unique container
-        const container = document.getElementById(uniqueId);
+          .html(`<div id="edge-icon-${d.id}" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;"></div>`);
+
+        // Render into this label's own container, not the first element with
+        // its id: during a rebuild an outgoing label can still hold that id,
+        // and the new label would then show no icon.
+        const container = (this as Element).firstElementChild;
         if (container) {
           const root = ReactDOM.createRoot(container);
           root.render(React.createElement(IconComponent, { 
@@ -3757,20 +3717,24 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       setItemLabelCount(result.placements.size);
     };
 
+    // d3.pointer reads clientX, which a touch drag's TouchEvent lacks (a tap on
+    // a label threw on tablets); d3.pointers reads the finger instead.
+    const labelPointer = (event: any) => d3.pointers(event, g.node() as any)[0] ?? null;
     edgeLabelGroups
       .style('cursor', 'grab')
       .call(d3.drag<any, any>()
         .filter((event: any) => !interactionLockedRef.current && !event.ctrlKey && !event.button)
         .on('start', (event, d: any) => {
           event.sourceEvent?.stopPropagation();
-          const [x, y] = d3.pointer(event, g.node() as any);
-          d._labelGrab = d._routeLabel
-            ? { x: x - d._routeLabel.x, y: y - d._routeLabel.y }
+          const pointer = labelPointer(event);
+          d._labelGrab = d._routeLabel && pointer
+            ? { x: pointer[0] - d._routeLabel.x, y: pointer[1] - d._routeLabel.y }
             : { x: 0, y: 0 };
         })
         .on('drag', function(event, d: any) {
-          if (!d._route || !d._labelGrab) return;
-          const [x, y] = d3.pointer(event, g.node() as any);
+          const pointer = labelPointer(event);
+          if (!d._route || !d._labelGrab || !pointer) return;
+          const [x, y] = pointer;
           const t = projectEdgeRoutePointer(d._route, {
             x: x - d._labelGrab.x, y: y - d._labelGrab.y
           }, d.labelT, { offset: d._routeLabel?.offset ?? 25 });
@@ -3983,13 +3947,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           directionStrategy(scale) === 'hidden' ? 0 : arrowVisibility(scale, d?._pTotal || 1).opacity);
       linkElements.filter((d: any) => edgeDisplay(d) !== 'none')
         .style('opacity', Math.max(0.1, getSmoothedOpacity(LOD_THRESHOLDS.VERY_FAR, 0.1)))
-        .attr('stroke-width', function(d: any) {
-          // Don't override stroke width if this edge has an active dialog
-          if (editingEdge && editingEdge.edge && editingEdge.edge.id === d.id) {
-            return 10; // Keep thick for active dialog
-          }
-          return ITEM_WIRE_WIDTH;
-        });
+        .attr('stroke-width', ITEM_WIRE_WIDTH);
     };
     zoom.on('zoom', (event) => {
       // D3 sets sourceEvent only for direct wheel/pointer gestures. Programmatic
@@ -5435,7 +5393,6 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           if (!edge) return;
           setItemRelationshipScope(null);
           setSelectedEdge(edge);
-          setShowRelationshipWindow(true);
           setEditingEdge({ edge, position: { x: window.innerWidth / 2, y: window.innerHeight / 2 } });
           setDragOffset({ x: 0, y: 0 });
         }}
@@ -6129,29 +6086,20 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       )}
 
       {/* Relationship Editor Window */}
+      {/* Relationship editor: open exactly while an edge is being edited, so
+          closing, Escape, or selecting something else closes it, and a type
+          change or flip keeps it on the saved relationship. */}
       <RelationshipEditorWindow
-        isVisible={showRelationshipWindow}
         editingEdge={editingEdge}
-        selectedNodes={selectedNodes}
         workItems={workItems}
-        onClose={() => setShowRelationshipWindow(false)}
-        onFlipDirection={() => {
-          // The component handles flip internally
-          setEditingEdge(null); // Clear after flip
+        onClose={() => setEditingEdge(null)}
+        onEdgeChange={(edge, previousId) => {
+          setEditingEdge(prev => (prev && prev.edge.id === previousId ? { edge, position: prev.position } : prev));
+          setSelectedEdge(prev => (prev?.id === previousId ? edge : prev));
         }}
-        onDeleteEdge={(edgeId) => {
-          setEditingEdge(null); // Clear after delete
-        }}
-        onCreateEdge={(sourceId, targetId, type) => {
-          // Clear selection after create
-          setSelectedNodes(new Set());
-        }}
+        onDeleteEdge={() => setEditingEdge(null)}
         showSuccess={showSuccess}
         showError={showError}
-        refetchEdges={refetchEdges}
-        onClearSelection={() => {
-          setSelectedNodes(new Set());
-        }}
       />
 
 
