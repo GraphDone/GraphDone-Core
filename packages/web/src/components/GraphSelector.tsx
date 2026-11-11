@@ -1,5 +1,5 @@
 import { ProjectTransfer } from './ProjectTransfer';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Plus, Folder, FolderOpen, FileText, Share2, Eye, Edit3, Crown, Trash2, FolderPlus, ChevronRight, Users, Bot, Settings, Zap, User, Lock, Sparkles } from 'lucide-react';
 import { useQuery } from '@apollo/client';
@@ -7,7 +7,7 @@ import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
 import { GET_WORK_ITEMS, GET_EDGES } from '../lib/queries';
 import { offlineEnabled, localGuest } from '../lib/offline/engine';
-import { exampleAction, starterHierarchy } from '../lib/workspaceRules';
+import { exampleAction, starterHierarchy, systemLocked } from '../lib/workspaceRules';
 
 interface GraphSelectorProps {
   onCreateGraph?: () => void;
@@ -20,7 +20,7 @@ interface GraphSelectorProps {
 }
 
 export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testId = 'graph-selector' }: GraphSelectorProps) {
-  const { currentGraph, graphHierarchy, selectGraph, addExampleProject } = useGraph();
+  const { currentGraph, availableGraphs, graphHierarchy, selectGraph, addExampleProject } = useGraph();
   const { currentTeam, currentUser } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['team', 'personal', 'system']));
@@ -152,79 +152,37 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
     }
   };
 
-  // The shared Welcome graph is the system's; a Welcome graph of the user's own is theirs to change.
-  const systemGraph = (graph: any) => graph.createdBy === 'system' ||
-    graph.id === 'welcome-graph-shared' ||
-    (graph.name?.toLowerCase() === 'welcome' && graph.createdBy !== currentUser?.id);
-
-  const graphActions = (graph: any) => (
-    <div className="shrink-0 flex items-center space-x-1 opacity-0 group-hover/item:opacity-100 transition-opacity ml-2">
-      {onEditGraph && (() => {
-        const isSystemGraph = systemGraph(graph);
-        return (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              if (!isSystemGraph) {
-                onEditGraph(graph);
-                setIsOpen(false);
-              }
-            }}
-            onMouseEnter={(e) => {
-              if (isSystemGraph) {
-                const rect = e.currentTarget.getBoundingClientRect();
-                setHoveredTooltip({
-                  message: '🔒 System graph — can\'t be edited',
-                  x: rect.right + 8,
-                  y: rect.top + rect.height / 2
-                });
-              }
-            }}
-            onMouseLeave={() => setHoveredTooltip(null)}
-            className={`p-1.5 rounded-lg transition-all duration-200 ${
-              isSystemGraph
-                ? 'text-gray-600 cursor-not-allowed'
-                : 'text-gray-400 hover:text-blue-400 hover:bg-blue-500/20 hover:scale-110'
-            }`}
-          >
-            <Edit3 className="h-3.5 w-3.5" />
-          </button>
-        );
-      })()}
-      {onDeleteGraph && (() => {
-        const isSystemGraph = systemGraph(graph);
-        return (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              if (!isSystemGraph) {
-                onDeleteGraph(graph);
-                setIsOpen(false);
-              }
-            }}
-            onMouseEnter={(e) => {
-              if (isSystemGraph) {
-                const rect = e.currentTarget.getBoundingClientRect();
-                setHoveredTooltip({
-                  message: '🔒 System graph — can\'t be deleted',
-                  x: rect.right + 8,
-                  y: rect.top + rect.height / 2
-                });
-              }
-            }}
-            onMouseLeave={() => setHoveredTooltip(null)}
-            className={`p-1.5 rounded-lg transition-all duration-200 ${
-              isSystemGraph
-                ? 'text-gray-600 cursor-not-allowed'
-                : 'text-gray-400 hover:text-red-400 hover:bg-red-500/20 hover:scale-110'
-            }`}
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
-        );
-      })()}
-    </div>
-  );
+  const graphActions = (row: any) => {
+    const graph = availableGraphs.find(g => g.id === row.id) ?? row;
+    const isSystemGraph = systemLocked(graph, currentUser?.id);
+    const action = (run: (graph: any) => void, locked: string, hover: string, icon: ReactNode) => (
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          if (!isSystemGraph) {
+            run(graph);
+            setIsOpen(false);
+          }
+        }}
+        onMouseEnter={(e) => {
+          if (isSystemGraph) {
+            const rect = e.currentTarget.getBoundingClientRect();
+            setHoveredTooltip({ message: locked, x: rect.right + 8, y: rect.top + rect.height / 2 });
+          }
+        }}
+        onMouseLeave={() => setHoveredTooltip(null)}
+        className={`p-1.5 rounded-lg transition-all duration-200 ${isSystemGraph ? 'text-gray-600 cursor-not-allowed' : `text-gray-400 ${hover} hover:scale-110`}`}
+      >
+        {icon}
+      </button>
+    );
+    return (
+      <div className="shrink-0 flex items-center space-x-1 opacity-0 group-hover/item:opacity-100 transition-opacity ml-2">
+        {onEditGraph && action(onEditGraph, '🔒 System graph — can\'t be edited', 'hover:text-blue-400 hover:bg-blue-500/20', <Edit3 className="h-3.5 w-3.5" />)}
+        {onDeleteGraph && action(onDeleteGraph, '🔒 System graph — can\'t be deleted', 'hover:text-red-400 hover:bg-red-500/20', <Trash2 className="h-3.5 w-3.5" />)}
+      </div>
+    );
+  };
 
   // Toggle dropdown and calculate position
   const toggleDropdown = () => {

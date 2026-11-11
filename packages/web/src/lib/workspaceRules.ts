@@ -20,6 +20,16 @@ export function projectDeleteBlock(graph: GraphRef, graphs: Array<Partial<GraphR
 }
 
 /**
+ * Whether only the system may edit or delete a graph: a system graph or the
+ * shared Welcome. A Welcome graph the user made (the example's first graph) is
+ * theirs, so a project holding it can still be emptied and deleted.
+ */
+export function systemLocked(graph: { id: string; name?: string; createdBy?: string | null }, userId: string | null | undefined): boolean {
+  if (graph.createdBy === 'system' || graph.id === 'welcome-graph-shared') return true;
+  return graph.name?.toLowerCase() === 'welcome' && (!graph.createdBy || graph.createdBy !== userId);
+}
+
+/**
  * Whether the starter has projects with graphs inside them. Signed-in hosted
  * accounts sync to /api/sync, which keeps no parent yet, so they get the
  * single Welcome graph; guests (never synced) and self-hosted get the hierarchy.

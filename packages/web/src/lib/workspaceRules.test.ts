@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { STARTER_MARKER_TTL_MS, exampleAction, exampleLimitMessage, missingStarterGraphs, parseStarterMarker, projectDeleteBlock, seenGraphCount, starterHierarchy, starterStep, type OwnGraph } from './workspaceRules';
+import { STARTER_MARKER_TTL_MS, exampleAction, exampleLimitMessage, missingStarterGraphs, parseStarterMarker, projectDeleteBlock, seenGraphCount, starterHierarchy, starterStep, systemLocked, type OwnGraph } from './workspaceRules';
 
 describe('deleting a project', () => {
   const project = { id: 'p', name: 'Getting started', parentGraphId: null };
@@ -14,6 +14,20 @@ describe('deleting a project', () => {
     expect(projectDeleteBlock(project, [project])).toBeNull();
     expect(projectDeleteBlock(project, [project, { id: 'x', name: 'Elsewhere', parentGraphId: 'other' }])).toBeNull();
     expect(projectDeleteBlock({ id: 'g0', name: 'Graph 0', parentGraphId: 'p' }, [project, ...inside(2)])).toBeNull();
+  });
+});
+
+describe('which graphs only the system may change', () => {
+  it('locks system graphs and the shared Welcome', () => {
+    expect(systemLocked({ id: 'overview', name: 'System Overview', createdBy: 'system' }, 'me')).toBe(true);
+    expect(systemLocked({ id: 'welcome-graph-shared', name: 'Welcome', createdBy: 'me' }, 'me')).toBe(true);
+    expect(systemLocked({ id: 'w', name: 'Welcome', createdBy: 'someone else' }, 'me'), "another user's Welcome").toBe(true);
+    expect(systemLocked({ id: 'w', name: 'Welcome' }, 'me'), 'a Welcome whose owner is unknown').toBe(true);
+  });
+
+  it("leaves the user's own Welcome and every other graph to the user", () => {
+    expect(systemLocked({ id: 'w', name: 'Welcome', createdBy: 'me' }, 'me')).toBe(false);
+    expect(systemLocked({ id: 'p', name: 'Plan a launch', createdBy: 'me' }, 'me')).toBe(false);
   });
 });
 
