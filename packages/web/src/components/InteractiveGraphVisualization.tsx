@@ -64,7 +64,7 @@ import { appendNodeControlGlyph, nodeControlGlyphTransform } from '../lib/nodeCo
 import { graphItemLayout, itemTitleScale, measureGraphText, edgeLabelDimensions, GRAPH_FONT_FAMILY, ITEM_TITLE_SIZE, ITEM_TITLE_LINE, ITEM_HEADER_HEIGHT, EDGE_LABEL_SIZE, ITEM_WIRE_WIDTH } from '../lib/graphSymbolLayout';
 import { placeItemLabels } from '../lib/edgeLabelPlacement';
 import { separateCards } from '../lib/separateCards';
-import { clearFreeCards, framedZoom, hierarchyWithLabelRoom, labelGap, LABEL_MIN_ZOOM, organizeWithLabelRoom, ORGANIZED_ZOOM_FLOOR, SMALL_GRAPH_ZOOM_FLOOR, SPREAD_MAX_CARDS, WHOLE_FIT_MAX_CARDS, type LabelEdge, type LabelRoomOptions } from '../lib/labelClearance';
+import { clearFreeCards, framedZoom, hierarchyWithLabelRoom, labelGap, LABEL_MIN_ZOOM, LAYOUT_CHECKS, organizeWithLabelRoom, ORGANIZED_ZOOM_FLOOR, SMALL_GRAPH_ZOOM_FLOOR, WHOLE_FIT_MAX_CARDS, type LabelEdge, type LabelRoomOptions } from '../lib/labelClearance';
 import { LocalItemNeighborhood } from './LocalItemNeighborhood';
 import { frameOrganizedNeighborhood } from '../lib/organizationCamera';
 import { DEFAULT_PHYSICS, collisionRadius, linkDistance, linkMaxDistance, linkStrength } from '../lib/physicsConfig';
@@ -4120,10 +4120,13 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // A settled layout can leave cards the simulation placed itself too close
     // for a label at the zoom the camera will frame them. Move only those free
     // cards apart, never a saved or organized one (labelClearance.clearFreeCards).
-    // Larger graphs open as an overview without labels (SPREAD_MAX_CARDS).
+    // Larger graphs keep the settled layout (WHOLE_FIT_MAX_CARDS), and the
+    // work is bounded like a click's layout (LAYOUT_CHECKS): this runs on the
+    // main thread when the simulation ends.
     const clearLabelsOfFreeCards = () => {
       const simNodes = simulation.nodes() as any[];
-      if (simNodes.length > SPREAD_MAX_CARDS || !simNodes.some(node => node.fx == null)) return false;
+      if (simNodes.length > WHOLE_FIT_MAX_CARDS || !simNodes.some(node => node.fx == null)) return false;
+      const work = { remaining: LAYOUT_CHECKS };
       forgetLabelSpots(validatedEdges as any[]);
       const byId = new Map(simNodes.map(node => [node.id, node]));
       const room = labelRoom(width, height, 0);
@@ -4138,7 +4141,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         const positions = new Map(simNodes.map(node => [node.id, { x: node.x, y: node.y }]));
         const zoom = Math.max(LABEL_MIN_ZOOM, framedZoom(simNodes, positions, room, 0));
         const cards = simNodes.map(node => ({ id: node.id, x: node.x, y: node.y, ...getNodeDimensionsAt(node, zoom) }));
-        const cleared = clearFreeCards(cards, labelled, { zoom, free: id => byId.get(id)?.fx == null });
+        const cleared = clearFreeCards(cards, labelled, { zoom, free: id => byId.get(id)?.fx == null, work });
         for (const [id, point] of cleared.moved) Object.assign(byId.get(id), { x: point.x, y: point.y, vx: 0, vy: 0 });
         moved ||= cleared.moved.size > 0;
         if (!cleared.moved.size || !cleared.hidden.length) break;
@@ -4289,10 +4292,13 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   // frames the busiest card's neighbourhood otherwise; the hierarchical
   // layout shows its top rows (prerequisites first).
   const wholeGraphFitRef = useRef<false | 'centre' | 'top'>(false);
+  // The framing the hierarchical layout replaced, restored when it is turned off.
+  const beforeHierarchyRef = useRef<{ floor: number; whole: false | 'centre' | 'top' } | null>(null);
   useEffect(() => {
     organizationZoomFloorRef.current = 0;
     organizationFocusRef.current = undefined;
     wholeGraphFitRef.current = false;
+    beforeHierarchyRef.current = null;
   }, [layoutScope]);
 
   // Fit view to show all nodes. Returns true if a fit transform was applied,
@@ -4633,6 +4639,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     (window as any).__graphOrganization = {components:arranged.components,work:arranged.work};
     organizationZoomFloorRef.current = floor;
     wholeGraphFitRef.current = whole && 'centre';
+    beforeHierarchyRef.current = null;
     organizationFocusRef.current = arranged.components[0]?.focus;
     cameraManuallyPositionedRef.current = true;
     if (currentGraphIdRef.current) fittedGraphsRef.current.add(currentGraphIdRef.current);
@@ -4663,6 +4670,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     const simNodes = sim.nodes() as any[];
     if (isHierarchicalLayout(mode)) {
       if (simNodes.length <= WHOLE_FIT_MAX_CARDS) {
+        beforeHierarchyRef.current ??= { floor: organizationZoomFloorRef.current, whole: wholeGraphFitRef.current };
         wholeGraphFitRef.current = 'top';
         organizationZoomFloorRef.current = Math.max(organizationZoomFloorRef.current, SMALL_GRAPH_ZOOM_FLOOR);
       }
@@ -4678,6 +4686,11 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         node.vx = node.vy = 0;
       });
     } else {
+      if (beforeHierarchyRef.current) {
+        organizationZoomFloorRef.current = beforeHierarchyRef.current.floor;
+        wholeGraphFitRef.current = beforeHierarchyRef.current.whole;
+        beforeHierarchyRef.current = null;
+      }
       simNodes.forEach((node: any) => {
         if (!node.__layerPinned) return;
         node.fy = node.__preLayerFy ?? null;
@@ -5071,6 +5084,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     (window as any).triggerZoomToFit = () => {
       organizationZoomFloorRef.current = 0;
       wholeGraphFitRef.current = false;
+      beforeHierarchyRef.current = null;
       return fitViewRef.current();
     };
     return () => {

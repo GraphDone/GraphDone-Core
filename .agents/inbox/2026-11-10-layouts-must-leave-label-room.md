@@ -45,8 +45,11 @@ concerns the room between connected cards.
 
 ## Limits
 
-Groups of more than 200 cards keep only the reserved gaps (the spread search
-would cost seconds; such graphs open as an overview). A graph's saved
+The search runs in the click handler, so its work is bounded: at most
+`WHOLE_FIT_MAX_CARDS` (60) cards, `LAYOUT_CHECKS` label checks and five
+layouts per click (about 100 ms on a desktop; a unit test guards it). Larger
+graphs keep the plain layouts and the 0.65 Organize floor (an early version
+searched up to 200 cards and froze the page for seconds). A graph's saved
 arrangement is never moved, so labels hidden there stay hidden until the person
 organizes. Labels under a control or the MiniMap are a camera matter, recorded
 by the audit but not counted.

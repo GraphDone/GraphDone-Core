@@ -29,6 +29,7 @@ import {
   type LabelEdge,
 } from './labelClearance';
 import { organizeTopology } from './topologyOrganization';
+import { computeCompactLayout } from './layoutAlgorithms';
 import { LABEL_SHAPES, type LabelShape } from './labelClearanceShapes';
 
 // measureGraphText's own estimate when there is no canvas: wider than the
@@ -192,6 +193,68 @@ describe('the whole small graph on screen', () => {
     const result = hierarchyWithLabelRoom(g.items, g.edges, { ...g, viewport: SCREENS[screen], floor: SMALL_GRAPH_ZOOM_FLOOR });
     expect(result.zoom).toBeGreaterThanOrEqual(LABEL_MIN_ZOOM);
     expect(problems(g, result.positions, result.zoom)).toEqual(NONE);
+  });
+});
+
+/** A generated graph: `n` tasks, `m` relationships mostly between near neighbours. */
+function generated(n: number, m: number, seed = 7): LabelShape {
+  let state = seed;
+  const random = () => (state = (state * 16807) % 2147483647) / 2147483647;
+  const types = ['DEPENDS_ON', 'BLOCKS', 'RELATES_TO', 'ENABLES'];
+  const edges: LabelShape['edges'] = [];
+  const seen = new Set<string>();
+  while (edges.length < m) {
+    const a = Math.floor(random() * n),
+      b = Math.min(n - 1, Math.max(0, a + Math.floor((random() - 0.5) * 12)));
+    const key = `${Math.min(a, b)}-${Math.max(a, b)}`;
+    if (a === b || seen.has(key)) continue;
+    seen.add(key);
+    edges.push({ source: `t${a}`, target: `t${b}`, type: types[edges.length % types.length] });
+  }
+  return {
+    name: `Generated ${n}`,
+    items: Array.from({ length: n }, (_, i) => ({ key: `t${i}`, title: `Task ${i + 1} of the plan`, type: 'TASK', status: 'NOT_STARTED' })),
+    edges,
+  };
+}
+
+describe('bounded work', () => {
+  it('a hub with four spokes on a phone is framed at the closest zoom that shows every label, not at the lowest', () => {
+    const shape: LabelShape = {
+      name: 'Hub',
+      items: ['System coordinator', 'Subsystem 1', 'Subsystem 2', 'Subsystem 3', 'Subsystem 4'].map((title, i) => ({ key: `h${i}`, title, type: 'TASK', status: 'NOT_STARTED' })),
+      edges: [1, 2, 3, 4].map(i => ({ source: 'h0', target: `h${i}`, type: 'BLOCKS' })),
+    };
+    const g = graph(shape);
+    const result = organizeWithLabelRoom(g.items, g.edges, { ...g, viewport: SCREENS.iPhone, floor: SMALL_GRAPH_ZOOM_FLOOR });
+    // The widest layout (room for labels at the lowest zoom) also fits; the
+    // search must go on to the closest zoom instead of settling for it.
+    expect(result.labelZoom).toBeGreaterThan(LABEL_MIN_ZOOM + 0.03);
+    expect(result.zoom).toBeGreaterThanOrEqual(result.labelZoom);
+    expect(problems(g, result.positions, result.zoom)).toEqual(NONE);
+  });
+
+  // Organize and the hierarchical toggle run in the click handler: a whole
+  // layout of WHOLE_FIT_MAX_CARDS cards takes about 100 ms on a desktop. The
+  // bound has room for a slow test runner, not for the seconds it once took.
+  it.each(['organize', 'hierarchical'] as const)('%s of 60 cards and 90 relationships finishes within a second', kind => {
+    const g = graph(generated(WHOLE_FIT_MAX_CARDS, 90));
+    const options = { ...g, viewport: SCREENS.desktop, floor: SMALL_GRAPH_ZOOM_FLOOR };
+    const run = () => (kind === 'organize' ? organizeWithLabelRoom : hierarchyWithLabelRoom)(g.items, g.edges, options);
+    run();
+    const start = performance.now();
+    run();
+    expect(performance.now() - start).toBeLessThan(1000);
+  });
+
+  it.each([0, ORGANIZED_ZOOM_FLOOR])('above WHOLE_FIT_MAX_CARDS (floor %s, as when items arrive unplaced) the layouts are the plain ones', floor => {
+    const g = graph(generated(WHOLE_FIT_MAX_CARDS + 1, 90));
+    const options = { ...g, viewport: SCREENS.desktop, floor };
+    const dims = (item: (typeof g.items)[number]) => g.dimensionsAt(item, 1);
+    expect(organizeWithLabelRoom(g.items, g.edges, options).positions).toEqual(organizeTopology(g.items, g.edges, dims, SCREENS.desktop).positions);
+    const hierarchy = hierarchyWithLabelRoom(g.items, g.edges, options);
+    expect(hierarchy.positions).toEqual(computeCompactLayout(g.items, g.edges, SCREENS.desktop, dims));
+    expect(hierarchy.labelZoom).toBe(1);
   });
 });
 
