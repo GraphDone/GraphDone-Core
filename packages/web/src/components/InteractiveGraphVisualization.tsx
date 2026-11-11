@@ -78,6 +78,8 @@ import { spawnCelebration } from '../lib/celebration';
 import { buildNeighborhood } from '../lib/graphAdjacency';
 import { UndoStack } from '../lib/undoStack';
 import { createSerialQueue } from '../lib/serialQueue';
+import { GraphZoomContext } from './GraphZoomContext';
+import type { ZoomLevel } from '../lib/graphZoomContext';
 
 // Level-of-detail zoom thresholds (single source of truth): below each scale the
 // matching per-node detail is hidden, for legibility and paint cost. (Values are
@@ -1523,6 +1525,25 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   // A graph owns one simulation. Detached simulations otherwise keep mutating
   // shared node objects after a rebuild and can fight the visible simulation.
   const [semanticOverviewActive, setSemanticOverviewActive] = useState(false);
+  // Zoom-out level (#277): 0 items, 1 graph frame, 2 neighbouring graphs, 3 projects.
+  const [zoomLevel, setZoomLevel] = useState<ZoomLevel>(0);
+  // The zoom-out limit: 0.1 normally, lower when there are graphs and projects
+  // around this one. Kept in a ref so a rebuilt zoom behaviour starts from it.
+  const zoomMinScaleRef = useRef(0.1);
+  const handleZoomLevel = useCallback((level: ZoomLevel, minScale: number) => {
+    setZoomLevel(level);
+    zoomMinScaleRef.current = minScale;
+    // Zooming out may go further when there are graphs and projects around this one.
+    const zoom = zoomBehaviorRef.current;
+    if (zoom && Math.abs(zoom.scaleExtent()[0] - minScale) > 1e-6) zoom.scaleExtent([minScale, zoom.scaleExtent()[1]]);
+  }, []);
+  const openZoomGraph = useCallback((graphId: string) => { void descendInto(graphId); }, [descendInto]);
+  // A project folder (a graph holding other graphs) with no items of its own
+  // opens on its graphs instead of an empty canvas.
+  const projectGraphs = useMemo(
+    () => (currentGraph ? availableGraphs.filter(graph => graph.parentGraphId === currentGraph.id) : []),
+    [availableGraphs, currentGraph]
+  );
   // True between a programmatic zoom transition's start and end, so leaving
   // the overview mid-transition can leave item presentation to the zoom's
   // single terminal pass. User gestures (wheel, pinch, drag) never set it: a
@@ -1558,7 +1579,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     
     if (isFirstInit) {
       // First initialization - clear everything and create core structure
-      svg.selectAll(':scope > :not(.semantic-overview-host)').remove();
+      svg.selectAll(':scope > :not(.semantic-overview-host):not(.graph-zoom-context)').remove();
       d3.select(containerRef.current).selectAll('.node-labels-container').remove();
     } else {
       // Surgical update - only clear data elements, preserve core structure
@@ -1576,7 +1597,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // Create zoom behavior for empty canvas with reversed wheel direction
     const zoom = d3.zoom<SVGSVGElement, unknown>()
       .filter(event => !(event.target as Element)?.closest('[data-lod-controls]') && (event.type === 'wheel' || !(event.target as Element)?.closest('[data-local-item-card]')) && (!event.ctrlKey || event.type === 'wheel') && !event.button)
-      .scaleExtent([0.1, 3])
+      .scaleExtent([zoomMinScaleRef.current, 3])
       .wheelDelta((event: WheelEvent) => {
         // Standard direction (like maps/most apps): scroll UP (deltaY<0) zooms IN.
         return -event.deltaY * (event.deltaMode === 1 ? 0.05 : event.deltaMode ? 1 : 0.002);
@@ -1586,9 +1607,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         if (!g.empty()) {
           g.attr('transform', event.transform);
         }
+        svg.select('g.graph-zoom-context').attr('transform', event.transform.toString());
       });
 
-    const g = isFirstInit ? svg.insert('g', '.semantic-overview-host').attr('class', 'main-graph-group') : existingMainGroup;
+    const g = isFirstInit ? svg.insert('g', '.graph-zoom-context').attr('class', 'main-graph-group') : existingMainGroup;
     
     // Create grid pattern and overlay (only on first init)
     if (isFirstInit) {
@@ -1921,7 +1943,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     
     if (isFirstInit) {
       // First initialization - clear everything and create core structure
-      svg.selectAll(':scope > :not(.semantic-overview-host)').remove();
+      svg.selectAll(':scope > :not(.semantic-overview-host):not(.graph-zoom-context)').remove();
       d3.select(containerRef.current).selectAll('.node-labels-container').remove();
     } else {
       // Surgical update - only clear data elements, preserve core structure
@@ -1943,13 +1965,13 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // Create or reuse zoom behavior with reversed wheel direction
     const zoom = d3.zoom<SVGSVGElement, unknown>()
       .filter(event => !(event.target as Element)?.closest('[data-lod-controls]') && (event.type === 'wheel' || !(event.target as Element)?.closest('[data-local-item-card]')) && (!event.ctrlKey || event.type === 'wheel') && !event.button)
-      .scaleExtent([0.1, 4])
+      .scaleExtent([zoomMinScaleRef.current, 4])
       .wheelDelta((event: WheelEvent) => {
         // Standard direction (like maps/most apps): scroll UP (deltaY<0) zooms IN.
         return -event.deltaY * (event.deltaMode === 1 ? 0.05 : event.deltaMode ? 1 : 0.002);
       });
 
-    const g = isFirstInit ? svg.insert('g', '.semantic-overview-host').attr('class', 'main-graph-group') : existingMainGroup;
+    const g = isFirstInit ? svg.insert('g', '.graph-zoom-context').attr('class', 'main-graph-group') : existingMainGroup;
 
     // Create or reuse background for capturing clicks  
     let background = g.select('rect.background');
@@ -4000,6 +4022,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         if (currentGraphIdRef.current) fittedGraphsRef.current.add(currentGraphIdRef.current);
       }
       g.attr('transform', event.transform);
+      // The zoom-out context (graph frame, neighbouring graphs, projects) moves
+      // in the same frame as the items; React only redraws its labels.
+      svg.select('g.graph-zoom-context').attr('transform', event.transform.toString());
       setCurrentTransform({
         x: event.transform.x,
         y: event.transform.y,
@@ -4381,7 +4406,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       cameraManuallyPositionedRef.current = true;
       if (currentGraphIdRef.current) fittedGraphsRef.current.add(currentGraphIdRef.current);
       const svg = d3.select(svgRef.current);
-      const k = Math.max(0.1, Math.min(4, targetK));
+      const k = Math.max(zoomBehaviorRef.current.scaleExtent()[0], Math.min(4, targetK));
       const w = containerRef.current.clientWidth;
       const h = containerRef.current.clientHeight;
       const t = d3.zoomIdentity.translate(w / 2 - graphX * k, h / 2 - graphY * k).scale(k);
@@ -5397,7 +5422,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
 
   return (
-    <div ref={containerRef} className="graph-container relative w-full h-full overflow-hidden select-none" data-overview={semanticOverviewActive || localItemActive || undefined} data-local-item-lod={localItemActive || undefined} data-quality={qualityTier} data-dense={isDenseGraph ? 'true' : undefined} data-simplify={isSimplified ? 'true' : undefined} data-dots={isDotMode ? 'true' : undefined}
+    <div ref={containerRef} className="graph-container relative w-full h-full overflow-hidden select-none" data-zoom-level={zoomLevel} data-overview={semanticOverviewActive || localItemActive || undefined} data-local-item-lod={localItemActive || undefined} data-quality={qualityTier} data-dense={isDenseGraph ? 'true' : undefined} data-simplify={isSimplified ? 'true' : undefined} data-dots={isDotMode ? 'true' : undefined}
       data-relationship-priority={relationshipLevel} data-relationship-total={workItemEdges.length}
       data-priority-summarized={priorityProjection.summarized.length} data-priority-represented={priorityProjection.represented.length} data-priority-pending={priorityProjection.pending.length}>
       {workItems.length < 40 && (!compactWorkspace || localItemControls) && <div data-graph-fit-obstacle="true" className="absolute left-3 right-16 top-3 md:left-16 md:right-40 z-20 flex flex-wrap gap-3">{!compactWorkspace && priorityControl}{localItemControls}</div>}
@@ -5447,6 +5472,16 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         aria-label="Interactive work-item dependency graph"
         aria-describedby="graph-a11y-desc"
       >
+        <GraphZoomContext
+          graphs={availableGraphs}
+          currentGraphId={currentGraph?.id ?? null}
+          camera={currentTransform}
+          readPositions={readOverviewPositions}
+          itemSize={getNodeDimensions}
+          overview={semanticOverviewActive}
+          onOpen={openZoomGraph}
+          onLevel={handleZoomLevel}
+        />
         <foreignObject className="semantic-overview-host" width="100%" height="100%" style={{ pointerEvents: 'none' }}>
       {currentGraph && workItems.length >= 40 && <SemanticGraphOverview
         key={layoutScope ?? currentGraph.id}
@@ -5501,12 +5536,32 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
             <div className="text-green-400 text-4xl mb-4">
               🌱
             </div>
+            {projectGraphs.length > 0 ? <>
+              <h3 className="text-2xl font-bold text-white mb-2">{currentGraph?.name}</h3>
+              <div className="text-gray-200 mb-4 leading-relaxed text-base max-w-md mx-auto">
+                {`This project holds ${projectGraphs.length === 1 ? '1 graph' : `${projectGraphs.length} graphs`}. Open one, or add a work item here.`}
+              </div>
+              <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-6 text-left" aria-label={`Graphs in ${currentGraph?.name ?? 'this project'}`}>
+                {projectGraphs.map(graph => (
+                  <li key={graph.id}>
+                    <button
+                      type="button"
+                      onClick={() => openZoomGraph(graph.id)}
+                      className="w-full rounded-lg border border-gray-600/60 bg-gray-900/60 hover:border-emerald-400/70 px-3 py-2 text-white font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-300"
+                    >
+                      {graph.name}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </> : <>
             <h3 className="text-2xl font-bold bg-gradient-to-r from-emerald-400 via-green-300 to-blue-400 bg-clip-text text-transparent mb-3">
               Start with one idea
             </h3>
             <div className="text-gray-200 mb-8 leading-relaxed text-base max-w-md mx-auto">
               Add a work item, give it a name, then use + to grow a connected idea.
             </div>
+            </>}
             
             <button 
               onClick={() => {
