@@ -1,4 +1,4 @@
-import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
+import { test, expect, type APIRequestContext, type BrowserContext, type Page } from '@playwright/test';
 import { testAdminCredentials } from '../../lib/auth-credentials.mjs';
 import { buildStarterWorkspace, EXAMPLE_PENDING_TAG } from '../../../packages/web/src/lib/starterWorkspace';
 import { missingStarterGraphs } from '../../../packages/web/src/lib/workspaceRules';
@@ -42,16 +42,20 @@ test('an example left unfinished by a closed browser is finished at the next sig
   const adminToken = (await api(request, LOGIN, { input: { emailOrUsername: admin.username, password: admin.password } })).login.token;
   const username = `example-resume-${Date.now()}`;
   const password = 'example-resume-password';
-  await api(request, 'mutation($input: CreateUserInput!) { createUser(input: $input) { id } }', {
-    input: { email: `${username}@example.test`, username, name: 'Example resume', password, role: 'USER' },
-  }, adminToken);
-  const session = await api(request, LOGIN, { input: { emailOrUsername: username, password } });
-  const token: string = session.login.token;
-  const own = async () => (await api<{ graphs: OwnGraph[] }>(request, OWN, { id: session.login.user.id }, token)).graphs;
+  const contexts: BrowserContext[] = [];
+  let userId: string | undefined;
+  let session: { token: string; user: { id: string } } | undefined;
+  const own = async () => (await api<{ graphs: OwnGraph[] }>(request, OWN, { id: session!.user.id }, session!.token)).graphs;
 
   try {
+    userId = (await api(request, 'mutation($input: CreateUserInput!) { createUser(input: $input) { id } }', {
+      input: { email: `${username}@example.test`, username, name: 'Example resume', password, role: 'USER' },
+    }, adminToken)).createUser.id;
+    session = (await api(request, LOGIN, { input: { emailOrUsername: username, password } })).login;
+
     // 1. The first browser starts the example and closes with an item write still in flight.
     const first = await browser.newContext();
+    contexts.push(first);
     const page = await first.newPage();
     let itemWrites = 0;
     let inFlight!: () => void;
@@ -63,7 +67,7 @@ test('an example left unfinished by a closed browser is finished at the next sig
       }
       await route.continue();
     });
-    await signIn(page, session.login);
+    await signIn(page, session!);
     await Promise.race([closing, page.waitForTimeout(60_000)]);
     expect(itemWrites, 'the first browser was writing the example when it closed').toBeGreaterThan(6);
     await first.close();
@@ -72,8 +76,9 @@ test('an example left unfinished by a closed browser is finished at the next sig
 
     // 2. A fresh browser signs in and finishes it, without writing anything twice.
     const second = await browser.newContext();
+    contexts.push(second);
     const again = await second.newPage();
-    await signIn(again, session.login);
+    await signIn(again, session!);
     let last: OwnGraph[] = [];
     await expect.poll(async () => {
       last = await own();
@@ -85,17 +90,19 @@ test('an example left unfinished by a closed browser is finished at the next sig
     expect(last.map(graph => graph.name).sort(), 'each example graph exactly once').toEqual([...plan.projects, ...plan.graphs].map(graph => graph.name).sort());
     for (const graph of plan.graphs) {
       const id = last.find(g => g.name === graph.name)!.id;
-      const content = await api<{ workItems: { title: string }[]; edges: unknown[] }>(request, CONTENT, { id }, token);
+      const content = await api<{ workItems: { title: string }[]; edges: unknown[] }>(request, CONTENT, { id }, session!.token);
       expect(content.workItems.map(item => item.title).sort(), `${graph.name}: each item once`).toEqual(graph.items.map(item => item.title).sort());
       expect(content.edges, `${graph.name}: each connection once`).toHaveLength(graph.edges.length);
     }
   } finally {
-    const graphs = await own().catch(() => [] as OwnGraph[]);
+    for (const context of contexts) await context.close().catch(() => undefined);
+    const token = session?.token;
+    const graphs = session ? await own().catch(() => [] as OwnGraph[]) : [];
     for (const graph of [...graphs].sort((a, b) => Number(!a.parentGraphId) - Number(!b.parentGraphId))) {
       await api(request, 'mutation($id: ID!) { deleteEdges(where: { source: { graph: { id: $id } } }) { nodesDeleted } }', { id: graph.id }, token).catch(() => undefined);
       await api(request, 'mutation($id: ID!) { deleteWorkItems(where: { graph: { id: $id } }) { nodesDeleted } }', { id: graph.id }, token).catch(() => undefined);
       await api(request, 'mutation($id: ID!) { deleteGraphs(where: { id: $id }) { nodesDeleted } }', { id: graph.id }, token).catch(() => undefined);
     }
-    await api(request, 'mutation($id: String!) { deleteUser(userId: $id) { message } }', { id: session.login.user.id }, adminToken).catch(() => undefined);
+    if (userId) await api(request, 'mutation($id: String!) { deleteUser(userId: $id) { message } }', { id: userId }, adminToken).catch(() => undefined);
   }
 });
