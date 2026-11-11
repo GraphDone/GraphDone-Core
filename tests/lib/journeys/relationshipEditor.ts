@@ -128,49 +128,85 @@ const zoomOf = (page: Page) => page.evaluate(() => {
 });
 
 /**
- * Zoom in on the pair, as a person does to see which way a connection points,
- * when its arrow is not drawn at this zoom (a phone opens the graph at half
- * size, where arrows and labels are hidden): a pinch on touch screens, the
- * wheel otherwise, centred on empty canvas beside the wire.
+ * Bring the connection's arrow into view as a person does when it is not
+ * drawn at this zoom (a phone opens the graph at half size, where arrows and
+ * labels are hidden) or not on screen: zoom in on it (a pinch on touch
+ * screens, the wheel otherwise), then drag the canvas until it is near the
+ * middle. Gestures start on empty canvas, never on a card or a wire.
  */
 export async function showPair(page: Page, aId: string, bId: string, type: string) {
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const drawn = await drawnRelationship(page, aId, bId, type, { seen: true });
+  for (let attempt = 0; attempt < 4; attempt++) {
+    if ((await drawnRelationship(page, aId, bId, type, { seen: true })).seen?.arrow) return;
     const k = await zoomOf(page);
-    if (drawn.seen?.arrow || k >= 0.9) return;
-    const spot = await page.evaluate(({ aId, bId }) => {
+    const at = await page.evaluate(({ aId, bId }) => {
       const id = (end: any) => end?.id ?? end;
-      const wire = (Array.from(document.querySelectorAll('.graph-container svg path.edge')) as any[]).find(el => {
+      const ofPair = (selector: string) => (Array.from(document.querySelectorAll(`.graph-container svg ${selector}`)) as any[]).find(el => {
         const d = el.__data__; return d && [id(d.source), id(d.target)].sort().join() === [aId, bId].sort().join();
-      }) as SVGPathElement | undefined;
+      });
+      const arrow = ofPair('path.arrow') as SVGPathElement | undefined, wire = ofPair('path.edge') as SVGPathElement | undefined;
       const svg = document.querySelector('.graph-container svg') as SVGSVGElement | null;
       if (!svg) return null;
-      const box = svg.getBoundingClientRect();
-      let centre = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
-      if (wire) {
+      const view = svg.getBoundingClientRect();
+      // The arrow where it is drawn; the wire's middle when the arrow is not laid out.
+      const box = arrow?.getBoundingClientRect();
+      let tip = box && box.width + box.height > 0 ? { x: box.x + box.width / 2, y: box.y + box.height / 2 } : null;
+      if (!tip && wire) {
         const p = wire.getPointAtLength(wire.getTotalLength() / 2);
         const q = new DOMPoint(p.x, p.y).matrixTransform(wire.getScreenCTM()!);
-        centre = { x: q.x, y: q.y };
+        tip = { x: q.x, y: q.y };
       }
+      if (!tip) return null;
+      const middle = { x: view.x + view.width / 2, y: view.y + view.height / 2 };
       const empty = (x: number, y: number) => {
+        if (x < view.x + 40 || x > view.right - 40 || y < view.y + 40 || y > view.bottom - 40) return false;
         const hit = document.elementFromPoint(x, y);
-        return !!hit && svg.contains(hit) && !hit.closest('g.node, .edge, .edge-clickable, .edge-label-group, foreignObject, [data-local-item-card]');
+        return !!hit && svg.contains(hit) && !hit.closest('g.node, .edge, .edge-clickable, .edge-label-group, .arrow, foreignObject, [data-local-item-card]');
       };
-      for (const r of [0, 30, 60, 90, 120]) for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) {
-        const x = centre.x + dx * r, y = centre.y + dy * r;
-        if (x > box.x + 30 && x < box.right - 30 && y > box.y + 30 && y < box.bottom - 30 && empty(x, y)) return { x, y };
-      }
-      return null;
+      const near = (c: { x: number; y: number }) => {
+        for (let r = 0; r <= 180; r += 15) for (let a = 0; a < 16; a++) {
+          const x = c.x + r * Math.cos(a * Math.PI / 8), y = c.y + r * Math.sin(a * Math.PI / 8);
+          if (empty(x, y)) return { x, y };
+          if (r === 0) break;
+        }
+        return null;
+      };
+      const onScreen = tip.x > view.x + 40 && tip.x < view.right - 40 && tip.y > view.y + 40 && tip.y < view.bottom - 40;
+      return { tip, middle, onScreen, nearTip: near(tip), nearMiddle: near(middle) };
     }, { aId, bId });
-    if (!spot) return;
-    const factor = Math.min(3, 1 / k);
-    if (await isTouch(page)) {
-      const cdp = await page.context().newCDPSession(page);
-      await cdp.send('Input.synthesizePinchGesture', { x: spot.x, y: spot.y, scaleFactor: factor, gestureSourceType: 'touch' });
-      await cdp.detach();
+    if (!at) return;
+    const touch = await isTouch(page);
+    if (!at.onScreen) {
+      // Drag the canvas so the arrow comes to the middle.
+      const from = at.nearMiddle;
+      if (!from) return;
+      const to = { x: from.x + (at.middle.x - at.tip.x), y: from.y + (at.middle.y - at.tip.y) };
+      if (touch) {
+        const cdp = await page.context().newCDPSession(page);
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: from.x, y: from.y }] });
+        for (let step = 1; step <= 10; step++) {
+          await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: from.x + (to.x - from.x) * step / 10, y: from.y + (to.y - from.y) * step / 10 }] });
+        }
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+        await cdp.detach();
+      } else {
+        await page.mouse.move(from.x, from.y);
+        await page.mouse.down();
+        await page.mouse.move(to.x, to.y, { steps: 10 });
+        await page.mouse.up();
+      }
+    } else if (k < 0.75 && at.nearTip) {
+      // Zoom in around the arrow, so it stays on screen.
+      const factor = Math.min(3, 0.9 / k);
+      if (touch) {
+        const cdp = await page.context().newCDPSession(page);
+        await cdp.send('Input.synthesizePinchGesture', { x: at.nearTip.x, y: at.nearTip.y, scaleFactor: factor, gestureSourceType: 'touch' });
+        await cdp.detach();
+      } else {
+        await page.mouse.move(at.nearTip.x, at.nearTip.y);
+        await page.mouse.wheel(0, -Math.log2(factor) / 0.002);
+      }
     } else {
-      await page.mouse.move(spot.x, spot.y);
-      await page.mouse.wheel(0, -Math.log2(factor) / 0.002);
+      return;
     }
     await page.waitForTimeout(500);
   }

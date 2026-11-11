@@ -13,11 +13,11 @@ import { RELATIONSHIP_OPTIONS } from '../../../packages/web/src/constants/workIt
  * "Browse all relationships" on a phone). After every change it checks, with
  * the editor still open, the saved data (exactly one relationship between the
  * pair, with the expected direction, type and weight), the editor (still "Edit
- * relationship", the direction line, the pressed type) and the canvas (one
- * wire, its colour, label text and icon for the type, the arrow at the
- * target); then it closes the editor, zooms in if the arrow is not drawn at
- * this zoom, and checks that a person sees the wire in the type's colour and
- * the arrow at the target; then the relationship list's entry. Everything a
+ * relationship", the direction line, the pressed type) and, beside it on
+ * desktop and iPad, the canvas (one wire, its colour, label text and icon for
+ * the type, the arrow at the target); then it closes the editor, brings the
+ * arrow into view as a person would (zoom in, drag) and checks that the wire
+ * shows the type's colour and the arrow is seen at the target; then the relationship list's entry. Everything a
  * step shows is compared at once, so a failure lists all that is wrong. Run
  * with --repeat-each=N for a success rate per path and device.
  */
@@ -32,9 +32,14 @@ type Want = { source: Item; target: Item; type: string; weight: number };
 type Trial = { graphId?: string; a: Item; b: Item; edge: StoredEdge; from: Item; to: Item };
 
 async function setup(page: Page, run: string): Promise<Trial> {
-  const { graphId } = await enterWorkspace(page);
-  const a = await createItem(page, `Plan ${run}`);
-  const b = await createItem(page, `Do ${run}`);
+  let graphId: string | undefined, a: Item, b: Item;
+  try {
+    ({ graphId } = await enterWorkspace(page));
+    a = await createItem(page, `Plan ${run}`);
+    b = await createItem(page, `Do ${run}`);
+  } catch (error) {
+    throw new SetupError(`opening the workspace with two items failed: ${(error as Error).message.split('\n')[0]}`);
+  }
   try {
     await LINK_PATHS.find(p => p.id === 'inspector-connect')!.run(page, a, b);
     await expect.poll(async () => (await storedEdges(page, graphId)).filter(e => linked([e], a.id, b.id)).length, { timeout: 20000 }).toBe(1);
@@ -97,17 +102,19 @@ async function expectSeen(page: Page, t: Trial, want: Want, step: string, timeou
 async function expectStep(page: Page, t: Trial, want: Want, step: string): Promise<StoredEdge> {
   const label = typeInfo(want.type).label;
   let pair: StoredEdge[] = [];
+  // On a phone the editor fills the screen, so the canvas is checked once it is closed.
+  const canvasBeside = (page.viewportSize()?.width ?? 1440) >= 640;
   const wantOpen = {
     saved: [{ source: want.source.id, target: want.target.id, type: want.type, weight: want.weight }],
     editor: { line: `Editing relationship: ${want.source.title} → ${want.target.title}`, pressed: [label], editWindows: 1 },
-    canvas: drawnAs(want),
+    canvas: canvasBeside ? drawnAs(want) : 'covered by the editor',
   };
   const open = await settle(page, async () => {
     pair = (await storedEdges(page, t.graphId)).filter(e => linked([e], t.a.id, t.b.id));
     return {
       saved: pair.map(({ source, target, type, weight }) => ({ source, target, type, weight })),
       editor: await editorShows(page),
-      canvas: await drawnRelationship(page, t.a.id, t.b.id, want.type),
+      canvas: canvasBeside ? await drawnRelationship(page, t.a.id, t.b.id, want.type) : 'covered by the editor',
     };
   }, wantOpen, 15000);
   const wantClosed = { editWindows: 0, canvas: seenAs(want) };
