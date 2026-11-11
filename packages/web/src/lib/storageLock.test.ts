@@ -73,7 +73,7 @@ describe('the localStorage lock used without Web Locks', () => {
     expect(log).toEqual(['slow starts', 'slow ends', 'next starts']);
   });
 
-  it('takes over the lock of a tab that closed without releasing it, once it expires', async () => {
+  it('takes over the lock of a tab that closed, or froze and stopped renewing it, once it expires', async () => {
     const store = memoryStore();
     store.setItem('graphdone:lock:starter', JSON.stringify({ owner: 'closed tab', expiresAt: Date.now() + 15_000 }));
     let started = false;

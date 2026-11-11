@@ -11,12 +11,32 @@ export interface GraphRef {
 }
 
 export const projectDeleteMessage = (name: string, graphs: number) =>
-  `${name} holds ${graphs} graph${graphs === 1 ? '' : 's'}. Delete or move them first.`;
+  `${name} holds ${graphs} graph${graphs === 1 ? '' : 's'}. Delete them first.`;
 
 /** Why a project cannot be deleted yet, or null when nothing sits inside it. */
 export function projectDeleteBlock(graph: GraphRef, graphs: Array<Partial<GraphRef>>): string | null {
   const inside = graphs.filter(other => other.parentGraphId === graph.id).length;
   return inside ? projectDeleteMessage(graph.name, inside) : null;
+}
+
+/**
+ * The graph list as a tree. A graph whose parent is missing (deleted, or not
+ * visible to this user) is listed at the top instead of vanishing, and parents
+ * that loop back on themselves cannot hang the list or drop its graphs.
+ */
+export function graphTree<T extends { id: string; parentGraphId?: string | null }, R>(graphs: T[], node: (graph: T, children: R[]) => R): R[] {
+  const ids = new Set(graphs.map(graph => graph.id));
+  const hasParent = (graph: T) => !!graph.parentGraphId && graph.parentGraphId !== graph.id && ids.has(graph.parentGraphId);
+  const children = new Map<string, T[]>();
+  for (const graph of graphs.filter(hasParent)) children.set(graph.parentGraphId!, [...(children.get(graph.parentGraphId!) || []), graph]);
+  const placed = new Set<string>();
+  const build = (graph: T): R => {
+    placed.add(graph.id);
+    return node(graph, (children.get(graph.id) || []).filter(child => !placed.has(child.id)).map(build));
+  };
+  const roots = graphs.filter(graph => !hasParent(graph) && !placed.has(graph.id)).map(build);
+  for (const graph of graphs) if (!placed.has(graph.id)) roots.push(build(graph));
+  return roots;
 }
 
 /**

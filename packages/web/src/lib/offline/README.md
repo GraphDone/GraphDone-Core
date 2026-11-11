@@ -30,12 +30,14 @@ flowchart LR
 | [`store.ts`](store.ts) | IndexedDB `graphdone-offline` (one record per account) and a `BroadcastChannel` so open tabs see each other's writes. |
 | `link.test.ts`, `model.test.ts`, `engine.test.ts` | Vitest tests: the link answering GraphQL from a fixture account (including graphs inside projects and the whole starter workspace), merge rules (no lost edits, conflicts kept until a person chooses), and backup import keeping or rejecting a hierarchy. |
 
-Each graph is a project row. A guest's row also keeps `type` and `parent_id`
-(the project it sits in); the link shapes `parentGraphId`, `depth` and `path`
-from that chain, moves graphs without cycles, and will not delete a project
-that still has graphs. Rows without these fields read as top-level projects.
-Signed-in accounts stay flat: `/api/sync` has no parent column yet and would
-drop the hierarchy on the next sync (#277).
+Each graph is a project row. A guest's row also keeps `type`, `parent_id`
+(the project it sits in), `description` and `tags` (JSON text, like an item's);
+the link shapes `parentGraphId`, `depth` and `path` from that chain, moves
+graphs without cycles, and will not delete a project that still has graphs.
+Rows without these fields read as top-level projects with no description or
+tags. Signed-in accounts stay flat and keep only the name: `/api/sync` has no
+parent, description or tags column yet and would drop them on the next sync
+(#277).
 
 The `/api/sync` service is part of the hosted build, not of
 [`packages/server/`](../../../../server/README.md); in development Vite proxies

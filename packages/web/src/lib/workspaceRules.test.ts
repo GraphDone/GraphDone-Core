@@ -1,19 +1,47 @@
 import { describe, expect, it } from 'vitest';
-import { STARTER_MARKER_TTL_MS, exampleAction, exampleLimitMessage, missingStarterGraphs, parseStarterMarker, projectDeleteBlock, seenGraphCount, starterHierarchy, starterMayOpen, starterStep, systemLocked, type OwnGraph } from './workspaceRules';
+import { STARTER_MARKER_TTL_MS, exampleAction, exampleLimitMessage, graphTree, missingStarterGraphs, parseStarterMarker, projectDeleteBlock, seenGraphCount, starterHierarchy, starterMayOpen, starterStep, systemLocked, type OwnGraph } from './workspaceRules';
 
 describe('deleting a project', () => {
   const project = { id: 'p', name: 'Getting started', parentGraphId: null };
   const inside = (count: number) => Array.from({ length: count }, (_, i) => ({ id: `g${i}`, name: `Graph ${i}`, parentGraphId: 'p' }));
 
   it('is refused while graphs sit inside it, naming the project and how many', () => {
-    expect(projectDeleteBlock(project, [project, ...inside(4)])).toBe('Getting started holds 4 graphs. Delete or move them first.');
-    expect(projectDeleteBlock(project, [project, ...inside(1)])).toBe('Getting started holds 1 graph. Delete or move them first.');
+    expect(projectDeleteBlock(project, [project, ...inside(4)])).toBe('Getting started holds 4 graphs. Delete them first.');
+    expect(projectDeleteBlock(project, [project, ...inside(1)])).toBe('Getting started holds 1 graph. Delete them first.');
   });
 
   it('is allowed once nothing sits inside it', () => {
     expect(projectDeleteBlock(project, [project])).toBeNull();
     expect(projectDeleteBlock(project, [project, { id: 'x', name: 'Elsewhere', parentGraphId: 'other' }])).toBeNull();
     expect(projectDeleteBlock({ id: 'g0', name: 'Graph 0', parentGraphId: 'p' }, [project, ...inside(2)])).toBeNull();
+  });
+});
+
+describe('the graph list as a tree', () => {
+  type Named = { id: string; name: string; parentGraphId?: string | null };
+  type Node = { name: string; children: Node[] };
+  const tree = (graphs: Named[]) => graphTree(graphs, (graph, children: Node[]) => ({ name: graph.name, children }));
+  const g = (id: string, parentGraphId: string | null = null) => ({ id, name: id, parentGraphId });
+
+  it('nests each graph under its project', () => {
+    expect(tree([g('Getting started'), g('Welcome', 'Getting started'), g('Home'), g('Move house', 'Home')])).toEqual([
+      { name: 'Getting started', children: [{ name: 'Welcome', children: [] }] },
+      { name: 'Home', children: [{ name: 'Move house', children: [] }] },
+    ]);
+  });
+
+  it('lists a graph whose project is gone or unknown at the top instead of dropping it', () => {
+    expect(tree([g('Home'), g('Orphan', 'deleted project'), g('Child of orphan', 'Orphan')])).toEqual([
+      { name: 'Home', children: [] },
+      { name: 'Orphan', children: [{ name: 'Child of orphan', children: [] }] },
+    ]);
+    expect(tree([{ id: 'x', name: 'Own parent', parentGraphId: 'x' }])).toEqual([{ name: 'Own parent', children: [] }]);
+  });
+
+  it('keeps every graph of a parent loop, once each', () => {
+    const listed = tree([g('A', 'B'), g('B', 'A'), g('C')]);
+    const names = (nodes: Node[]): string[] => nodes.flatMap(node => [node.name, ...names(node.children)]);
+    expect(names(listed).sort()).toEqual(['A', 'B', 'C']);
   });
 });
 
