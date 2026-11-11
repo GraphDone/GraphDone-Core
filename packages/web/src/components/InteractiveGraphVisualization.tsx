@@ -4284,8 +4284,11 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const organizationFocusRef = useRef<string>();
   // Organize or the hierarchical layout on a graph of at most
   // WHOLE_FIT_MAX_CARDS: frame the whole graph down to the zoom where card
-  // titles and relationship labels still show (no phone floor).
-  const wholeGraphFitRef = useRef(false);
+  // titles and relationship labels still show (no phone floor). When even
+  // that is too small, Organize stays centred if the graph nearly fits and
+  // frames the busiest card's neighbourhood otherwise; the hierarchical
+  // layout shows its top rows (prerequisites first).
+  const wholeGraphFitRef = useRef<false | 'centre' | 'top'>(false);
   useEffect(() => {
     organizationZoomFloorRef.current = 0;
     organizationFocusRef.current = undefined;
@@ -4332,6 +4335,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     const phoneFloor = window.matchMedia(COMPACT_WORKSPACE_QUERY).matches && cards.length < 40 && !localItemActiveRef.current && !wholeGraphFitRef.current
       && PHONE_READABLE_SCALE > Math.max(scale, minimumScale);
     if (phoneFloor) minimumScale = PHONE_READABLE_SCALE;
+    // A small graph that nearly fits stays centred whole rather than on its hub.
+    const nearlyWhole = !!wholeGraphFitRef.current && scale >= 0.8 * minimumScale;
     if (minimumScale > scale) {
       // A freshly organized graph keeps a readable floor instead of shrinking
       // every card to fit: stay centred on the same cards at that scale.
@@ -4340,10 +4345,15 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       scale = minimumScale;
       translateX = fit.region.x + fit.region.width / 2 - centerX * scale;
       translateY = fit.region.y + fit.region.height / 2 - centerY * scale;
+      if (wholeGraphFitRef.current === 'top') {
+        const top = Math.min(...cards.map(node => node.y - getNodeDimensionsAt(node, scale).height / 2));
+        translateY = fit.region.y + 16 - top * scale;
+      }
     }
     const focus = (organizationFocusRef.current && cards.find(node => node.id === organizationFocusRef.current))
       || (phoneFloor ? [...cards].sort((a, b) => ((b as WorkItem).priority ?? 0) - ((a as WorkItem).priority ?? 0))[0] : undefined);
-    if (minimumScale > 0 && focus) {
+    // A hierarchy too tall for the screen keeps its top rows in view instead.
+    if (minimumScale > 0 && focus && wholeGraphFitRef.current !== 'top' && !nearlyWhole) {
       const at = frameOrganizedNeighborhood(
         cards.map(node => ({ id: node.id, x: node.x, y: node.y, ...getNodeDimensionsAt(node, scale) })),
         focus.id,
@@ -4622,7 +4632,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     forgetLabelSpots(validatedEdges as any[]);
     (window as any).__graphOrganization = {components:arranged.components,work:arranged.work};
     organizationZoomFloorRef.current = floor;
-    wholeGraphFitRef.current = whole;
+    wholeGraphFitRef.current = whole && 'centre';
     organizationFocusRef.current = arranged.components[0]?.focus;
     cameraManuallyPositionedRef.current = true;
     if (currentGraphIdRef.current) fittedGraphsRef.current.add(currentGraphIdRef.current);
@@ -4653,7 +4663,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     const simNodes = sim.nodes() as any[];
     if (isHierarchicalLayout(mode)) {
       if (simNodes.length <= WHOLE_FIT_MAX_CARDS) {
-        wholeGraphFitRef.current = true;
+        wholeGraphFitRef.current = 'top';
         organizationZoomFloorRef.current = Math.max(organizationZoomFloorRef.current, SMALL_GRAPH_ZOOM_FLOOR);
       }
       const { positions } = hierarchyWithLabelRoom(simNodes, validatedEdges as any[],

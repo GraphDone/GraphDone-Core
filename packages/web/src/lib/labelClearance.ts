@@ -37,7 +37,7 @@ import {
   type OrganizationNode,
 } from './topologyOrganization';
 import { computeCompactLayout } from './layoutAlgorithms';
-import { CARD_TITLES_HIDE_BELOW, CARD_TITLES_SHOW_ABOVE } from './cardTitleZoom';
+import { CARD_TITLES_HIDE_BELOW } from './cardTitleZoom';
 
 type Point = { x: number; y: number };
 type Size = { width: number; height: number };
@@ -50,12 +50,14 @@ export const LABEL_MIN_ZOOM = CARD_TITLES_HIDE_BELOW;
 export const ORGANIZED_ZOOM_FLOOR = 0.65;
 /**
  * Up to this many cards, Organize and the hierarchical layout frame the whole
- * graph, down to SMALL_GRAPH_ZOOM_FLOOR (where card titles and labels still
- * show), with room for each label at that zoom. Larger graphs keep
+ * graph, down to SMALL_GRAPH_ZOOM_FLOOR (the smallest zoom where card titles
+ * and labels still show), with room for each label at that zoom. Below it the
+ * camera holds that zoom on the organized hub's neighbourhood or the top rows
+ * of the hierarchy. Larger graphs keep
  * ORGANIZED_ZOOM_FLOOR and open on a neighbourhood or the overview.
  */
 export const WHOLE_FIT_MAX_CARDS = 60;
-export const SMALL_GRAPH_ZOOM_FLOOR = CARD_TITLES_SHOW_ABOVE;
+export const SMALL_GRAPH_ZOOM_FLOOR = CARD_TITLES_HIDE_BELOW;
 const ARROW_LENGTH = 16;
 
 /** How much bigger than its drawn size a label is in graph units at `zoom`. */
