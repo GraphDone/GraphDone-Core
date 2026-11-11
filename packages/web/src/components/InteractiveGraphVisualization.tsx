@@ -1537,7 +1537,14 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     const zoom = zoomBehaviorRef.current;
     if (zoom && Math.abs(zoom.scaleExtent()[0] - minScale) > 1e-6) zoom.scaleExtent([minScale, zoom.scaleExtent()[1]]);
   }, []);
-  const openZoomGraph = useCallback((graphId: string) => { void descendInto(graphId); }, [descendInto]);
+  // Until this time, wheel events are the tail of the gesture that opened a
+  // graph from the zoom-out view, not the person placing the new graph's camera.
+  const zoomSwitchUntilRef = useRef(0);
+  const openZoomGraph = useCallback((graphId: string) => {
+    zoomSwitchUntilRef.current = performance.now() + 1000;
+    fittedGraphsRef.current.delete(graphId);
+    void descendInto(graphId);
+  }, [descendInto]);
   // A project folder (a graph holding other graphs) with no items of its own
   // opens on its graphs instead of an empty canvas.
   const projectGraphs = useMemo(
@@ -1976,12 +1983,14 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // Create or reuse background for capturing clicks  
     let background = g.select('rect.background');
     if (background.empty()) {
+      // Large enough to stay under the whole screen at the furthest zoom-out
+      // (the zoom-out view can go well below 0.1 when there are projects).
       background = g.append('rect')
         .attr('class', 'background')
-        .attr('x', -10000)
-        .attr('y', -10000)
-        .attr('width', 20000)
-        .attr('height', 20000)
+        .attr('x', -1000000)
+        .attr('y', -1000000)
+        .attr('width', 2000000)
+        .attr('height', 2000000)
         .attr('fill', 'transparent')
         .style('cursor', 'default') as any;
     }
@@ -4017,7 +4026,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       // D3 sets sourceEvent only for direct wheel/pointer gestures. Programmatic
       // fit/restore transforms must remain distinguishable so an automatic fit
       // that later clips a restored task can be repaired on reload.
-      if (event.sourceEvent) {
+      // The rest of a wheel gesture that just opened a graph (zoom-out view)
+      // must not mark the new graph as placed, or it would skip its fit.
+      const switching = performance.now() < zoomSwitchUntilRef.current;
+      if (event.sourceEvent && !switching) {
         cameraManuallyPositionedRef.current = true;
         if (currentGraphIdRef.current) fittedGraphsRef.current.add(currentGraphIdRef.current);
       }
@@ -4034,7 +4046,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       // reload and isn't reset on the next visit. localStorage only — no D1 chatter.
       {
         const gid = currentGraphIdRef.current;
-        if (gid) {
+        if (gid && !switching) {
           // Stamp the viewport size with the camera so a later restore can tell
           // the window was resized materially (rotate / maximize) and re-fit
           // instead of applying a transform framed for a different size.
