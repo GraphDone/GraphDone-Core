@@ -45,7 +45,7 @@ function welcomeAsToday(hierarchy: boolean) {
 describe('starter workspace definition', () => {
   it('has 2 projects and 5 graphs, each graph inside a project', () => {
     const plan = full();
-    expect(plan.projects.map(project => project.name)).toEqual(['Getting started', 'Personal']);
+    expect(plan.projects.map(project => project.name)).toEqual(['Getting started', 'Home']);
     expect(plan.graphs.map(graph => graph.name)).toEqual(['Welcome', 'Plan a launch', 'Fix bugs', 'Ideas', 'Move house']);
     const projects = new Map(plan.projects.map(project => [project.key, project.name]));
     for (const graph of plan.graphs) {
@@ -54,7 +54,7 @@ describe('starter workspace definition', () => {
     }
     expect(plan.graphs.filter(graph => projects.get(graph.project!) === 'Getting started').map(graph => graph.name))
       .toEqual(['Welcome', 'Plan a launch', 'Fix bugs', 'Ideas']);
-    expect(plan.graphs.filter(graph => projects.get(graph.project!) === 'Personal').map(graph => graph.name)).toEqual(['Move house']);
+    expect(plan.graphs.filter(graph => projects.get(graph.project!) === 'Home').map(graph => graph.name)).toEqual(['Move house']);
     expect(plan.opensFirst).toBe('welcome');
     expect(starterGraphCount(plan)).toBe(7);
     expect(new Set([...plan.projects, ...plan.graphs].map(entry => entry.key)).size).toBe(7);
@@ -148,10 +148,10 @@ describe('starter workspace definition', () => {
   });
 
   it('renames a top-level name that is already taken', () => {
-    expect(uniqueName('Personal', [])).toBe('Personal');
-    expect(uniqueName('Personal', ['Personal', 'Personal (2)'])).toBe('Personal (3)');
+    expect(uniqueName('Home', [])).toBe('Home');
+    expect(uniqueName('Home', ['Home', 'Home (2)'])).toBe('Home (3)');
     const again = buildStarterWorkspace({ hierarchy: true, takenNames: ['Getting started', 'Welcome', 'Fix bugs'] });
-    expect(again.projects.map(project => project.name)).toEqual(['Getting started (2)', 'Personal']);
+    expect(again.projects.map(project => project.name)).toEqual(['Getting started (2)', 'Home']);
     expect(again.graphs.map(graph => graph.name)).toEqual(['Welcome', 'Plan a launch', 'Fix bugs', 'Ideas', 'Move house']);
     expect(buildStarterWorkspace({ hierarchy: false, takenNames: ['Welcome'] }).graphs[0].name).toBe('Welcome (2)');
   });
@@ -215,7 +215,7 @@ describe('creating the starter workspace', () => {
     const created = await createStarterWorkspace(plan, backend.api);
 
     expect(backend.log.slice(0, 6)).toEqual([
-      'graphs Getting started, Personal',
+      'graphs Getting started, Home',
       'graphs Welcome, Plan a launch, Fix bugs, Ideas, Move house',
       'items Welcome', 'edges Welcome', 'counts Welcome', 'opened Welcome',
     ]);

@@ -1,6 +1,6 @@
 /**
  * The example content of a new workspace (#277). `hierarchy: true` gives two
- * projects (Getting started: Welcome, Plan a launch, Fix bugs, Ideas; Personal:
+ * projects (Getting started: Welcome, Plan a launch, Fix bugs, Ideas; Home:
  * Move house); `hierarchy: false` gives today's single top-level Welcome graph.
  * Ids come from the backend at creation, never from this definition.
  */
@@ -187,7 +187,7 @@ const IDEAS: Omit<StarterGraph, 'project' | 'type'> = {
 const MOVE_HOUSE: Omit<StarterGraph, 'project' | 'type'> = {
   key: 'move-house',
   name: 'Move house',
-  description: 'An example personal plan for moving to a new home.',
+  description: 'An example plan for moving to a new home.',
   tags: ['example'],
   items: [
     item('movers', 'Book the movers', 'TASK', 'COMPLETED', 0.8, -340, -90,
@@ -218,9 +218,9 @@ const PROJECTS: StarterProject[] = [
     tags: ['example'],
   },
   {
-    key: 'personal',
-    name: 'Personal',
-    description: 'An example personal project, so you can see two projects side by side.',
+    key: 'home',
+    name: 'Home',
+    description: 'An example project for life at home, so you can see two projects side by side.',
     tags: ['example'],
   },
 ];
@@ -230,7 +230,7 @@ const IN_PROJECTS: Array<[string, Omit<StarterGraph, 'project' | 'type'>]> = [
   ['getting-started', PLAN_A_LAUNCH],
   ['getting-started', FIX_BUGS],
   ['getting-started', IDEAS],
-  ['personal', MOVE_HOUSE],
+  ['home', MOVE_HOUSE],
 ];
 
 export function uniqueName(name: string, taken: Iterable<string>): string {
