@@ -217,6 +217,74 @@ export const CREATE_GRAPH = gql`
   }
 `;
 
+export const CREATE_STARTER_GRAPHS = gql`
+  mutation CreateStarterGraphs($input: [GraphCreateInput!]!) {
+    createGraphs(input: $input) {
+      graphs {
+        id
+        name
+        type
+        parentGraphId
+        depth
+        path
+      }
+    }
+  }
+`;
+
+// The example workspace's own reads and writes (#277): small fixed shapes the
+// database plans once, so writing the example never slows the user's own reads.
+export const STARTER_OWN_GRAPHS = gql`
+  query StarterOwnGraphs($userId: String!) {
+    graphs(where: { createdBy: $userId }) {
+      id
+      name
+      type
+      parentGraphId
+      createdAt
+      tags
+    }
+  }
+`;
+
+export const STARTER_CONTENT = gql`
+  query StarterContent($items: WorkItemWhere, $edges: EdgeWhere) {
+    workItems(where: $items) {
+      id
+      title
+    }
+    edges(where: $edges) {
+      type
+      source {
+        id
+      }
+      target {
+        id
+      }
+    }
+  }
+`;
+
+export const CREATE_STARTER_ITEMS = gql`
+  mutation CreateStarterItems($input: [WorkItemCreateInput!]!) {
+    createWorkItems(input: $input) {
+      workItems {
+        id
+      }
+    }
+  }
+`;
+
+export const CREATE_STARTER_EDGES = gql`
+  mutation CreateStarterEdges($input: [EdgeCreateInput!]!) {
+    createEdges(input: $input) {
+      edges {
+        id
+      }
+    }
+  }
+`;
+
 export const UPDATE_GRAPH = gql`
   mutation UpdateGraph($id: ID!, $input: GraphUpdateInput!) {
     updateGraphs(where: { id: $id }, update: $input) {

@@ -34,6 +34,9 @@ export const SEQUENCES = {
     'tests/e2e/quality/visual-style.spec.ts',
     `--project=${PW}`, '--headed', '--workers=1', '--retries=0', '--trace=retain-on-failure',
   ], blocking: true },
+  'example-resume': { adapter: 'playwright', title: 'Example project finished at the next sign-in', args: [
+    'tests/e2e/quality/example-resume.spec.ts', `--project=${PW}`, '--workers=1', '--retries=0', '--trace=retain-on-failure',
+  ], blocking: true },
   'agent-connection': { adapter: 'playwright', title: 'Agent connection and handoff acceptance', args: [
     'tests/e2e/quality/agent-collaboration.spec.ts', `--project=${PW}`, '--headed', '--workers=1', '--retries=0', '--trace=retain-on-failure',
   ], blocking: true },

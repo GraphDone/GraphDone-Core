@@ -5,14 +5,20 @@ import { AlertTriangle, CheckCircle, WORK_ITEM_TYPES } from '../constants/workIt
 import { useGraph } from '../contexts/GraphContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { GET_WORK_ITEMS, GET_EDGES, DELETE_WORK_ITEM, DELETE_EDGE } from '../lib/queries';
+import { projectDeleteBlock } from '../lib/workspaceRules';
+import type { Graph } from '../types/graph';
 
 interface DeleteGraphModalProps {
   isOpen: boolean;
   onClose: () => void;
+  /** The graph to delete; the open graph when omitted. */
+  graph?: Graph | null;
 }
 
-export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
-  const { currentGraph, deleteGraph } = useGraph();
+export function DeleteGraphModal({ isOpen, onClose, graph }: DeleteGraphModalProps) {
+  const { currentGraph, availableGraphs, deleteGraph } = useGraph();
+  const targetGraph = graph ?? currentGraph;
+  const blocked = targetGraph ? projectDeleteBlock(targetGraph, availableGraphs) : null;
   const { showSuccess, showError } = useNotifications();
   const [loading, setLoading] = useState(false);
   const [confirmText, setConfirmText] = useState('');
@@ -23,30 +29,30 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
 
   // Query to get the nodes in the graph
   const { data: nodesData, loading: loadingNodes, error: nodesError } = useQuery(GET_WORK_ITEMS, {
-    variables: currentGraph ? {
+    variables: targetGraph ? {
       where: {
         graph: {
-          id: currentGraph.id
+          id: targetGraph.id
         }
       }
     } : undefined,
-    skip: !isOpen || !currentGraph,
+    skip: !isOpen || !targetGraph || !!blocked,
     fetchPolicy: 'network-only',
     notifyOnNetworkStatusChange: true,
   });
 
   // Query to get all edges for connection information
   const { data: edgesData, loading: loadingEdges, error: edgesError } = useQuery(GET_EDGES, {
-    variables: currentGraph ? {
+    variables: targetGraph ? {
       where: {
         source: {
           graph: {
-            id: currentGraph.id
+            id: targetGraph.id
           }
         }
       }
     } : undefined,
-    skip: !isOpen || !currentGraph,
+    skip: !isOpen || !targetGraph || !!blocked,
     fetchPolicy: 'network-only',
     notifyOnNetworkStatusChange: true,
   });
@@ -69,21 +75,21 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
     refetchQueries: [
       { 
         query: GET_WORK_ITEMS,
-        variables: currentGraph ? {
+        variables: targetGraph ? {
           where: {
             graph: {
-              id: currentGraph.id
+              id: targetGraph.id
             }
           }
         } : undefined
       },
       {
         query: GET_EDGES,
-        variables: currentGraph ? {
+        variables: targetGraph ? {
           where: {
             source: {
               graph: {
-                id: currentGraph.id
+                id: targetGraph.id
               }
             }
           }
@@ -99,11 +105,11 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
       'GetEdges', 'GetWorkItems',
       {
         query: GET_EDGES,
-        variables: currentGraph ? {
+        variables: targetGraph ? {
           where: {
             source: {
               graph: {
-                id: currentGraph.id
+                id: targetGraph.id
               }
             }
           }
@@ -121,7 +127,7 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
       setConfirmDeletion(false);
       setShowBulkDeleteConfirm(false);
     }
-  }, [isOpen, currentGraph?.id]);
+  }, [isOpen, targetGraph?.id]);
 
   const handleDeleteNode = async (nodeId: string, nodeTitle: string) => {
     if (!inspectionReady || nodeConnections[nodeId]?.length) return;
@@ -195,18 +201,18 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
     }
   };
 
-  if (!isOpen || !currentGraph) return null;
+  if (!isOpen || !targetGraph) return null;
 
-  const isConfirmValid = confirmText === currentGraph.name;
+  const isConfirmValid = confirmText === targetGraph.name;
 
   const handleDelete = async () => {
     if (!inspectionReady || !isConfirmValid) return;
     
     setLoading(true);
-    const graphName = currentGraph.name; // Store name before deletion
+    const graphName = targetGraph.name; // Store name before deletion
     
     try {
-      await deleteGraph(currentGraph.id);
+      await deleteGraph(targetGraph.id);
       
       // Show success notification
       showSuccess(
@@ -271,6 +277,22 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
               }}></div>
             </div>
             
+            {blocked && (
+              <div className="py-8 relative z-10 text-center">
+                <div className="flex items-center justify-center w-16 h-16 bg-orange-900/20 rounded-full mx-auto mb-4">
+                  <AlertTriangle className="h-8 w-8 text-orange-400" />
+                </div>
+                <h4 className="text-xl font-semibold text-orange-200 mb-2">This project still holds graphs</h4>
+                <p role="alert" className="text-gray-300 mb-6">{blocked}</p>
+                <button
+                  onClick={onClose}
+                  className="px-6 py-3 text-gray-300 bg-gradient-to-r from-gray-700/80 to-gray-600/80 rounded-xl hover:from-gray-600/80 hover:to-gray-500/80 transition-all duration-300 border border-gray-500/30 hover:text-white font-medium"
+                >
+                  Close
+                </button>
+              </div>
+            )}
+
             {/* Loading state */}
             {(loadingNodes || loadingEdges) && (
               <div className="py-12 relative z-10">
@@ -280,7 +302,7 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
                 <p className="text-center text-gray-400 mt-4 font-medium">Analyzing graph structure...</p>
               </div>
             )}
-            {!loadingNodes && !loadingEdges && !inspectionReady && (
+            {!blocked && !loadingNodes && !loadingEdges && !inspectionReady && (
               <p role="alert" className="py-6 relative z-10 text-red-200">
                 Deletion is unavailable because the current tasks and connections could not be verified. Close this dialog and try again after reconnecting.
               </p>
@@ -297,7 +319,7 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
                   Graph Contains Active Work Items
                 </h4>
                 <p className="text-gray-300 text-center mb-8">
-                  Cannot delete <strong className="text-white">"{currentGraph.name}"</strong> while it contains work items
+                  Cannot delete <strong className="text-white">"{targetGraph.name}"</strong> while it contains work items
                 </p>
               </div>
 
@@ -383,7 +405,7 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
                                     const result = await deleteWorkItem({
                                       variables: { 
                                         where: { 
-                                          graph: { id: currentGraph.id },
+                                          graph: { id: targetGraph.id },
                                           id_IN: nodeIds
                                         }
                                       },
@@ -396,7 +418,7 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
                                     // Single success notification for bulk operation
                                     showSuccess(
                                       'Work Items Deletion Completed Successfully!',
-                                      `Removed ${unconnectedNodeCount} work item${unconnectedNodeCount !== 1 ? 's' : ''} from ${currentGraph.name}.`
+                                      `Removed ${unconnectedNodeCount} work item${unconnectedNodeCount !== 1 ? 's' : ''} from ${targetGraph.name}.`
                                     );
                                     
                                   } catch (error) {
@@ -576,7 +598,7 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
                   Delete Empty Graph
                 </h4>
                 <p className="text-gray-300 text-center mb-6">
-                  You are about to permanently delete the empty graph <strong className="text-white">"{currentGraph.name}"</strong>
+                  You are about to permanently delete the empty graph <strong className="text-white">"{targetGraph.name}"</strong>
                 </p>
                 
                 {/* Confirmation that graph is empty */}
@@ -648,7 +670,7 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
                     className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-red-600 focus:ring-red-500 border-gray-600 rounded bg-gray-700 cursor-pointer"
                   />
                   <span className="text-gray-300 text-xs leading-relaxed">
-                    I confirm that I want to delete the empty graph "{currentGraph.name}"
+                    I confirm that I want to delete the empty graph "{targetGraph.name}"
                   </span>
                 </label>
               </div>
@@ -710,7 +732,7 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
                   <span className="text-red-200 font-semibold">IRREVERSIBLE ACTION</span>
                 </div>
                 <p className="text-red-300 text-center text-sm">
-                  Once you click "Delete Forever", the graph "{currentGraph.name}" and all its data will be permanently destroyed.
+                  Once you click "Delete Forever", the graph "{targetGraph.name}" and all its data will be permanently destroyed.
                 </p>
               </div>
 
@@ -721,7 +743,7 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
                 </label>
                 <div className="text-center mb-3">
                   <span className="text-white font-mono bg-gray-700 px-3 py-1 rounded text-sm">
-                    {currentGraph.name}
+                    {targetGraph.name}
                   </span>
                 </div>
                 <input
@@ -732,7 +754,7 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
                   placeholder="Type the graph name here"
                   autoFocus
                 />
-                {confirmText && confirmText !== currentGraph.name && (
+                {confirmText && confirmText !== targetGraph.name && (
                   <p className="text-red-400 text-xs mt-1 text-center">Graph name doesn't match</p>
                 )}
                 {isConfirmValid && (

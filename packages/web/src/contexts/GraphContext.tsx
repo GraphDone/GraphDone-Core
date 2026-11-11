@@ -6,14 +6,77 @@ import {
   GET_GRAPHS,
   GET_GRAPHS_BY_USER,
   CREATE_GRAPH,
+  CREATE_STARTER_GRAPHS,
+  CREATE_STARTER_ITEMS,
+  CREATE_STARTER_EDGES,
+  STARTER_CONTENT,
+  STARTER_OWN_GRAPHS,
   UPDATE_GRAPH,
   DELETE_GRAPH
 } from '../graphql/graph';
 import { GET_WORK_ITEMS, DELETE_WORK_ITEM, CREATE_WORK_ITEM, CREATE_EDGE } from '../lib/queries';
+import { awaitExampleIdle, buildStarterWorkspace, createStarterWorkspace, isExamplePending, starterGraphCount, type StarterApi, type StarterJournal } from '../lib/starterWorkspace';
+import { offlineEnabled, localGuest } from '../lib/offline/engine';
+import { OFFLINE_PROJECT_LIMIT } from '../lib/offline/model';
+import { withStorageLock } from '../lib/storageLock';
+import { exampleLimitMessage, parseStarterMarker, projectDeleteBlock, seenGraphCount, starterHierarchy, starterMayOpen, starterStep, type StarterMarker } from '../lib/workspaceRules';
 
 const GraphContext = createContext<GraphContextType | undefined>(undefined);
 
 // Using only real GraphQL data from Neo4j database
+
+const hierarchyHere = () => starterHierarchy({ offline: offlineEnabled, guest: localGuest() });
+// A server write sent just before a reload can still land afterwards; a resume
+// waits up to this long after it was sent. Browser-local writes never land late.
+const STARTER_WRITE_LIMIT_MS = 30000;
+// The example waits for the user's own view to load before each write, for at most this long in all.
+const STARTER_YIELD_LIMIT_MS = 20000;
+const starterPendingKey = (userId: string) => `graphdone:starter-pending:${userId}`;
+const readStarterPending = (userId: string): StarterMarker | null => {
+  const raw = localStorage.getItem(starterPendingKey(userId));
+  const marker = parseStarterMarker(raw, Date.now());
+  if (raw && !marker) localStorage.removeItem(starterPendingKey(userId));
+  return marker;
+};
+const saveStarterMarker = (userId: string, marker: StarterMarker) =>
+  localStorage.setItem(starterPendingKey(userId), JSON.stringify(marker));
+const starterJournal = (userId: string, marker: StarterMarker): StarterJournal => {
+  const update = (change: (inflight: StarterMarker['inflight']) => StarterMarker['inflight']) => {
+    const current = parseStarterMarker(localStorage.getItem(starterPendingKey(userId))) ?? marker;
+    saveStarterMarker(userId, { ...current, inflight: change(current.inflight) });
+  };
+  return {
+    begin: write => update(inflight => [...inflight, write]),
+    end: id => update(inflight => inflight.filter(write => write.id !== id))
+  };
+};
+
+function parseGraph(g: any): Graph {
+  return {
+    ...g,
+    settings: g.settings ? JSON.parse(g.settings) : {
+      theme: 'light',
+      layout: 'force',
+      showPriorities: true,
+      showDependencies: true,
+      autoLayout: true,
+      zoomLevel: 1.0
+    },
+    permissions: g.permissions ? JSON.parse(g.permissions) : {
+      owner: g.createdBy || 'unknown',
+      admins: g.createdBy ? [g.createdBy] : [],
+      editors: [],
+      viewers: [],
+      teamPermission: 'VIEW'
+    },
+    shareSettings: g.shareSettings ? JSON.parse(g.shareSettings) : {
+      isPublic: false,
+      allowTeamAccess: true,
+      allowCopying: false,
+      allowForking: false
+    },
+  };
+}
 
 interface GraphProviderProps {
   children: ReactNode;
@@ -26,6 +89,12 @@ export function GraphProvider({ children }: GraphProviderProps) {
   const [availableGraphs, setAvailableGraphs] = useState<Graph[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const isCreatingWelcomeGraphRef = useRef(false);
+  const isAddingExampleRef = useRef(false);
+  const currentUserIdRef = useRef<string | undefined>(currentUser?.id);
+  currentUserIdRef.current = currentUser?.id;
+  const currentGraphRef = useRef<Graph | null>(currentGraph);
+  currentGraphRef.current = currentGraph;
+  const pickedGraphRef = useRef(false);
 
 
   // GraphQL operations - Load graphs for current user only
@@ -36,11 +105,191 @@ export function GraphProvider({ children }: GraphProviderProps) {
   
 
   const [createGraphMutation] = useMutation(CREATE_GRAPH);
+  const [createStarterGraphsMutation] = useMutation(CREATE_STARTER_GRAPHS);
   const [updateGraphMutation] = useMutation(UPDATE_GRAPH);
   const [deleteGraphMutation] = useMutation(DELETE_GRAPH);
   const [deleteWorkItemMutation] = useMutation(DELETE_WORK_ITEM);
   const [createWorkItemMutation] = useMutation(CREATE_WORK_ITEM);
   const [createEdgeMutation] = useMutation(CREATE_EDGE);
+  const starterContent = async (graphId: string) => {
+    const { data } = await apolloClient.query({
+      query: STARTER_CONTENT,
+      variables: { items: { graph: { id: graphId } }, edges: { source: { graph: { id: graphId } } } },
+      fetchPolicy: 'no-cache'
+    });
+    return {
+      items: (data?.workItems || []).map((item: { id: string; title: string }) => ({ id: item.id, title: item.title })),
+      edges: (data?.edges || []).map((edge: { type: string; source?: { id: string }; target?: { id: string } }) => ({
+        sourceId: edge.source?.id || '',
+        targetId: edge.target?.id || '',
+        type: edge.type
+      }))
+    };
+  };
+
+  const viewLoading = () => [...apolloClient.getObservableQueries('active').values()].some(query => query.getCurrentResult().loading);
+  const yieldToView = () => {
+    let left = STARTER_YIELD_LIMIT_MS;
+    return async () => {
+      while (left > 0 && viewLoading()) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        left -= 100;
+      }
+    };
+  };
+
+  const starterApi = (userId: string, teamId: string): StarterApi => ({
+    createGraphs: async inputs => {
+      const { data } = await createStarterGraphsMutation({
+        variables: {
+          input: inputs.map(input => ({
+            ...input,
+            ...(input.parentGraphId && { parentGraph: { connect: { where: { node: { id: input.parentGraphId } } } } }),
+            status: 'ACTIVE',
+            teamId,
+            createdBy: userId,
+            defaultRole: 'USER',
+            isShared: false,
+            nodeCount: 0,
+            edgeCount: 0,
+            contributorCount: 1,
+            lastActivity: new Date().toISOString(),
+            permissions: JSON.stringify({
+              owner: userId,
+              admins: [userId],
+              editors: [],
+              viewers: [],
+              teamPermission: 'VIEW'
+            }),
+            shareSettings: JSON.stringify({
+              isPublic: false,
+              allowTeamAccess: true,
+              allowCopying: false,
+              allowForking: false
+            }),
+            settings: JSON.stringify({
+              theme: 'light',
+              layout: 'force',
+              showPriorities: true,
+              showDependencies: true,
+              autoLayout: true,
+              zoomLevel: 1.0
+            })
+          }))
+        }
+      });
+      return data?.createGraphs?.graphs || [];
+    },
+    createItems: async (graphId, items) => {
+      const { data } = await apolloClient.mutate({
+        mutation: CREATE_STARTER_ITEMS,
+        fetchPolicy: 'no-cache',
+        variables: {
+          input: items.map(item => ({
+            title: item.title,
+            description: item.description,
+            type: item.type,
+            status: item.status,
+            priority: item.priority,
+            positionX: item.x,
+            positionY: item.y,
+            positionZ: 0,
+            radius: 1.0,
+            theta: 0,
+            phi: 0,
+            priorityComp: item.priority,
+            tags: item.tags,
+            owner: { connect: { where: { node: { id: userId } } } },
+            graph: { connect: { where: { node: { id: graphId } } } }
+          }))
+        }
+      });
+      return (data?.createWorkItems?.workItems || []).map((workItem: { id: string }) => workItem.id);
+    },
+    createEdges: async edges => {
+      await apolloClient.mutate({
+        mutation: CREATE_STARTER_EDGES,
+        fetchPolicy: 'no-cache',
+        variables: {
+          input: edges.map(edge => ({
+            type: edge.type,
+            source: { connect: { where: { node: { id: edge.sourceId } } } },
+            target: { connect: { where: { node: { id: edge.targetId } } } }
+          }))
+        }
+      });
+    },
+    setCounts: async (graphId, { nodeCount, edgeCount, tags }) => {
+      await updateGraphMutation({
+        variables: { id: graphId, input: { nodeCount, edgeCount, lastActivity: new Date().toISOString(), ...(tags && { tags }) } }
+      });
+    },
+    ownGraphs: async () => {
+      const { data } = await apolloClient.query({ query: STARTER_OWN_GRAPHS, variables: { userId }, fetchPolicy: 'no-cache' });
+      return data?.graphs || [];
+    },
+    content: starterContent,
+    idle: yieldToView(),
+    filled: async graphId => {
+      if (currentGraphRef.current?.id === graphId) await apolloClient.refetchQueries({ include: ['GetWorkItems', 'GetEdges'] });
+    }
+  });
+
+  const writeStarter = async (userId: string, interrupted: StarterMarker | null) => {
+    const api = starterApi(userId, currentTeam?.id || 'team-1');
+    const resume = !!interrupted;
+    const marker = interrupted ?? { hierarchy: hierarchyHere(), startedAt: Date.now(), inflight: [] };
+    saveStarterMarker(userId, marker);
+    const plan = buildStarterWorkspace({ hierarchy: marker.hierarchy });
+    const created = await createStarterWorkspace(plan, {
+      ...api,
+      deleteGraph: async graphId => {
+        await deleteGraphMutation({ variables: { id: graphId } });
+      },
+      opened: async graphId => {
+        const { data } = await refetchGraphs();
+        const current = currentGraphRef.current;
+        const found = (data?.userGraphs || []).find((g: { id: string }) => g.id === graphId);
+        const graphs = [...(data?.userGraphs || []), ...(data?.sharedGraphs || []), ...(data?.systemGraphs || [])];
+        if (found && starterMayOpen({ picked: pickedGraphRef.current, current, stored: localStorage.getItem('currentGraphId'), graphs })) {
+          localStorage.setItem('currentGraphId', graphId);
+          setCurrentGraph(parseGraph(found));
+        } else if (current?.id === graphId) {
+          await apolloClient.refetchQueries({ include: ['GetWorkItems', 'GetEdges'] });
+        }
+      }
+    }, {
+      resume,
+      journal: starterJournal(userId, marker),
+      inflight: marker.inflight,
+      writeLimitMs: offlineEnabled ? 0 : STARTER_WRITE_LIMIT_MS,
+      pending: !offlineEnabled
+    });
+    localStorage.removeItem(starterPendingKey(userId));
+    console.log('✅ Starter workspace ready:', plan.projects.length, 'projects,', plan.graphs.length, 'graphs');
+    await refetchGraphs();
+    // An item/connection list for an example graph may have asked while it was still empty (#262).
+    if (Object.values(created.ids).includes(currentGraphRef.current?.id ?? '')) {
+      await apolloClient.refetchQueries({ include: ['GetWorkItems', 'GetEdges'] });
+    }
+  };
+
+  const startStarter = async (userId: string) => {
+    const run = async () => {
+      if (currentUserIdRef.current !== userId) return;
+      const { data } = await refetchGraphs();
+      const local = readStarterPending(userId);
+      const unfinished = !offlineEnabled && (data?.userGraphs || []).some(isExamplePending);
+      const step = starterStep({ graphsSeen: seenGraphCount(data), pending: !!local || unfinished });
+      if (step === 'create') await writeStarter(userId, null);
+      if (step !== 'finish') return;
+      // Started in another browser, which may still be writing it: finish it only once nothing changes.
+      if (!local && !(await awaitExampleIdle(starterApi(userId, currentTeam?.id || 'team-1'), STARTER_WRITE_LIMIT_MS))) return;
+      await writeStarter(userId, local ?? { hierarchy: true, startedAt: Date.now(), inflight: [] });
+    };
+    if (navigator.locks) await navigator.locks.request(`graphdone-starter:${userId}`, run);
+    else await withStorageLock(`starter:${userId}`, run, { store: localStorage });
+  };
 
   // Subscriptions for real-time updates (commented out until properly implemented)
   // useSubscription(GRAPH_CREATED, {
@@ -124,30 +373,7 @@ export function GraphProvider({ children }: GraphProviderProps) {
     // CASE 1: User has graphs - display them
     if (allGraphs.length > 0) {
       // Parse JSON strings in settings, permissions, shareSettings
-      const parsedGraphs = allGraphs.map((g: any) => ({
-        ...g,
-        settings: g.settings ? JSON.parse(g.settings) : {
-          theme: 'light',
-          layout: 'force',
-          showPriorities: true,
-          showDependencies: true,
-          autoLayout: true,
-          zoomLevel: 1.0
-        },
-        permissions: g.permissions ? JSON.parse(g.permissions) : {
-          owner: g.createdBy || 'unknown',
-          admins: g.createdBy ? [g.createdBy] : [],
-          editors: [],
-          viewers: [],
-          teamPermission: 'VIEW'
-        },
-        shareSettings: g.shareSettings ? JSON.parse(g.shareSettings) : {
-          isPublic: false,
-          allowTeamAccess: true,
-          allowCopying: false,
-          allowForking: false
-        },
-      }));
+      const parsedGraphs = allGraphs.map(parseGraph);
       setAvailableGraphs(parsedGraphs);
       
       // Try to restore previously selected graph from localStorage
@@ -173,6 +399,15 @@ export function GraphProvider({ children }: GraphProviderProps) {
           // Save to localStorage for persistence
           localStorage.setItem('currentGraphId', selectedGraph.id);
         }
+      }
+
+      // A reload, or a browser closed mid-write, interrupted the starter: finish it once per page load.
+      const unfinished = !offlineEnabled && userGraphs.some(isExamplePending);
+      if ((readStarterPending(currentUser.id) || unfinished) && !isCreatingWelcomeGraphRef.current) {
+        isCreatingWelcomeGraphRef.current = true;
+        startStarter(currentUser.id).catch(error => {
+          console.error('❌ Failed to finish the starter workspace:', error);
+        });
       }
     } else {
       // CASE 2: User has NO graphs - check if we should create a Welcome graph
@@ -207,197 +442,11 @@ export function GraphProvider({ children }: GraphProviderProps) {
         setAvailableGraphs([]);
         setCurrentGraph(null);
 
-        // Create Welcome graph automatically with tutorial content
-        const createWelcomeGraphWithTutorial = async () => {
-        console.log('📝 Starting Welcome graph creation process...');
-        try {
-          // Step 1: Create the Welcome graph
-          const welcomeGraphInput = {
-            name: 'Welcome',
-            description: 'A tutorial graph to help you understand GraphDone. Feel free to explore and experiment!',
-            type: 'PROJECT',
-            status: 'ACTIVE',
-            teamId: currentTeam?.id || 'team-1',
-            createdBy: currentUser.id,
-            tags: ['tutorial', 'welcome', 'getting-started'],
-            defaultRole: 'USER',
-            isShared: false
-          };
-
-          const graphInput = {
-            ...welcomeGraphInput,
-            parentGraphId: null,
-            depth: 0,
-            path: [],
-            nodeCount: 0,
-            edgeCount: 0,
-            contributorCount: 1,
-            lastActivity: new Date().toISOString(),
-            permissions: JSON.stringify({
-              owner: currentUser.id,
-              admins: [currentUser.id],
-              editors: [],
-              viewers: [],
-              teamPermission: 'VIEW'
-            }),
-            shareSettings: JSON.stringify({
-              isPublic: false,
-              allowTeamAccess: true,
-              allowCopying: false,
-              allowForking: false
-            }),
-            settings: JSON.stringify({
-              theme: 'light',
-              layout: 'force',
-              showPriorities: true,
-              showDependencies: true,
-              autoLayout: true,
-              zoomLevel: 1.0
-            })
-          };
-
-          const { data: graphData } = await createGraphMutation({
-            variables: { input: graphInput },
-            refetchQueries: [{ query: GET_GRAPHS_BY_USER, variables: { userId: currentUser.id } }],
-            awaitRefetchQueries: true
+        startStarter(currentUser.id)
+          .catch(error => {
+            console.error('❌ Failed to create the starter workspace:', error);
+            isCreatingWelcomeGraphRef.current = false; // Allow retry on next attempt
           });
-
-          if (!graphData?.createGraphs?.graphs?.[0]) {
-            throw new Error('Failed to create Welcome graph');
-          }
-
-          const welcomeGraph = graphData.createGraphs.graphs[0];
-
-          // Step 2: Create tutorial work items
-          const tutorialWorkItems = [
-            {
-              title: 'Welcome to GraphDone',
-              description: 'GraphDone helps you organize work through natural dependencies instead of rigid hierarchies. Start by exploring this tutorial graph.',
-              type: 'MILESTONE',
-              status: 'IN_PROGRESS',
-              priority: 0.9,
-              positionX: 0,
-              positionY: -100,
-              positionZ: 0,
-              radius: 1.0,
-              theta: 0,
-              phi: 0,
-              priorityComp: 0.9,
-              tags: ['tutorial', 'introduction'],
-              owner: { connect: { where: { node: { id: currentUser.id } } } },
-              graph: { connect: { where: { node: { id: welcomeGraph.id } } } }
-            },
-            {
-              title: 'Create your first work item',
-              description: 'Use the + button at the top to create a new work item. Try it now!',
-              type: 'TASK',
-              status: 'COMPLETED',
-              priority: 0.7,
-              positionX: -150,
-              positionY: 50,
-              positionZ: 0,
-              radius: 1.0,
-              theta: 0,
-              phi: 0,
-              priorityComp: 0.7,
-              tags: ['tutorial', 'basics'],
-              owner: { connect: { where: { node: { id: currentUser.id } } } },
-              graph: { connect: { where: { node: { id: welcomeGraph.id } } } }
-            },
-            {
-              title: 'Connect work items together',
-              description: 'Drag from one work item to another to create connections. This shows dependencies and relationships.',
-              type: 'TASK',
-              status: 'PLANNED',
-              priority: 0.6,
-              positionX: 150,
-              positionY: 50,
-              positionZ: 0,
-              radius: 1.0,
-              theta: 0,
-              phi: 0,
-              priorityComp: 0.6,
-              tags: ['tutorial', 'connections'],
-              owner: { connect: { where: { node: { id: currentUser.id } } } },
-              graph: { connect: { where: { node: { id: welcomeGraph.id } } } }
-            },
-            {
-              title: 'Explore different views',
-              description: 'Switch between Graph, Table, Kanban, Gantt, Calendar, and Card views using the buttons at the top.',
-              type: 'TASK',
-              status: 'PLANNED',
-              priority: 0.5,
-              positionX: 0,
-              positionY: 200,
-              positionZ: 0,
-              radius: 1.0,
-              theta: 0,
-              phi: 0,
-              priorityComp: 0.5,
-              tags: ['tutorial', 'views'],
-              owner: { connect: { where: { node: { id: currentUser.id } } } },
-              graph: { connect: { where: { node: { id: welcomeGraph.id } } } }
-            }
-          ];
-
-          console.log('📝 Creating tutorial work items...', tutorialWorkItems.length, 'items');
-          const { data: workItemsData } = await createWorkItemMutation({
-            variables: { input: tutorialWorkItems }
-          });
-          console.log('✅ Work items created:', workItemsData?.createWorkItems?.workItems?.length || 0);
-
-          // Step 3: Create connections between tutorial items
-          if (workItemsData?.createWorkItems?.workItems) {
-            const items = workItemsData.createWorkItems.workItems;
-            const edges = [
-              {
-                type: 'DEPENDS_ON',
-                source: { connect: { where: { node: { id: items[0].id } } } },
-                target: { connect: { where: { node: { id: items[1].id } } } }
-              },
-              {
-                type: 'DEPENDS_ON',
-                source: { connect: { where: { node: { id: items[1].id } } } },
-                target: { connect: { where: { node: { id: items[2].id } } } }
-              },
-              {
-                type: 'DEPENDS_ON',
-                source: { connect: { where: { node: { id: items[2].id } } } },
-                target: { connect: { where: { node: { id: items[3].id } } } }
-              }
-            ];
-
-            await createEdgeMutation({ variables: { input: edges } });
-            console.log('✅ Created 3 edges connecting tutorial items');
-          }
-
-          // Step 4: Update graph counts
-          await updateGraphMutation({
-            variables: {
-              id: welcomeGraph.id,
-              input: {
-                nodeCount: 4,
-                edgeCount: 3,
-                lastActivity: new Date().toISOString()
-              }
-            }
-          });
-          console.log('✅ Updated graph counts: 4 nodes, 3 edges');
-
-          console.log('✅ Welcome graph created with tutorial content:', welcomeGraph.name);
-
-          // Refetch graphs to show the new graph with updated counts, and every
-          // open item/connection list (List view, header counts) that already
-          // asked while the graph was still empty (#262).
-          await refetchGraphs();
-          await apolloClient.refetchQueries({ include: ['GetWorkItems', 'GetEdges'] });
-        } catch (error) {
-          console.error('❌ Failed to create Welcome graph:', error);
-          isCreatingWelcomeGraphRef.current = false; // Allow retry on next attempt
-        }
-      };
-
-        createWelcomeGraphWithTutorial();
       }
     }
   }, [
@@ -423,6 +472,7 @@ export function GraphProvider({ children }: GraphProviderProps) {
     try {
       const graph = availableGraphs.find(g => g.id === graphId);
       if (graph) {
+        pickedGraphRef.current = true;
         setCurrentGraph(graph);
         localStorage.setItem('currentGraphId', graphId);
       }
@@ -489,6 +539,7 @@ export function GraphProvider({ children }: GraphProviderProps) {
         
         // Manually refetch to ensure UI is in sync
         await refetchGraphs();
+        pickedGraphRef.current = true;
         setCurrentGraph(newGraph);
         localStorage.setItem('currentGraphId', newGraph.id);
         return newGraph;
@@ -519,6 +570,9 @@ export function GraphProvider({ children }: GraphProviderProps) {
         ...(updates.settings && { settings: JSON.stringify(updates.settings) }),
         ...(updates.permissions && { permissions: JSON.stringify(updates.permissions) }),
         ...(updates.shareSettings && { shareSettings: JSON.stringify(updates.shareSettings) }),
+        ...('parentGraphId' in updates && { parentGraphId: updates.parentGraphId ?? null }),
+        ...(updates.depth !== undefined && { depth: updates.depth }),
+        ...(updates.path !== undefined && { path: updates.path }),
       };
 
       const { data } = await updateGraphMutation({
@@ -549,6 +603,10 @@ export function GraphProvider({ children }: GraphProviderProps) {
 
   const deleteGraph = async (graphId: string): Promise<void> => {
     try {
+      const graph = availableGraphs.find(g => g.id === graphId);
+      const blocked = graph && projectDeleteBlock(graph, availableGraphs);
+      if (blocked) throw new Error(blocked);
+
       // First, check if the graph contains any nodes
       const { data: workItemsData } = await apolloClient.query({
         query: GET_WORK_ITEMS,
@@ -631,6 +689,12 @@ export function GraphProvider({ children }: GraphProviderProps) {
   const moveGraph = async (graphId: string, newParentId?: string): Promise<void> => {
     const graph = availableGraphs.find(g => g.id === graphId);
     if (!graph) throw new Error('Graph not found');
+    if (newParentId) {
+      if (!availableGraphs.some(g => g.id === newParentId)) throw new Error('Parent graph not found');
+      if (newParentId === graphId || getGraphPathIds(newParentId).includes(graphId)) {
+        throw new Error('A graph cannot be moved inside itself.');
+      }
+    }
 
     const newDepth = newParentId ? getGraphDepth(newParentId) + 1 : 0;
     const newPath = newParentId ? [...getGraphPathIds(newParentId), newParentId] : [];
@@ -640,6 +704,40 @@ export function GraphProvider({ children }: GraphProviderProps) {
       depth: newDepth,
       path: newPath
     });
+  };
+
+  const addExampleProject = async (): Promise<Graph> => {
+    if (!currentUser) throw new Error('Sign in to add the example project.');
+    if (isAddingExampleRef.current) throw new Error('The example project is already being added.');
+    const plan = buildStarterWorkspace({
+      hierarchy: hierarchyHere(),
+      takenNames: availableGraphs.map(g => g.name)
+    });
+    const full = exampleLimitMessage({ offline: offlineEnabled, hierarchy: plan.projects.length > 0, existing: availableGraphs.length, adds: starterGraphCount(plan), limit: OFFLINE_PROJECT_LIMIT });
+    if (full) throw new Error(full);
+    isAddingExampleRef.current = true;
+    setIsCreating(true);
+    try {
+      const opened: { graph: Graph | null } = { graph: null };
+      await createStarterWorkspace(plan, {
+        ...starterApi(currentUser.id, currentTeam?.id || 'team-1'),
+        opened: async graphId => {
+          const { data } = await refetchGraphs();
+          const found = (data?.userGraphs || []).find((g: any) => g.id === graphId);
+          if (!found) return;
+          opened.graph = parseGraph(found);
+          setCurrentGraph(opened.graph);
+          localStorage.setItem('currentGraphId', graphId);
+        }
+      });
+      await refetchGraphs();
+      await apolloClient.refetchQueries({ include: ['GetWorkItems', 'GetEdges'] });
+      if (!opened.graph) throw new Error('The example project was added, but it could not be opened. Choose it in the list.');
+      return opened.graph;
+    } finally {
+      isAddingExampleRef.current = false;
+      setIsCreating(false);
+    }
   };
 
   const shareGraph = async (graphId: string, settings: Partial<ShareSettings>): Promise<void> => {
@@ -746,6 +844,7 @@ export function GraphProvider({ children }: GraphProviderProps) {
     deleteGraph,
     duplicateGraph,
     moveGraph,
+    addExampleProject,
     getGraphPath,
     getGraphChildren,
     descendInto,

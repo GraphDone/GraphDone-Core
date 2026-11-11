@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import { getToken,getUserRaw } from '../authStorage';
 import { cloudFailure, skipBackgroundPoll } from '../hostedUsage';
-import { changes,dirty,makeRequest,merge,Snapshot,Row,validateBackupSnapshot,ambiguousRetriedCreation } from './model';
+import { changes,dirty,makeRequest,merge,Snapshot,Row,validateBackupSnapshot,validateBackupProjects,ambiguousRetriedCreation,OFFLINE_PROJECT_LIMIT } from './model';
 import { readAccount,editAccount,channel } from './store';
 import { PROJECT_FORMAT,parseProjectDocument,projectDocument,projectMermaid,projectFilename,downloadText } from '../project-transfer/format';
 export const offlineEnabled=import.meta.env.VITE_OFFLINE_SYNC==='true';
@@ -148,19 +148,25 @@ export async function importOffline(file:File) {
  if(data?.format!=='graphdone-offline-v1'||!data.account?.projects||Array.isArray(data.account.projects)||typeof data.account.projects!=='object'||!owner)throw Error('Choose a GraphDone offline backup while signed in.');
  // Import as NEW local projects. Never replay another account's requests/ids.
  if(Object.keys(data.account.projects).length>100)throw Error('Import at most 100 projects at a time.');
- const copies:Snapshot[]=[];
+ const snapshots:Snapshot[]=[];
  for(const p of Object.values(data.account.projects) as any[]) {
   if(!p||typeof p!=='object')throw Error('Invalid project in backup');
   if(!p.local)continue;const s=p.local as Snapshot;validateBackupSnapshot(s);
   if(!s.project||typeof s.project.name!=='string'||!Array.isArray(s.nodes)||!Array.isArray(s.edges)||!Array.isArray(s.notes))throw Error('Invalid project in backup');
   if(s.nodes.length>300||s.edges.length>600||s.notes.length>2000)throw Error('A project exceeds the supported import size.');
-  const ids=new Map(s.nodes.map(n=>[n.id,crypto.randomUUID()]));
-  copies.push({project:{...s.project,id:crypto.randomUUID(),owner_id:owner,sync_version:0,name:`${s.project.name.slice(0,105)} (imported)`},nodes:s.nodes.map(n=>({...n,id:ids.get(n.id)!})),edges:s.edges.map(e=>({...e,id:crypto.randomUUID(),source_id:ids.get(e.source_id),target_id:ids.get(e.target_id)})),notes:s.notes.map(n=>({...n,id:crypto.randomUUID(),work_item_id:ids.get(n.work_item_id)||null}))});
+  snapshots.push(s);
  }
+ validateBackupProjects(snapshots);
+ // A signed-in account syncs, and /api/sync keeps no parent yet: import it flat (#277).
+ const hierarchy=localGuest(),newIds=snapshots.map(()=>crypto.randomUUID()),projectIds=new Map(snapshots.map((s,i)=>[s.project.id,newIds[i]]));
+ const copies:Snapshot[]=snapshots.map((s,i)=>{
+  const ids=new Map(s.nodes.map(n=>[n.id,crypto.randomUUID()])),{type,parent_id,...project}=s.project,parent=hierarchy&&parent_id!=null?projectIds.get(parent_id)!:null;
+  return {project:{...project,...(hierarchy&&type!=null?{type}:{}),...(parent?{parent_id:parent}:{}),id:newIds[i],owner_id:owner,sync_version:0,name:parent?s.project.name:`${s.project.name.slice(0,105)} (imported)`},nodes:s.nodes.map(n=>({...n,id:ids.get(n.id)!})),edges:s.edges.map(e=>({...e,id:crypto.randomUUID(),source_id:ids.get(e.source_id),target_id:ids.get(e.target_id)})),notes:s.notes.map(n=>({...n,id:crypto.randomUUID(),work_item_id:ids.get(n.work_item_id)||null}))};
+ });
  if(!copies.length)throw Error('This file contains no projects to import.');
  if(owner!==ownerId())throw Error('Account changed. Please import again.');
  await editAccount(owner,a=>{const ids=new Set(a.list.map(p=>p.id));for(const [id,p] of Object.entries(a.projects)){if(p.local)ids.add(id);else ids.delete(id);}
- if(ids.size+copies.length>100)throw Error('Import would exceed 100 projects. Remove unused projects or import fewer projects.');
+ if(ids.size+copies.length>OFFLINE_PROJECT_LIMIT)throw Error(`Import would exceed ${OFFLINE_PROJECT_LIMIT} projects. Remove unused projects or import fewer projects.`);
  for(const s of copies)a.projects[s.project.id]={base:null,local:s,checkedAt:Date.now()};});
  window.dispatchEvent(new Event('graphdone-sync-refresh'));void syncNow();
  return copies.map(s=>({id:s.project.id,name:s.project.name}));
