@@ -238,6 +238,10 @@ export interface ZoomLevelInput {
 
 /** Each level has an on and a higher off threshold, so a camera resting near a
  * threshold never flickers between levels. */
+/** Above this zoom every level is 0 (or the large-graph overview's 1): the
+ * neighbours and projects only appear once the person has zoomed out. */
+export const ZOOMED_OUT = 0.95;
+
 export function nextZoomState(previous: ZoomLevelState, input: ZoomLevelInput): ZoomLevelState {
   const { scale, viewport, frame } = input;
   const shortSide = Math.max(1, Math.min(viewport.w, viewport.h));
@@ -249,15 +253,17 @@ export function nextZoomState(previous: ZoomLevelState, input: ZoomLevelInput): 
   const siblings =
     input.hasSiblings &&
     (previous.siblings
-      ? tilePx <= 0.5 * shortSide && scale < 0.95
+      ? tilePx <= 0.5 * shortSide && scale < ZOOMED_OUT
       : tilePx < 0.4 * shortSide && scale < 0.85);
   let projects = false;
   if (input.cluster) {
     // How much of the viewport the project's graphs fill in their tightest direction.
     const fill = Math.max((input.cluster.w * scale) / viewport.w, (input.cluster.h * scale) / viewport.h);
+    // Like the siblings, only once the person has zoomed out: a small graph
+    // alone in its project keeps its normal first screen.
     projects = previous.projects
-      ? fill <= 0.45 || (tilePx <= 112 && fill <= 1.1)
-      : fill < 0.35 || (tilePx < 96 && fill < 1);
+      ? scale < ZOOMED_OUT && (fill <= 0.45 || (tilePx <= 112 && fill <= 1.1))
+      : scale < 0.85 && (fill < 0.35 || (tilePx < 96 && fill < 1));
   }
   return { cardsHidden, siblings, projects };
 }

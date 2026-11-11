@@ -14,6 +14,7 @@ import {
   ZoomLevel,
   zoomLayout,
   zoomLevelOf,
+  ZOOMED_OUT,
 } from '../lib/graphZoomContext';
 
 /**
@@ -98,8 +99,8 @@ function Label({ x, y, k, name, detail, anchor = 'start', maxPx, backing = false
   );
 }
 
-function Tile({ id, openId = id, rect, k, name, detail, viewportShort, interactive, labelled, onOpen, kind, labelAbove = false }: {
-  id: string; openId?: string; rect: Rect; labelAbove?: boolean; k: number; name: string; detail: string; viewportShort: number;
+function Tile({ id, openId = id, rect, k, name, detail, viewportShort, interactive, labelled, onOpen, kind, labelAbove = false, holdsGraphs = true }: {
+  id: string; openId?: string; rect: Rect; labelAbove?: boolean; holdsGraphs?: boolean; k: number; name: string; detail: string; viewportShort: number;
   interactive: boolean; labelled: boolean; onOpen: (id: string) => void; kind: 'graph' | 'project';
 }) {
   const ref = useRef<SVGGElement>(null);
@@ -113,14 +114,20 @@ function Tile({ id, openId = id, rect, k, name, detail, viewportShort, interacti
     // Zooming in over a tile that already fills much of the screen opens it:
     // the person is diving into that graph. (d3's zoom stops wheel events at
     // the SVG, so this listens on the tile itself.)
+    let opened = false; // one gesture opens the graph once
     const wheel = (event: WheelEvent) => {
-      if (event.deltaY < 0 && sizeRef.current >= 0.42 * viewportShort) openRef.current(openId);
+      if (opened || event.deltaY >= 0 || sizeRef.current < 0.42 * viewportShort) return;
+      opened = true;
+      openRef.current(openId);
     };
     el.addEventListener('wheel', wheel, { passive: true });
     return () => el.removeEventListener('wheel', wheel);
   }, [openId, interactive, kind, viewportShort]);
   const radius = 14 / k;
-  const label = kind === 'graph' ? `${name} graph, ${detail}` : `${name} project, ${detail}`;
+  // A top-level graph with no graphs inside is shown beside the projects but is
+  // still a graph, so it is announced as one.
+  const noun = kind === 'project' && !holdsGraphs ? 'graph' : kind;
+  const label = `${name} ${noun}, ${detail}`;
   return (
     <g
       ref={ref}
@@ -167,12 +174,28 @@ export function GraphZoomContext({ graphs, currentGraphId, camera, readPositions
     const next = graphFrame(items, index => itemSize(items[index]));
     setFrame(prev => (sameRect(prev, next) ? prev : next));
   };
+  // Every level above 0 needs the camera below ZOOMED_OUT, so at normal zoom
+  // the frame is read once per graph and not kept up to date (a 2000-item graph
+  // re-measures every card to frame it).
+  const zoomedOut = k < ZOOMED_OUT;
   useEffect(() => {
     readFrame.current();
+    if (!zoomedOut) return undefined;
     const timer = window.setInterval(() => readFrame.current(), 400);
     return () => window.clearInterval(timer);
-  }, [currentGraphId]);
-  useEffect(() => { readFrame.current(); }, [k]);
+  }, [currentGraphId, zoomedOut]);
+  // A zoom gesture or animation fires many camera changes a second; framing a
+  // large graph measures every card, so do it at most every 150 ms (and once
+  // more when the gesture stops).
+  const frameTimer = useRef<number | null>(null);
+  useEffect(() => {
+    if (!zoomedOut || frameTimer.current !== null) return;
+    frameTimer.current = window.setTimeout(() => {
+      frameTimer.current = null;
+      readFrame.current();
+    }, 150);
+  }, [k, zoomedOut]);
+  useEffect(() => () => { if (frameTimer.current !== null) window.clearTimeout(frameTimer.current); }, []);
 
   useLayoutEffect(() => {
     ref.current?.setAttribute('transform', `translate(${camera.x},${camera.y}) scale(${k})`);
@@ -245,6 +268,7 @@ export function GraphZoomContext({ graphs, currentGraphId, camera, readPositions
               rect={rect}
               k={k}
               kind="project"
+              holdsGraphs={project.children.length > 0}
               name={project.graph.name}
               detail={project.children.length ? `${plural(project.children.length, 'graph')} · ${plural(project.items, 'item')}` : plural(project.items, 'item')}
               viewportShort={short}

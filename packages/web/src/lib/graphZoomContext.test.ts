@@ -191,6 +191,14 @@ describe('nextZoomState', () => {
       const state = nextZoomState(INITIAL_ZOOM_STATE, { scale: 1, viewport: DESKTOP, frame, overview: false, hasSiblings: true, cluster: layout.cluster });
       expect(zoomLevelOf(state, false)).toBe(0);
     }
+    // A one-item graph alone in its project is small enough to "fill" little of
+    // the screen, but it still opens on its items, not on the projects.
+    const lone = zoomLayout(zoomContextOf([g('p', 'Project'), g('only', 'Only graph', 'p', 1), g('q', 'Other')], 'only')!, tiny);
+    for (const viewport of [DESKTOP, TABLET, PHONE]) {
+      const state = nextZoomState(INITIAL_ZOOM_STATE, { scale: 1, viewport, frame: tiny, overview: false, hasSiblings: false, cluster: lone.cluster });
+      expect(zoomLevelOf(state, false)).toBe(0);
+      expect(zoomLevelOf(nextZoomState(state, { scale: 0.9, viewport, frame: tiny, overview: false, hasSiblings: false, cluster: lone.cluster }), false)).toBe(0);
+    }
   });
 });
 
