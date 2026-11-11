@@ -9,13 +9,14 @@ import {
   CREATE_STARTER_GRAPHS,
   CREATE_STARTER_ITEMS,
   CREATE_STARTER_EDGES,
+  DELETE_STARTER_CONTENT,
   STARTER_CONTENT,
   STARTER_OWN_GRAPHS,
   UPDATE_GRAPH,
   DELETE_GRAPH
 } from '../graphql/graph';
 import { GET_WORK_ITEMS, DELETE_WORK_ITEM, CREATE_WORK_ITEM, CREATE_EDGE } from '../lib/queries';
-import { awaitExampleIdle, buildStarterWorkspace, createStarterWorkspace, isExamplePending, starterGraphCount, type StarterApi, type StarterJournal } from '../lib/starterWorkspace';
+import { awaitExampleIdle, buildStarterWorkspace, createStarterWorkspace, exampleIdleMs, examplePendingParts, starterGraphCount, withExampleFailure, withoutPendingTag, type StarterApi, type StarterJournal } from '../lib/starterWorkspace';
 import { offlineEnabled, localGuest } from '../lib/offline/engine';
 import { OFFLINE_PROJECT_LIMIT } from '../lib/offline/model';
 import { withStorageLock } from '../lib/storageLock';
@@ -118,8 +119,9 @@ export function GraphProvider({ children }: GraphProviderProps) {
       fetchPolicy: 'no-cache'
     });
     return {
-      items: (data?.workItems || []).map((item: { id: string; title: string }) => ({ id: item.id, title: item.title })),
-      edges: (data?.edges || []).map((edge: { type: string; source?: { id: string }; target?: { id: string } }) => ({
+      items: (data?.workItems || []).map((item: { id: string; title: string; tags?: string[] | null }) => ({ id: item.id, title: item.title, tags: item.tags })),
+      edges: (data?.edges || []).map((edge: { id: string; type: string; source?: { id: string }; target?: { id: string } }) => ({
+        id: edge.id,
         sourceId: edge.source?.id || '',
         targetId: edge.target?.id || '',
         type: edge.type
@@ -229,6 +231,12 @@ export function GraphProvider({ children }: GraphProviderProps) {
       return data?.graphs || [];
     },
     content: starterContent,
+    deleteContent: async (items, edges) => {
+      await apolloClient.mutate({ mutation: DELETE_STARTER_CONTENT, variables: { items, edges }, fetchPolicy: 'no-cache' });
+    },
+    setTags: async (graphId, tags) => {
+      await updateGraphMutation({ variables: { id: graphId, input: { tags } } });
+    },
     idle: yieldToView(),
     filled: async graphId => {
       if (currentGraphRef.current?.id === graphId) await apolloClient.refetchQueries({ include: ['GetWorkItems', 'GetEdges'] });
@@ -274,18 +282,36 @@ export function GraphProvider({ children }: GraphProviderProps) {
     }
   };
 
+  const countExampleFailure = async (userId: string) => {
+    const { data } = await apolloClient.query({ query: STARTER_OWN_GRAPHS, variables: { userId }, fetchPolicy: 'no-cache' });
+    for (const graph of examplePendingParts(data?.graphs || []).open) {
+      await updateGraphMutation({ variables: { id: graph.id, input: { tags: withExampleFailure(graph) } } });
+    }
+  };
+
   const startStarter = async (userId: string) => {
     const run = async () => {
       if (currentUserIdRef.current !== userId) return;
       const { data } = await refetchGraphs();
       const local = readStarterPending(userId);
-      const unfinished = !offlineEnabled && (data?.userGraphs || []).some(isExamplePending);
-      const step = starterStep({ graphsSeen: seenGraphCount(data), pending: !!local || unfinished });
+      const { open, abandoned } = examplePendingParts(offlineEnabled ? [] : data?.userGraphs || []);
+      for (const graph of abandoned) {
+        await updateGraphMutation({ variables: { id: graph.id, input: { tags: withoutPendingTag(graph.tags) } } });
+      }
+      // On the self-hosted server the backend says what is unfinished; this browser's marker only covers a first write still in flight.
+      const unfinished = offlineEnabled ? !!local : open.length > 0 || (!!local?.inflight.length && seenGraphCount(data) === 0);
+      if (local && !unfinished) localStorage.removeItem(starterPendingKey(userId));
+      const step = starterStep({ graphsSeen: seenGraphCount(data), pending: unfinished });
       if (step === 'create') await writeStarter(userId, null);
       if (step !== 'finish') return;
       // Started in another browser, which may still be writing it: finish it only once nothing changes.
-      if (!local && !(await awaitExampleIdle(starterApi(userId, currentTeam?.id || 'team-1'), STARTER_WRITE_LIMIT_MS))) return;
-      await writeStarter(userId, local ?? { hierarchy: true, startedAt: Date.now(), inflight: [] });
+      if (!local && !(await awaitExampleIdle(starterApi(userId, currentTeam?.id || 'team-1'), exampleIdleMs(STARTER_WRITE_LIMIT_MS)))) return;
+      try {
+        await writeStarter(userId, local ?? { hierarchy: true, startedAt: Date.now(), inflight: [] });
+      } catch (error) {
+        if (!offlineEnabled) await countExampleFailure(userId).catch(() => undefined);
+        throw error;
+      }
     };
     if (navigator.locks) await navigator.locks.request(`graphdone-starter:${userId}`, run);
     else await withStorageLock(`starter:${userId}`, run, { store: localStorage });
@@ -402,7 +428,8 @@ export function GraphProvider({ children }: GraphProviderProps) {
       }
 
       // A reload, or a browser closed mid-write, interrupted the starter: finish it once per page load.
-      const unfinished = !offlineEnabled && userGraphs.some(isExamplePending);
+      const pendingParts = examplePendingParts(offlineEnabled ? [] : userGraphs);
+      const unfinished = pendingParts.open.length + pendingParts.abandoned.length > 0;
       if ((readStarterPending(currentUser.id) || unfinished) && !isCreatingWelcomeGraphRef.current) {
         isCreatingWelcomeGraphRef.current = true;
         startStarter(currentUser.id).catch(error => {
