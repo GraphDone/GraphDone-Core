@@ -17,7 +17,6 @@ export const SEQUENCES = {
   'prod-smoke': { adapter: 'playwright', title: 'Production stack smoke gate', args: ['tests/e2e/smoke/user-smoke.spec.ts', `--project=${PW}`, '--headed', '--workers=1', '--retries=0', '--trace=retain-on-failure'], blocking: true },
   'new-user': { adapter: 'playwright', title: 'Headed new-user acceptance', args: [
     'tests/e2e/quality/new-user-modes.spec.ts',
-    'tests/e2e/quality/example-resume.spec.ts',
     'tests/e2e/quality/button-content.spec.ts',
     'tests/e2e/graph/guest-dialog-layout.spec.ts',
     'tests/e2e/graph/responsive-real-workflows.spec.ts',
@@ -33,6 +32,9 @@ export const SEQUENCES = {
     'tests/e2e/quality/graph-controls.spec.ts',
     'tests/e2e/quality/visual-style.spec.ts',
     `--project=${PW}`, '--headed', '--workers=1', '--retries=0', '--trace=retain-on-failure',
+  ], blocking: true },
+  'example-resume': { adapter: 'playwright', title: 'Example project finished at the next sign-in', args: [
+    'tests/e2e/quality/example-resume.spec.ts', `--project=${PW}`, '--workers=1', '--retries=0', '--trace=retain-on-failure',
   ], blocking: true },
   'agent-connection': { adapter: 'playwright', title: 'Agent connection and handoff acceptance', args: [
     'tests/e2e/quality/agent-collaboration.spec.ts', `--project=${PW}`, '--headed', '--workers=1', '--retries=0', '--trace=retain-on-failure',
@@ -84,6 +86,14 @@ export const SEQUENCES = {
     '--project=journeys', '--project=journeys-ipad', '--project=journeys-iphone',
     `--repeat-each=${process.env.JOURNEY_REPEAT || 10}`, '--workers=4', '--retries=0',
   ], blocking: false },
+  // ZOOM OUT (#277): from the Welcome graph to the projects, every step must show
+  // readable text and the levels go items → graph → neighbouring graphs →
+  // projects, on desktop, iPad and iPhone. Needs the example project new
+  // workspaces get.
+  'zoom-out': { adapter: 'playwright', title: 'Zoom out — every level labelled, items to projects', args: [
+    'tests/e2e/journeys/zoom-out.spec.ts', '--project=journeys', '--project=journeys-ipad', '--project=journeys-iphone',
+    '--workers=1', '--retries=0', '--trace=retain-on-failure',
+  ], blocking: true },
   // Cross-repo: ingest the newest GraphDone-Cloud live-audit findings.json (sibling
   // repo) into the unified report. Skips cleanly when absent.
   'cloud-audit': { adapter: 'cloud-audit', title: 'Cloud live audit (ingested)', blocking: false },
@@ -91,8 +101,8 @@ export const SEQUENCES = {
 
 export const PROFILES = {
   smoke: ['unit-web', 'smoke', 'e2e-auth'],
-  pr: ['unit-web', 'smoke', 'e2e-auth', 'e2e-graph', 'agent-connection', 'inspector-readability', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'devices', 'perf-budgets'],
-  full: ['unit-web', 'smoke', 'e2e-auth', 'e2e-graph', 'agent-connection', 'inspector-readability', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'devices', 'perf-budgets', 'diagnostics', 'showcase', 'matrix', 'vlm', 'perf-scale', 'cloud-audit'],
+  pr: ['unit-web', 'smoke', 'e2e-auth', 'e2e-graph', 'agent-connection', 'inspector-readability', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'devices', 'perf-budgets', 'zoom-out'],
+  full: ['unit-web', 'smoke', 'e2e-auth', 'e2e-graph', 'agent-connection', 'inspector-readability', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'devices', 'perf-budgets', 'zoom-out', 'diagnostics', 'showcase', 'matrix', 'vlm', 'perf-scale', 'cloud-audit'],
   report: ['diagnostics', 'showcase', 'matrix', 'vlm', 'perf-scale', 'cloud-audit'],
   live: ['live-journey'],
   journeys: ['journeys'],

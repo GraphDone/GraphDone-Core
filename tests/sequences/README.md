@@ -25,13 +25,14 @@ flowchart LR
 | Profile | npm script | What it runs |
 | --- | --- | --- |
 | `smoke` | `npm run test:unified:smoke` | Web unit tests, the smoke gate, passwordless sign-in focus. |
-| `pr` | `npm run test:pr` | `smoke` plus the graph, agent, inspector, level-of-detail, wire, large-graph, schematic, layout-recovery, routing, mobile, UI fit and performance-budget sequences. All blocking. |
+| `pr` | `npm run test:pr` | `smoke` plus the graph, agent, inspector, level-of-detail, wire, large-graph, schematic, layout-recovery, routing, mobile, UI fit, performance-budget and zoom-out sequences. All blocking. |
 | `full` | `npm run test:unified` | `pr` plus the report-only diagnostics, showcase, matrix, VLM, scale sweep and cloud-audit sequences. |
 | `report` | none | Only the report-only capture sequences. |
 | `live` | none | The guest journey on the live hosted site (`live-journey`). |
 | `journeys` | none | Basic user journeys with success rates ([`e2e/journeys/`](../e2e/journeys/README.md)). |
 
-`new-user` and `prod-smoke` are in no profile: CI runs `new-user` by name, and
+`new-user`, `example-resume` and `prod-smoke` are in no profile: CI runs
+`new-user` and `example-resume` by name, and
 `scripts/test-production-stack.mjs` runs `prod-smoke`.
 
 ## How to use

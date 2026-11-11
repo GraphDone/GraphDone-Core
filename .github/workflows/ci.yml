@@ -163,10 +163,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: new user
+          - name: new user, zoom out
             sequences: |
               smoke ci-smoke
               new-user ci-new-user xvfb
+              zoom-out ci-zoom-out
           - name: 2000 items, nested LOD, routes, mobile
             sequences: |
               smoke ci-smoke
@@ -188,6 +189,7 @@ jobs:
               smoke ci-smoke
               semantic-lod ci-semantic-lod xvfb
               layout-recovery ci-layout-recovery xvfb
+              example-resume ci-example-resume
     services:
       neo4j:
         image: neo4j:5.26.12
