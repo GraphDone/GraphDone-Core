@@ -31,6 +31,33 @@ export function seenGraphCount(lists: { userGraphs?: GraphRef[]; sharedGraphs?: 
   return new Set([...(lists?.userGraphs || []), ...(lists?.sharedGraphs || []), ...(lists?.systemGraphs || [])].map(graph => graph.id)).size;
 }
 
+/**
+ * Kept in this browser while a new user's starter is being written, so the
+ * next page load can finish it. It expires, so a marker left behind can never
+ * bring back example graphs the user has since deleted.
+ */
+export interface StarterMarker {
+  hierarchy: boolean;
+  startedAt: number;
+  sentAt: number;
+}
+
+export const STARTER_MARKER_TTL_MS = 10 * 60_000;
+
+/** The stored marker, or null when there is none, it is malformed, or it has expired. */
+export function parseStarterMarker(raw: string | null, now: number): StarterMarker | null {
+  let value: unknown;
+  try {
+    value = JSON.parse(raw || 'null');
+  } catch {
+    return null;
+  }
+  const marker = value as Partial<StarterMarker> | null;
+  if (!marker || typeof marker.hierarchy !== 'boolean' || typeof marker.startedAt !== 'number' || typeof marker.sentAt !== 'number') return null;
+  if (now - marker.startedAt > STARTER_MARKER_TTL_MS || marker.startedAt > now + 60_000) return null;
+  return { hierarchy: marker.hierarchy, startedAt: marker.startedAt, sentAt: marker.sentAt };
+}
+
 export type StarterStep = 'none' | 'create' | 'finish';
 
 /**

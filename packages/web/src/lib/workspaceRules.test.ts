@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { exampleAction, exampleLimitMessage, missingStarterGraphs, projectDeleteBlock, seenGraphCount, starterHierarchy, starterStep, type OwnGraph } from './workspaceRules';
+import { STARTER_MARKER_TTL_MS, exampleAction, exampleLimitMessage, missingStarterGraphs, parseStarterMarker, projectDeleteBlock, seenGraphCount, starterHierarchy, starterStep, type OwnGraph } from './workspaceRules';
 
 describe('deleting a project', () => {
   const project = { id: 'p', name: 'Getting started', parentGraphId: null };
@@ -40,6 +40,29 @@ describe('which starter a user gets', () => {
     expect(seenGraphCount({ userGraphs: [own], sharedGraphs: [own, { id: 'b', name: 'B' }], systemGraphs: [{ id: 'c', name: 'C' }] })).toBe(3);
     expect(seenGraphCount({ userGraphs: [], sharedGraphs: [], systemGraphs: [{ id: 'overview', name: 'System Overview' }] }), 'a shared or system graph counts as a graph').toBe(1);
     expect(seenGraphCount(undefined)).toBe(0);
+  });
+});
+
+describe('the marker of a starter being written', () => {
+  const start = 1_000_000;
+  const marker = { hierarchy: true, startedAt: start, sentAt: start + 2000 };
+
+  it('is read back while it is fresh', () => {
+    expect(parseStarterMarker(JSON.stringify(marker), start + 5000)).toEqual(marker);
+    expect(parseStarterMarker(JSON.stringify(marker), start + STARTER_MARKER_TTL_MS)).toEqual(marker);
+  });
+
+  it('expires after about ten minutes, so it cannot bring back deleted example graphs', () => {
+    expect(STARTER_MARKER_TTL_MS).toBe(10 * 60_000);
+    expect(parseStarterMarker(JSON.stringify(marker), start + STARTER_MARKER_TTL_MS + 1)).toBeNull();
+    expect(parseStarterMarker(JSON.stringify(marker), start - 120_000), 'a marker from the future').toBeNull();
+  });
+
+  it('ignores a missing or malformed marker', () => {
+    expect(parseStarterMarker(null, start)).toBeNull();
+    expect(parseStarterMarker('not json', start)).toBeNull();
+    expect(parseStarterMarker(JSON.stringify({ hierarchy: true, sentAt: start }), start), 'no start time').toBeNull();
+    expect(parseStarterMarker(JSON.stringify({ ...marker, hierarchy: 'yes' }), start)).toBeNull();
   });
 });
 

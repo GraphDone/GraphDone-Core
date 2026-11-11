@@ -14,7 +14,7 @@ import { GET_WORK_ITEMS, GET_EDGES, DELETE_WORK_ITEM, CREATE_WORK_ITEM, CREATE_E
 import { buildStarterWorkspace, createStarterWorkspace, starterGraphCount, type StarterApi } from '../lib/starterWorkspace';
 import { offlineEnabled, localGuest } from '../lib/offline/engine';
 import { OFFLINE_PROJECT_LIMIT } from '../lib/offline/model';
-import { exampleLimitMessage, projectDeleteBlock, seenGraphCount, starterHierarchy, starterStep } from '../lib/workspaceRules';
+import { exampleLimitMessage, parseStarterMarker, projectDeleteBlock, seenGraphCount, starterHierarchy, starterStep, type StarterMarker } from '../lib/workspaceRules';
 
 const GraphContext = createContext<GraphContextType | undefined>(undefined);
 
@@ -26,18 +26,18 @@ const hierarchyHere = () => starterHierarchy({ offline: offlineEnabled, guest: l
 // can still land afterwards, so a resume first waits STARTER_SETTLE_MS from
 // the last write sent; browser-local writes need no wait.
 const STARTER_SETTLE_MS = 15000;
-type StarterPending = { hierarchy: boolean; sentAt: number };
 const starterPendingKey = (userId: string) => `graphdone:starter-pending:${userId}`;
-const readStarterPending = (userId: string): StarterPending | null => {
-  try {
-    const value = JSON.parse(localStorage.getItem(starterPendingKey(userId)) || 'null');
-    return value && typeof value.hierarchy === 'boolean' && typeof value.sentAt === 'number' ? value : null;
-  } catch {
-    return null;
-  }
+const readStarterPending = (userId: string): StarterMarker | null => {
+  const raw = localStorage.getItem(starterPendingKey(userId));
+  const marker = parseStarterMarker(raw, Date.now());
+  if (raw && !marker) localStorage.removeItem(starterPendingKey(userId));
+  return marker;
 };
-const markStarterSent = (userId: string, hierarchy: boolean) =>
-  localStorage.setItem(starterPendingKey(userId), JSON.stringify({ hierarchy, sentAt: Date.now() }));
+const markStarterSent = (userId: string, hierarchy: boolean) => {
+  const now = Date.now();
+  const startedAt = readStarterPending(userId)?.startedAt ?? now;
+  localStorage.setItem(starterPendingKey(userId), JSON.stringify({ hierarchy, startedAt, sentAt: now }));
+};
 const STARTER_PROJECTS = new Set(buildStarterWorkspace({ hierarchy: true }).projects.map(project => project.name));
 const isEmptyStarterProject = (graph: Graph) =>
   graph.type === 'PROJECT' && !graph.parentGraphId && STARTER_PROJECTS.has(graph.name);
