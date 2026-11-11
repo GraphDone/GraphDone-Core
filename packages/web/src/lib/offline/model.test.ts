@@ -1,5 +1,5 @@
 import { describe,it,expect } from 'vitest';
-import { changes,dirty,merge,makeRequest,Snapshot,Project,validateBackupSnapshot,ambiguousRetriedCreation } from './model';
+import { changes,dirty,merge,makeRequest,Snapshot,Project,Row,validateBackupSnapshot,validateBackupProjects,ambiguousRetriedCreation,graphPath,graphType,createsCycle } from './model';
 const base=():Snapshot=>({project:{id:'p',name:'Family plans',sync_version:1},nodes:[{id:'a',title:'Dinner',status:'PROPOSED',priority:.3,position_x:0,position_y:0}],edges:[],notes:[]});
 describe('durable project reconciliation',()=>{
  it('merges agent status with offline human title without overwriting either',()=>{const b=base(),l=structuredClone(b),r=structuredClone(b);l.nodes[0].title='Dinner for six';r.nodes[0].status='IN_PROGRESS';const m=merge(b,l,r);expect(m.conflicts).toEqual([]);expect(m.local!.nodes[0]).toMatchObject({title:'Dinner for six',status:'IN_PROGRESS'});});
@@ -13,4 +13,22 @@ describe('durable project reconciliation',()=>{
  it('rejects malformed backup data before it can poison local rendering',()=>{expect(()=>validateBackupSnapshot({project:{name:'X'},nodes:[{id:'a',title:{html:'bad'}}],edges:[],notes:[]})).toThrow(/invalid/);});
  it('never silently resurrects a remote deletion after an old create receipt expires',()=>{const b=base(),l=structuredClone(b);l.nodes.push({id:'new',title:'Unconfirmed'});const req=makeRequest('p',{base:b,local:l,checkedAt:0});req.attempts=2;expect(ambiguousRetriedCreation(req,b,l,b)).toBe(true);expect(ambiguousRetriedCreation(req,b,b,b)).toBe(false);req.attempts=1;expect(ambiguousRetriedCreation(req,b,l,b)).toBe(false);});
  it('runs 1000 deterministic disjoint person/agent edit scenarios',()=>{for(let i=0;i<1000;i++){const b=base(),l=structuredClone(b),r=structuredClone(b);l.nodes[0].position_x=i;r.nodes[0].priority=i/1000;r.notes.push({id:'n'+i,body:'Agent progress '+i});const m=merge(b,l,r);expect(m.conflicts).toEqual([]);expect(m.local!.nodes[0].position_x).toBe(i);expect(m.local!.nodes[0].priority).toBe(i/1000);expect(m.local!.notes).toHaveLength(1);}});
+});
+describe('graph hierarchy in the browser workspace',()=>{
+ const row=(id:string,parent_id?:string|null,type?:string):Row=>({id,name:id,...(parent_id!==undefined?{parent_id}:{}),...(type?{type}:{})});
+ const rows=(...list:Row[])=>new Map(list.map(r=>[r.id,r]));
+ const project=(id:string,parent_id?:string|null,type?:string):Snapshot=>({project:row(id,parent_id,type),nodes:[],edges:[],notes:[]});
+ it('reads a row without hierarchy fields as a top-level project',()=>{expect(graphType({id:'old'})).toBe('PROJECT');expect(graphType({id:'odd',type:'FOLDER'})).toBe('PROJECT');expect(graphPath({id:'old'},rows())).toEqual([]);});
+ it('lists ancestors root first and stops at a missing parent',()=>{const all=rows(row('p'),row('g','p','SUBGRAPH'),row('d','g','SUBGRAPH'),row('lost','gone'));expect(graphPath(all.get('d')!,all)).toEqual(['p','g']);expect(graphPath(all.get('lost')!,all)).toEqual([]);});
+ it('detects a move that would put a graph inside itself',()=>{const all=rows(row('p'),row('g','p'),row('d','g'));expect(createsCycle('p','d',all)).toBe(true);expect(createsCycle('g','g',all)).toBe(true);expect(createsCycle('d','p',all)).toBe(false);});
+ it('accepts an old backup and a backup whose parents are all inside it',()=>{expect(()=>validateBackupProjects([project('a'),project('b')])).not.toThrow();expect(()=>validateBackupProjects([project('p',null,'PROJECT'),project('g','p','SUBGRAPH'),project('d','g','SUBGRAPH')])).not.toThrow();});
+ it('rejects a missing parent, a cycle, a self parent and a bad type',()=>{
+  expect(()=>validateBackupProjects([project('g','missing','SUBGRAPH')])).toThrow(/Nothing was imported/);
+  expect(()=>validateBackupProjects([project('a','b'),project('b','a')])).toThrow(/Nothing was imported/);
+  expect(()=>validateBackupProjects([project('p'),project('a','b'),project('b','c'),project('c','b')])).toThrow(/Nothing was imported/);
+  expect(()=>validateBackupSnapshot(project('a','a'))).toThrow(/invalid/);
+  expect(()=>validateBackupSnapshot(project('a',null,'FOLDER'))).toThrow(/invalid/);
+  expect(()=>validateBackupSnapshot({...project('a'),project:{id:'a',name:'a',parent_id:{id:'p'}}})).toThrow(/invalid/);
+  expect(()=>validateBackupProjects([project('p'),project('p'),project('g','p')])).toThrow(/Nothing was imported/);
+ });
 });

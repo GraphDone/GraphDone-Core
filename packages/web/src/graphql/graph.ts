@@ -217,6 +217,21 @@ export const CREATE_GRAPH = gql`
   }
 `;
 
+export const CREATE_STARTER_GRAPHS = gql`
+  mutation CreateStarterGraphs($input: [GraphCreateInput!]!) {
+    createGraphs(input: $input) {
+      graphs {
+        id
+        name
+        type
+        parentGraphId
+        depth
+        path
+      }
+    }
+  }
+`;
+
 export const UPDATE_GRAPH = gql`
   mutation UpdateGraph($id: ID!, $input: GraphUpdateInput!) {
     updateGraphs(where: { id: $id }, update: $input) {
