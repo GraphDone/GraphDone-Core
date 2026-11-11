@@ -6,6 +6,7 @@ import {
   edgeRouteArrowBounds,
   edgeSegmentHitsBox,
   edgeSegmentHitsRotatedBox,
+  orientedBoxesOverlap,
   pointOnEdgeRoute,
   projectEdgeRoutePointer,
 } from '../edgeRouteGeometry';
@@ -347,3 +348,47 @@ it.each([45, 135, -45, -135])(
     ).toBe(true);
   }
 );
+
+describe('turned label boxes', () => {
+  it('tests a turned label with its real footprint, not the box around it', () => {
+    const label = { x: 0, y: 0, width: 200, height: 20, rotation: 45 };
+    // Inside the label's axis-aligned bounds, but off the turned label itself.
+    const corner = { x: 60, y: -60, width: 20, height: 20 };
+    const halfBounds = ((200 + 20) * Math.SQRT1_2) / 2;
+    expect(Math.abs(corner.x) + corner.width / 2).toBeLessThan(halfBounds);
+    expect(Math.abs(corner.y) + corner.height / 2).toBeLessThan(halfBounds);
+    expect(orientedBoxesOverlap(label, corner)).toBe(false);
+    expect(orientedBoxesOverlap(label, { x: 50, y: 50, width: 20, height: 20 })).toBe(true);
+  });
+
+  it('counts boxes that only touch as clear, and padding grows the second box', () => {
+    const a = { x: 0, y: 0, width: 100, height: 20 };
+    expect(orientedBoxesOverlap(a, { x: 100, y: 0, width: 100, height: 20 })).toBe(false);
+    expect(orientedBoxesOverlap(a, { x: 99, y: 0, width: 100, height: 20 })).toBe(true);
+    expect(orientedBoxesOverlap(a, { x: 108, y: 0, width: 100, height: 20 }, 8)).toBe(false);
+    expect(orientedBoxesOverlap(a, { x: 107, y: 0, width: 100, height: 20 }, 8)).toBe(true);
+    // Order does not matter for turned pairs.
+    const b = { x: 70, y: 10, width: 60, height: 10, rotation: 30 };
+    expect(orientedBoxesOverlap(a, b)).toBe(orientedBoxesOverlap(b, a));
+  });
+
+  it('slides a label along its edge past blocked middles and ends instead of hiding it', () => {
+    const route = createEdgeRoute([
+      { x: 0, y: 0 },
+      { x: 800, y: 0 },
+    ])!;
+    const obstacles = [
+      { x: 400, y: 0, width: 200, height: 200 },
+      { x: 48, y: 0, width: 60, height: 200 },
+      { x: 752, y: 0, width: 60, height: 200 },
+    ];
+    const dims = { width: 80, height: 20 };
+    const label = edgeRouteLabel(route, { dims, obstacles })!;
+    expect(label).not.toBeNull();
+    for (const box of obstacles) expect(orientedBoxesOverlap({ ...label, ...dims }, box, 8)).toBe(false);
+    // The clear spot nearest the middle, the earlier one of a tie.
+    expect(label.x).toBeLessThan(400);
+    expect(label.x).toBeGreaterThan(200);
+  });
+});
+

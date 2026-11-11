@@ -236,6 +236,46 @@ export function edgeSegmentHitsRotatedBox(
   );
 }
 
+/**
+ * Whether two boxes overlap, each centred on (x, y) and turned by its
+ * `rotation` in degrees (an obstacle without one is axis-aligned). `b` grows
+ * by `padding` on every side. Separating-axis test on both boxes' axes, so a
+ * turned label is tested with its real footprint, not the box around it.
+ */
+export function orientedBoxesOverlap(
+  a: ObstacleBox,
+  b: ObstacleBox,
+  padding = 0
+) {
+  const axes = (rotation = 0) => {
+    const r = (rotation * Math.PI) / 180;
+    return [
+      { x: Math.cos(r), y: Math.sin(r) },
+      { x: -Math.sin(r), y: Math.cos(r) },
+    ];
+  };
+  const [au, av] = axes(a.rotation),
+    [bu, bv] = axes(b.rotation);
+  const aw = a.width / 2,
+    ah = a.height / 2,
+    bw = b.width / 2 + padding,
+    bh = b.height / 2 + padding;
+  const dx = b.x - a.x,
+    dy = b.y - a.y;
+  for (const n of [au, av, bu, bv]) {
+    const reach =
+      Math.abs(aw * (au.x * n.x + au.y * n.y)) +
+      Math.abs(ah * (av.x * n.x + av.y * n.y)) +
+      Math.abs(bw * (bu.x * n.x + bu.y * n.y)) +
+      Math.abs(bh * (bv.x * n.x + bv.y * n.y));
+    if (Math.abs(dx * n.x + dy * n.y) >= reach - 1e-9) return false;
+  }
+  return true;
+}
+
+/** Positions tried along each straight part of a route, besides its ends and middle. */
+export const LABEL_SAMPLES = 12;
+
 export function edgeRouteLabel(
   route: EdgeRouteGeometry,
   options: {
@@ -261,8 +301,10 @@ export function edgeRouteLabel(
   )
     return null;
   const desired = fraction(options.t ?? 0.5) * route.length;
-  let best: EdgeRouteLabel | null = null;
-  let bestDistance = Infinity;
+  // Every candidate spot, nearest the desired one first (then the earlier
+  // one); the first that clears everything wins. A label slides along its
+  // edge, or flips to the other side, before it gives up.
+  const candidates: (EdgeRouteLabel & { delta: number })[] = [];
   for (const segment of route.segments) {
     const margin = dims.width / 2 + padding;
     if (segment.length < 2 * margin) continue;
@@ -312,82 +354,95 @@ export function edgeRouteLabel(
         }
       }
       if (visibleLow > visibleHigh) continue;
-      for (const distance of new Set([
+      const distances = new Set([
         clamp(desired, visibleLow, visibleHigh),
         (visibleLow + visibleHigh) / 2,
         visibleLow,
         visibleHigh,
-      ])) {
+      ]);
+      for (let step = 1; step < LABEL_SAMPLES; step++)
+        distances.add(
+          visibleLow + ((visibleHigh - visibleLow) * step) / LABEL_SAMPLES
+        );
+      for (const distance of distances) {
         const local = (distance - segment.start) / segment.length;
-        const x =
-          segment.source.x +
-          (segment.target.x - segment.source.x) * local +
-          Math.sin(radians) * candidateOffset;
-        const y =
-          segment.source.y +
-          (segment.target.y - segment.source.y) * local -
-          Math.cos(radians) * candidateOffset;
-        const viewport = options.viewport;
-        if (
-          viewport &&
-          (Math.abs(x - viewport.x) + width / 2 + padding >
-            viewport.width / 2 ||
-            Math.abs(y - viewport.y) + height / 2 + padding >
-              viewport.height / 2)
-        )
-          continue;
-        let blocked = false;
-        for (const box of obstacles) {
-          if (options.budget) {
-            if (options.budget.remaining <= 0) return best;
-            options.budget.remaining--;
-          }
-          if (
-            Math.abs(x - box.x) < (width + box.width) / 2 + padding &&
-            Math.abs(y - box.y) < (height + box.height) / 2 + padding
-          ) {
-            blocked = true;
-            break;
-          }
-        }
-        if (blocked) continue;
-        for (const part of options.segments ?? []) {
-          if (options.budget) {
-            if (options.budget.remaining <= 0) return best;
-            options.budget.remaining--;
-          }
-          if (
-            edgeSegmentHitsRotatedBox(
-              part,
-              { x, y, width: dims.width, height: dims.height },
-              rotation,
-              padding
-            )
-          ) {
-            blocked = true;
-            break;
-          }
-        }
-        if (blocked) continue;
-        const delta =
-          Math.abs(distance - desired) +
-          Math.abs(candidateOffset - offset) * 0.01;
-        if (
-          delta < bestDistance ||
-          (delta === bestDistance && distance / route.length < best!.t)
-        ) {
-          bestDistance = delta;
-          best = {
-            x,
-            y,
-            t: distance / route.length,
-            rotation,
-            iconRotation: flipped ? 180 : 0,
-            offset: candidateOffset,
-          };
-        }
+        candidates.push({
+          x:
+            segment.source.x +
+            (segment.target.x - segment.source.x) * local +
+            Math.sin(radians) * candidateOffset,
+          y:
+            segment.source.y +
+            (segment.target.y - segment.source.y) * local -
+            Math.cos(radians) * candidateOffset,
+          t: distance / route.length,
+          rotation,
+          iconRotation: flipped ? 180 : 0,
+          offset: candidateOffset,
+          delta:
+            Math.abs(distance - desired) +
+            Math.abs(candidateOffset - offset) * 0.01,
+        });
       }
     }
   }
-  return best;
+  candidates.sort((a, b) => a.delta - b.delta || a.t - b.t);
+  for (const candidate of candidates) {
+    const { x, y, rotation } = candidate;
+    const radians = (rotation * Math.PI) / 180;
+    const width =
+      Math.abs(Math.cos(radians)) * dims.width +
+      Math.abs(Math.sin(radians)) * dims.height;
+    const height =
+      Math.abs(Math.sin(radians)) * dims.width +
+      Math.abs(Math.cos(radians)) * dims.height;
+    const viewport = options.viewport;
+    if (
+      viewport &&
+      (Math.abs(x - viewport.x) + width / 2 + padding > viewport.width / 2 ||
+        Math.abs(y - viewport.y) + height / 2 + padding >
+          viewport.height / 2)
+    )
+      continue;
+    const label = { x, y, width: dims.width, height: dims.height, rotation };
+    let blocked = false;
+    for (const box of obstacles) {
+      if (options.budget) {
+        if (options.budget.remaining <= 0) return null;
+        options.budget.remaining--;
+      }
+      if (orientedBoxesOverlap(label, box, padding)) {
+        blocked = true;
+        break;
+      }
+    }
+    if (blocked) continue;
+    for (const part of options.segments ?? []) {
+      if (options.budget) {
+        if (options.budget.remaining <= 0) return null;
+        options.budget.remaining--;
+      }
+      if (
+        edgeSegmentHitsRotatedBox(
+          part,
+          { x, y, width: dims.width, height: dims.height },
+          rotation,
+          padding
+        )
+      ) {
+        blocked = true;
+        break;
+      }
+    }
+    if (!blocked)
+      return {
+        x,
+        y,
+        t: candidate.t,
+        rotation,
+        iconRotation: candidate.iconRotation,
+        offset: candidate.offset,
+      };
+  }
+  return null;
 }
