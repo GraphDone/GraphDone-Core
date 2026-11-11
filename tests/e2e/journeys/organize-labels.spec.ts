@@ -17,7 +17,8 @@ import { ORGANIZED_ZOOM_FLOOR } from '../../../packages/web/src/lib/labelClearan
  * least 11 px, not under any card, not on another label, reachable at its
  * centre and inside the visible gap of its own edge. Every edge whose two
  * cards are on screen, clear of the graph controls, must show its label. No
- * card title on screen is split inside a word (a word too wide ends in "…").
+ * card title on screen is split inside a word (a word too wide ends in "…";
+ * a path, URL or identifier may break inside).
  *
  * On a desktop or tablet a graph of up to 60 items is framed whole down to the
  * smallest zoom where card titles and labels still show (CARD_TITLES_HIDE_BELOW).
@@ -163,6 +164,7 @@ async function measure(page: Page, shape: LabelShape, stage: string, via?: strin
 /**
  * Card title lines on screen that split a word: every line must be whole words
  * of the title, and only a line ending in "…" may end in the start of a word.
+ * A path, URL or identifier (graphSymbolLayout's tokens) may break anywhere.
  */
 function brokenTitles(page: Page): Promise<string[]> {
   return page.evaluate(() => {
@@ -172,13 +174,15 @@ function brokenTitles(page: Page): Promise<string[]> {
       if (box.right <= 0 || box.bottom <= 0 || box.left >= innerWidth || box.top >= innerHeight) continue;
       const title = group.querySelector('title')?.textContent ?? '';
       const words = title.replace(/\s+/g, ' ').trim().split(' ');
+      const token = (word: string) => /[^\p{L}'’]|\p{Ll}\p{Lu}/u.test(word.replace(/^\p{P}+|\p{P}+$/gu, ''));
       for (const text of group.querySelectorAll<SVGTextElement>('.node-title-text')) {
         if (getComputedStyle(text).opacity === '0') continue;
         const line = text.textContent ?? '';
         const clipped = line.endsWith('…');
         const tokens = (clipped ? line.slice(0, -1) : line).split(' ').filter(Boolean);
-        const whole = tokens.every((token, index) =>
-          clipped && index === tokens.length - 1 ? words.some(word => word.startsWith(token)) : words.includes(token));
+        const whole = tokens.every((part, index) => words.includes(part)
+          || (clipped && index === tokens.length - 1 && words.some(word => word.startsWith(part)))
+          || words.some(word => token(word) && word.includes(part)));
         if (!whole && line !== 'Untitled') out.push(`"${line}" in "${title}"`);
       }
     }

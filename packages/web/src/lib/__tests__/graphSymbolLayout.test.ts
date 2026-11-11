@@ -53,7 +53,7 @@ describe('graph symbol content geometry', () => {
       'Email campaign',
       'coordinator of the subsystems',
       'Review the gateway settlement reconciliation and retry policy',
-      'PaymentGatewayRetryReconciliationHandler',
+      'Coordinator, then subsystems.',
     ];
     for (const title of titles)
       for (let width = 40; width <= 320; width += 10) {
@@ -65,6 +65,32 @@ describe('graph symbol content geometry', () => {
       }
     // A word too wide for the line is cut where it is, never carried over.
     expect(fitGraphText('System coordinator', 110, ITEM_TITLE_SIZE, measure).lines).toEqual(['System', 'coordinat…']);
+  });
+
+  it('shows a path, URL or identifier wider than the line in full while lines are left, "…" only when they run out', () => {
+    const fit = (title: string, width: number) => fitGraphText(title, width, ITEM_TITLE_SIZE, measure);
+    expect(fit('Update packages/web/src/lib/labelClearance.ts', 240)).toEqual({
+      lines: ['Update', 'packages/web/src/lib/', 'labelClearance.ts'], truncated: false,
+    });
+    expect(fit('PaymentGatewayRetryReconciliationHandler', 240)).toEqual({
+      lines: ['PaymentGatewayRetry', 'ReconciliationHandler'], truncated: false,
+    });
+    expect(fit('See https://example.com/docs/graph?view=labels', 240)).toEqual({
+      lines: ['See', 'https://example.com/', 'docs/graph?view=labels'], truncated: false,
+    });
+    // Out of lines: the last one ends in "…".
+    const long = fit('packages/web/src/lib/__tests__/graphSymbolLayout.test.ts', 120);
+    expect(long.lines).toHaveLength(3);
+    expect(long.truncated).toBe(true);
+    expect(long.lines[2]).toMatch(/…$/);
+    for (const line of long.lines) expect(measure(line, ITEM_TITLE_SIZE)).toBeLessThanOrEqual(120);
+    // Shown in full: the lines put back together are the title.
+    for (const title of ['src/lib/labelClearance.ts', 'PaymentGatewayRetryReconciliationHandler', 'https://example.com/a/b'])
+      for (let width = 60; width <= 320; width += 10) {
+        const result = fit(title, width);
+        if (!result.truncated) expect(result.lines.join(''), `${title} at ${width}`).toBe(title);
+        else expect(result.lines, `${title} at ${width}`).toHaveLength(3);
+      }
   });
 
   it('makes short cards compact and reserves title, description and metadata rows', () => {

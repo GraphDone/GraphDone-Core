@@ -14,12 +14,23 @@ export type TextMeasure = (
 
 /** Scripts written without spaces between words: a line may break between any two characters there. */
 const UNSPACED_SCRIPT = /[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff]/;
+/**
+ * A path, URL, identifier or number rather than a word: inside its leading and
+ * trailing punctuation it has something other than letters, or a capital after
+ * a small letter (camelCase).
+ */
+const isToken = (word: string) => /[^\p{L}'’]|\p{Ll}\p{Lu}/u.test(word.replace(/^\p{P}+|\p{P}+$/gu, ''));
+/** Where a token breaks best: after a separator, or before a capital in camelCase. */
+const tokenBreak = (chars: string[], at: number) =>
+  /[\/\\._:?=&#,;+~|@-]/.test(chars[at - 1]) || (/[\p{Ll}\p{N}]/u.test(chars[at - 1]) && /\p{Lu}/u.test(chars[at]));
 
 /**
- * `text` in at most `maxLines` lines no wider than `width`, broken only at
- * spaces. A word wider than a line is never split across lines: it is cut and
- * ends in "…" (scripts written without spaces still break between
- * characters). When more text follows the last line, that line ends in "…".
+ * `text` in at most `maxLines` lines no wider than `width`, broken at spaces.
+ * A word wider than a line is never split across lines: it is cut and ends in
+ * "…". A path, URL or identifier wider than a line breaks inside instead
+ * (after a separator or before a capital where it can) and shows in full while
+ * lines are left, as do scripts written without spaces. When more text
+ * follows the last line, that line ends in "…".
  */
 export function fitGraphText(
   text: string,
@@ -72,9 +83,14 @@ export function fitGraphText(
     // The next word alone is wider than the line (or the last line has room
     // for none of the words and the "…").
     const chars = Array.from(words[next]);
-    if (!last && UNSPACED_SCRIPT.test(words[next])) {
-      const take = longest(chars, '');
+    if (!last && (UNSPACED_SCRIPT.test(words[next]) || isToken(words[next]))) {
+      let take = longest(chars, '');
       if (!take) return { lines: [...lines, '…'], truncated: true };
+      for (let at = take; at > 0; at--)
+        if (tokenBreak(chars, at)) {
+          take = at;
+          break;
+        }
       lines.push(chars.slice(0, take).join(''));
       words[next] = chars.slice(take).join('');
       continue;
