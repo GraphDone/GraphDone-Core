@@ -26,9 +26,16 @@ flowchart LR
 | --- | --- |
 | [`link.ts`](link.ts) | Start here. `offlineLink`, the first link in [`../apollo.ts`](../apollo.ts). Handles `graphs`, `workItems`, `workItem`, `edges`, their create/update/delete mutations, `restoreWorkItem`, `me` and `guestLogin`; everything else is forwarded. Shapes rows as the server's GraphQL types would. |
 | [`engine.ts`](engine.ts) | Account and project state: `listProjects`, `getProject`, `syncNow` (one tab at a time via Web Locks), `resolveConflict`, `prepareOffline`, backup `exportOffline` / `importOffline`, `exportProject`. `useOffline` exposes status to the UI. |
-| [`model.ts`](model.ts) | Pure data model: `Snapshot` (project, nodes, edges, notes), change detection, the three-way `merge`, upload requests and backup validation. |
+| [`model.ts`](model.ts) | Pure data model: `Snapshot` (project, nodes, edges, notes), change detection, the three-way `merge`, upload requests and backup validation, and the graph hierarchy (`graphType`, `graphPath`, `createsCycle`). |
 | [`store.ts`](store.ts) | IndexedDB `graphdone-offline` (one record per account) and a `BroadcastChannel` so open tabs see each other's writes. |
-| `link.test.ts`, `model.test.ts` | Vitest tests: the link answering GraphQL from a fixture account, and merge rules (no lost edits, conflicts kept until a person chooses). |
+| `link.test.ts`, `model.test.ts`, `engine.test.ts` | Vitest tests: the link answering GraphQL from a fixture account (including graphs inside projects and the whole starter workspace), merge rules (no lost edits, conflicts kept until a person chooses), and backup import keeping or rejecting a hierarchy. |
+
+Each graph is a project row. A guest's row also keeps `type` and `parent_id`
+(the project it sits in); the link shapes `parentGraphId`, `depth` and `path`
+from that chain, moves graphs without cycles, and will not delete a project
+that still has graphs. Rows without these fields read as top-level projects.
+Signed-in accounts stay flat: `/api/sync` has no parent column yet and would
+drop the hierarchy on the next sync (#277).
 
 The `/api/sync` service is part of the hosted build, not of
 [`packages/server/`](../../../../server/README.md); in development Vite proxies

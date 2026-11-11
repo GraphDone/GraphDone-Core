@@ -5,11 +5,19 @@ import { valueFromASTUntyped } from 'graphql';
 import { getUserRaw } from '../authStorage';
 import { offlineEnabled,ownerId,localGuest,primaryProjectId,sessionAccountId,listProjects,getProject } from './engine';
 import { readAccount,editAccount } from './store';
-import { Row,Snapshot } from './model';
+import { Account,Row,Snapshot,GRAPH_TYPES,OFFLINE_PROJECT_LIMIT,graphType,graphPath,createsCycle } from './model';
+import { projectDeleteMessage } from '../workspaceRules';
 const iso=(n:number)=>new Date(n*1000).toISOString();
 const now=()=>Math.floor(Date.now()/1000);
-function graph(row:Row,s?:Snapshot|null):any {
- return {__typename:'Graph',id:row.id,name:row.name,description:'',type:'PROJECT',status:'ACTIVE',parentGraphId:null,teamId:null,createdBy:row.owner_id,tags:[],defaultRole:'USER',depth:0,path:[],isShared:false,nodeCount:s?.nodes.length??row.node_count??0,edgeCount:s?.edges.length??row.edge_count??0,contributorCount:1,lastActivity:iso(row.created_at||now()),settings:JSON.stringify({theme:'dark',layout:'force',showPriorities:true,showDependencies:true,autoLayout:true,zoomLevel:1}),permissions:JSON.stringify({owner:row.owner_id,admins:[row.owner_id],editors:[],viewers:[],teamPermission:'VIEW'}),shareSettings:JSON.stringify({isPublic:false,allowTeamAccess:false,allowCopying:false,allowForking:false}),team:null,createdAt:iso(row.created_at||now()),updatedAt:iso(row.created_at||now()),workItems:[],subgraphs:[],parentGraph:null};
+/** Every graph row the account can see, as listProjects reads them. */
+function accountRows(a:Account):Map<string,Row> {
+ const rows=new Map(a.list.map(r=>[r.id,r]));
+ for(const [id,p] of Object.entries(a.projects)){if(p.local)rows.set(id,p.local.project);else rows.delete(id);}
+ return rows;
+}
+function graph(row:Row,s?:Snapshot|null,rows?:Map<string,Row>):any {
+ const path=rows?graphPath(row,rows):row.parent_id!=null?[row.parent_id]:[];
+ return {__typename:'Graph',id:row.id,name:row.name,description:'',type:graphType(row),status:'ACTIVE',parentGraphId:path.length?path[path.length-1]:null,teamId:null,createdBy:row.owner_id,tags:[],defaultRole:'USER',depth:path.length,path,isShared:false,nodeCount:s?.nodes.length??row.node_count??0,edgeCount:s?.edges.length??row.edge_count??0,contributorCount:1,lastActivity:iso(row.created_at||now()),settings:JSON.stringify({theme:'dark',layout:'force',showPriorities:true,showDependencies:true,autoLayout:true,zoomLevel:1}),permissions:JSON.stringify({owner:row.owner_id,admins:[row.owner_id],editors:[],viewers:[],teamPermission:'VIEW'}),shareSettings:JSON.stringify({isPublic:false,allowTeamAccess:false,allowCopying:false,allowForking:false}),team:null,createdAt:iso(row.created_at||now()),updatedAt:iso(row.created_at||now()),workItems:[],subgraphs:[],parentGraph:null};
 }
 export function workItem(row:Row,s:Snapshot):any {
  const lite=(id:string)=>{const n=s.nodes.find(n=>n.id===id);return n?{__typename:'WorkItem',id:n.id,title:n.title,type:n.type,status:n.status}:null;};
@@ -79,8 +87,8 @@ export const offlineLink=new ApolloLink((operation,forward)=>{
      const id=crypto.randomUUID();value={__typename:'AuthPayload',token:'local-guest',user:{__typename:'User',id,name:'Guest',username:'Guest',email:'',role:'GUEST',isActive:true,isEmailVerified:false,avatar:null,team:null}};
      await editAccount(id,a=>{a.listedAt=Date.now();});
     }else if(name==='graphs') {
-     const list=await listProjects();const a=await readAccount(ownerId()!);
-     value=list.map(p=>graph(p,a.projects[p.id]?.local)).filter(g=>matches(g,args.where));
+     const list=await listProjects();const a=await readAccount(ownerId()!),rows=new Map(list.map(p=>[p.id,p]));
+     value=list.map(p=>graph(p,a.projects[p.id]?.local,rows)).filter(g=>matches(g,args.where));
      if(args.where?.id)for(const g of value){const s=await getProject(g.id);g.workItems=s.nodes.map(n=>workItem(n,s));}
     }else if(['workItems','workItem','edges'].includes(name)) {
      const id=await findProject(args,name==='edges'?'edges':'nodes'),s=await getProject(id);
@@ -96,10 +104,15 @@ export const offlineLink=new ApolloLink((operation,forward)=>{
       if(a.blocked==='validation'){a.retryAt=0;a.error='';delete a.blocked;}
       if(name==='createGraphs') {
        const occupied=new Set(a.list.filter(r=>!a.projects[r.id]||a.projects[r.id].base||a.projects[r.id].local).map(r=>r.id));for(const [id,p] of Object.entries(a.projects))if(p.base||p.local)occupied.add(id);
-       const input=Array.isArray(args.input)?args.input:[args.input];if(occupied.size+input.length>100)throw Error('This account can hold 100 projects. Sync a project deletion before adding another.');
+       const input=Array.isArray(args.input)?args.input:[args.input];if(occupied.size+input.length>OFFLINE_PROJECT_LIMIT)throw Error(`This account can hold ${OFFLINE_PROJECT_LIMIT} projects. Sync a project deletion before adding another.`);
+       // Only guests keep a hierarchy: /api/sync has no parent column yet, so a signed-in account stays flat (#277).
+       const rows=accountRows(a),hierarchy=localGuest();
        const created=input.map((i:any)=>{
         if(!i.name?.trim())throw Error('A project name is required.');
-        const id=crypto.randomUUID(),s:Snapshot={project:{id,name:i.name.slice(0,120),owner_id:owner,created_at:now(),sync_version:0},nodes:[],edges:[],notes:[]};a.projects[id]={base:null,local:s,checkedAt:Date.now()};return graph(s.project,s);
+        const type=i.type??'PROJECT',parent=i.parentGraphId??null;
+        if(hierarchy&&!GRAPH_TYPES.includes(type))throw Error('Choose a project, workspace, sub-graph or template.');
+        if(hierarchy&&parent!=null&&(typeof parent!=='string'||!rows.has(parent)))throw Error('The parent project does not exist.');
+        const id=crypto.randomUUID(),s:Snapshot={project:{id,name:i.name.slice(0,120),owner_id:owner,created_at:now(),sync_version:0,...(hierarchy?{type,parent_id:parent}:{})},nodes:[],edges:[],notes:[]};a.projects[id]={base:null,local:s,checkedAt:Date.now()};rows.set(id,s.project);return graph(s.project,s,rows);
        });return {__typename:'GraphsMutationResponse',graphs:created};
       }
       const p=a.projects[pid],s=p?.local;if(!s)throw Error('Download this project before editing offline.');
@@ -117,8 +130,23 @@ export const offlineLink=new ApolloLink((operation,forward)=>{
        if(s.nodes.length>=300)throw Error('This project can hold 300 tasks. Start another project to continue.');
        s.nodes.push(row);return workItem(row,s);
       }
-      if(name==='updateGraphs'){if(args.update.name!==undefined)s.project.name=String(args.update.name).trim().slice(0,120);if(!s.project.name)throw Error('A project name is required.');return {__typename:'GraphsMutationResponse',graphs:[graph(s.project,s)]};}
-      if(name==='deleteGraphs'){const count=s.nodes.length;p.local=null;return {__typename:'DeleteResponse',nodesDeleted:count,relationshipsDeleted:s.edges.length};}
+      if(name==='updateGraphs'){
+       const u=args.update,rows=accountRows(a);
+       if(u.name!==undefined)s.project.name=String(u.name).trim().slice(0,120);if(!s.project.name)throw Error('A project name is required.');
+       if(localGuest()&&u.type!==undefined){if(!GRAPH_TYPES.includes(u.type))throw Error('Choose a project, workspace, sub-graph or template.');s.project.type=u.type;}
+       if(localGuest()&&'parentGraphId' in u) {
+        const parent=u.parentGraphId??null;
+        if(parent!=null&&(typeof parent!=='string'||!rows.has(parent)))throw Error('The parent project does not exist.');
+        if(parent!=null&&createsCycle(pid,parent,rows))throw Error('A graph cannot be moved inside itself.');
+        s.project.parent_id=parent;
+       }
+       return {__typename:'GraphsMutationResponse',graphs:[graph(s.project,s,rows)]};
+      }
+      if(name==='deleteGraphs'){
+       const children=[...accountRows(a).values()].filter(r=>r.parent_id===pid).length;
+       if(children)throw Error(projectDeleteMessage(s.project.name,children));
+       const count=s.nodes.length;p.local=null;return {__typename:'DeleteResponse',nodesDeleted:count,relationshipsDeleted:s.edges.length};
+      }
       const deleted=name.startsWith('delete'),created=name.startsWith('create');
       if(deleted) {
        const ids=new Set(s[table].filter(row=>matches(table==='nodes'?workItem(row,s):edge(row,s),args.where)).map(r=>r.id));

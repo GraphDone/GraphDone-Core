@@ -188,6 +188,7 @@ jobs:
               smoke ci-smoke
               semantic-lod ci-semantic-lod xvfb
               layout-recovery ci-layout-recovery xvfb
+              example-resume ci-example-resume
               organize-labels ci-organize-labels
     services:
       neo4j:
