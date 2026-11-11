@@ -150,6 +150,80 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
     }
   };
 
+  // The shared Welcome graph is the system's; a Welcome graph of the user's own is theirs to change.
+  const systemGraph = (graph: any) => graph.createdBy === 'system' ||
+    graph.id === 'welcome-graph-shared' ||
+    (graph.name?.toLowerCase() === 'welcome' && graph.createdBy !== currentUser?.id);
+
+  const graphActions = (graph: any) => (
+    <div className="shrink-0 flex items-center space-x-1 opacity-0 group-hover/item:opacity-100 transition-opacity ml-2">
+      {onEditGraph && (() => {
+        const isSystemGraph = systemGraph(graph);
+        return (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!isSystemGraph) {
+                onEditGraph(graph);
+                setIsOpen(false);
+              }
+            }}
+            onMouseEnter={(e) => {
+              if (isSystemGraph) {
+                const rect = e.currentTarget.getBoundingClientRect();
+                setHoveredTooltip({
+                  message: '🔒 System graph — can\'t be edited',
+                  x: rect.right + 8,
+                  y: rect.top + rect.height / 2
+                });
+              }
+            }}
+            onMouseLeave={() => setHoveredTooltip(null)}
+            className={`p-1.5 rounded-lg transition-all duration-200 ${
+              isSystemGraph
+                ? 'text-gray-600 cursor-not-allowed'
+                : 'text-gray-400 hover:text-blue-400 hover:bg-blue-500/20 hover:scale-110'
+            }`}
+          >
+            <Edit3 className="h-3.5 w-3.5" />
+          </button>
+        );
+      })()}
+      {onDeleteGraph && (() => {
+        const isSystemGraph = systemGraph(graph);
+        return (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!isSystemGraph) {
+                onDeleteGraph(graph);
+                setIsOpen(false);
+              }
+            }}
+            onMouseEnter={(e) => {
+              if (isSystemGraph) {
+                const rect = e.currentTarget.getBoundingClientRect();
+                setHoveredTooltip({
+                  message: '🔒 System graph — can\'t be deleted',
+                  x: rect.right + 8,
+                  y: rect.top + rect.height / 2
+                });
+              }
+            }}
+            onMouseLeave={() => setHoveredTooltip(null)}
+            className={`p-1.5 rounded-lg transition-all duration-200 ${
+              isSystemGraph
+                ? 'text-gray-600 cursor-not-allowed'
+                : 'text-gray-400 hover:text-red-400 hover:bg-red-500/20 hover:scale-110'
+            }`}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        );
+      })()}
+    </div>
+  );
+
   // Toggle dropdown and calculate position
   const toggleDropdown = () => {
     if (!isOpen) {
@@ -399,98 +473,30 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
                               )}
                             </button>
                             
-                            {/* Per-Graph Actions */}
-                            <div className="shrink-0 flex items-center space-x-1 opacity-0 group-hover/item:opacity-100 transition-opacity ml-2">
-                              {onEditGraph && (() => {
-                                const isSystemGraph = graph.createdBy === 'system' ||
-                                                    graph.id === 'welcome-graph-shared' ||
-                                                    graph.name?.toLowerCase() === 'welcome';
-                                return (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      if (!isSystemGraph) {
-                                        onEditGraph(graph);
-                                        setIsOpen(false);
-                                      }
-                                    }}
-                                    onMouseEnter={(e) => {
-                                      if (isSystemGraph) {
-                                        const rect = e.currentTarget.getBoundingClientRect();
-                                        setHoveredTooltip({
-                                          message: '🔒 System graph - Cannot editable',
-                                          x: rect.right + 8,
-                                          y: rect.top + rect.height / 2
-                                        });
-                                      }
-                                    }}
-                                    onMouseLeave={() => setHoveredTooltip(null)}
-                                    className={`p-1.5 rounded-lg transition-all duration-200 ${
-                                      isSystemGraph
-                                        ? 'text-gray-600 cursor-not-allowed'
-                                        : 'text-gray-400 hover:text-blue-400 hover:bg-blue-500/20 hover:scale-110'
-                                    }`}
-                                  >
-                                    <Edit3 className="h-3.5 w-3.5" />
-                                  </button>
-                                );
-                              })()}
-                              {onDeleteGraph && (() => {
-                                const isSystemGraph = graph.createdBy === 'system' ||
-                                                    graph.id === 'welcome-graph-shared' ||
-                                                    graph.name?.toLowerCase() === 'welcome';
-                                return (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      if (!isSystemGraph) {
-                                        onDeleteGraph(graph);
-                                        setIsOpen(false);
-                                      }
-                                    }}
-                                    onMouseEnter={(e) => {
-                                      if (isSystemGraph) {
-                                        const rect = e.currentTarget.getBoundingClientRect();
-                                        setHoveredTooltip({
-                                          message: '🔒 System graph - Cannot deletable',
-                                          x: rect.right + 8,
-                                          y: rect.top + rect.height / 2
-                                        });
-                                      }
-                                    }}
-                                    onMouseLeave={() => setHoveredTooltip(null)}
-                                    className={`p-1.5 rounded-lg transition-all duration-200 ${
-                                      isSystemGraph
-                                        ? 'text-gray-600 cursor-not-allowed'
-                                        : 'text-gray-400 hover:text-red-400 hover:bg-red-500/20 hover:scale-110'
-                                    }`}
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </button>
-                                );
-                              })()}
-                            </div>
+                            {graphActions(graph)}
                           </div>
                           {graph.children && graph.children.length > 0 && expandedGraphs.has(graph.id) && (
                             <div className="ml-6 mt-1 space-y-1 border-l border-gray-700/40 pl-2">
                               {graph.children.map((child: any) => (
-                                <button
-                                  key={child.id}
-                                  onClick={() => handleGraphSelect(child.id)}
-                                  className={`w-full flex items-center space-x-2 p-2 rounded-lg text-left transition-all duration-200 ${
-                                    child.id === currentGraph?.id
-                                      ? 'bg-emerald-500/20 text-emerald-200 border border-emerald-400/40'
-                                      : 'hover:bg-gray-700/50 text-gray-300 border border-transparent'
-                                  }`}
-                                >
-                                  <div className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 ${getGraphTypeColor(child.type)}`}>
-                                    {getGraphTypeIcon(child.type)}
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <div className="text-xs font-medium truncate">{child.name}</div>
-                                    <div className="text-xs text-gray-400">{child.nodeCount || 0} items • {child.edgeCount || 0} connections</div>
-                                  </div>
-                                </button>
+                                <div key={child.id} className="flex min-w-0 items-center group/item">
+                                  <button
+                                    onClick={() => handleGraphSelect(child.id)}
+                                    className={`min-w-0 flex-1 flex items-center space-x-2 p-2 rounded-lg text-left transition-all duration-200 ${
+                                      child.id === currentGraph?.id
+                                        ? 'bg-emerald-500/20 text-emerald-200 border border-emerald-400/40'
+                                        : 'hover:bg-gray-700/50 text-gray-300 border border-transparent'
+                                    }`}
+                                  >
+                                    <div className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 ${getGraphTypeColor(child.type)}`}>
+                                      {getGraphTypeIcon(child.type)}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="text-xs font-medium truncate">{child.name}</div>
+                                      <div className="text-xs text-gray-400">{child.nodeCount || 0} items • {child.edgeCount || 0} connections</div>
+                                    </div>
+                                  </button>
+                                  {graphActions(child)}
+                                </div>
                               ))}
                             </div>
                           )}

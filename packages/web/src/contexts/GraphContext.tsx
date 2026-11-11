@@ -14,6 +14,7 @@ import { GET_WORK_ITEMS, GET_EDGES, DELETE_WORK_ITEM, CREATE_WORK_ITEM, CREATE_E
 import { buildStarterWorkspace, createStarterWorkspace, starterGraphCount, type StarterApi } from '../lib/starterWorkspace';
 import { offlineEnabled, localGuest } from '../lib/offline/engine';
 import { OFFLINE_PROJECT_LIMIT } from '../lib/offline/model';
+import { projectDeleteBlock } from '../lib/workspaceRules';
 
 const GraphContext = createContext<GraphContextType | undefined>(undefined);
 
@@ -561,10 +562,9 @@ export function GraphProvider({ children }: GraphProviderProps) {
 
   const deleteGraph = async (graphId: string): Promise<void> => {
     try {
-      const children = availableGraphs.filter(g => g.parentGraphId === graphId);
-      if (children.length > 0) {
-        throw new Error(`Cannot delete graph: it contains ${children.length} graph${children.length !== 1 ? 's' : ''}. Please delete them first.`);
-      }
+      const graph = availableGraphs.find(g => g.id === graphId);
+      const blocked = graph && projectDeleteBlock(graph, availableGraphs);
+      if (blocked) throw new Error(blocked);
 
       // First, check if the graph contains any nodes
       const { data: workItemsData } = await apolloClient.query({

@@ -4,7 +4,7 @@ import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { emptyAccount, type Account, type Snapshot } from './model';
 
-const fixture = vi.hoisted(() => ({ account: null as Account | null, graphId: 'project', guest: false, showSuccess: vi.fn(), showError: vi.fn() }));
+const fixture = vi.hoisted(() => ({ account: null as Account | null, graphId: 'project', graphs: [] as Array<{ id: string; name: string; parentGraphId?: string | null }>, guest: false, showSuccess: vi.fn(), showError: vi.fn() }));
 vi.mock('./store', () => ({
   readAccount: async () => structuredClone(fixture.account),
   editAccount: async (_owner: string, edit: (account: Account) => unknown) => {
@@ -28,7 +28,7 @@ vi.mock('./engine', () => ({
   },
 }));
 vi.mock('../authStorage', () => ({ getUserRaw: () => JSON.stringify({ id: 'owner', role: 'USER' }) }));
-vi.mock('../../contexts/GraphContext', () => ({ useGraph: () => ({ currentGraph: { id: fixture.graphId, name: fixture.graphId }, deleteGraph: vi.fn() }) }));
+vi.mock('../../contexts/GraphContext', () => ({ useGraph: () => ({ currentGraph: { id: fixture.graphId, name: fixture.graphId }, availableGraphs: fixture.graphs, deleteGraph: vi.fn() }) }));
 vi.mock('../../contexts/NotificationContext', () => ({ useNotifications: () => ({ showSuccess: fixture.showSuccess, showError: fixture.showError }) }));
 
 import { offlineLink } from './link';
@@ -53,6 +53,7 @@ describe('offline GraphQL bulk selection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     fixture.graphId = 'project';
+    fixture.graphs = [];
     fixture.account = emptyAccount();
     for (const s of [snapshot('project', ['a', 'b', 'c']), snapshot('other', ['d'])]) {
       fixture.account.projects[s.project.id] = { base: structuredClone(s), local: s, checkedAt: 0 };
@@ -105,6 +106,34 @@ describe('offline GraphQL bulk selection', () => {
     expect(fixture.account!.projects.project.local!.nodes).toEqual([]);
     expect(fixture.account!.projects.other.local!.nodes.map(n => n.id)).toEqual(['d']);
     expect(screen.queryByRole('button', { name: /Delete All Unconnected/ })).toBeNull();
+    client.stop();
+  });
+
+  it('inspects the graph that was clicked, not the one that is open', async () => {
+    const client = new ApolloClient({ link: offlineLink, cache: new InMemoryCache() });
+    const other = { id: 'other', name: 'other' } as never;
+    render(createElement(ApolloProvider, { client, children: createElement(DeleteGraphModal, { isOpen: true, onClose: vi.fn(), graph: other }) }));
+    expect(await screen.findByRole('button', { name: 'Delete All Unconnected Work Items (1)' })).not.toBeNull();
+    expect(screen.getByText('"other"')).not.toBeNull();
+    client.stop();
+  });
+
+  it('refuses a project that still holds graphs before anyone types its name', async () => {
+    fixture.graphs = [
+      { id: 'project', name: 'Getting started', parentGraphId: null },
+      ...['Welcome', 'Plan a launch', 'Fix bugs', 'Ideas'].map(name => ({ id: name, name, parentGraphId: 'project' })),
+    ];
+    const asked: string[] = [];
+    const spy = new ApolloLink((operation, forward) => { asked.push(operation.operationName); return forward(operation); });
+    const client = new ApolloClient({ link: spy.concat(offlineLink), cache: new InMemoryCache() });
+    const project = { id: 'project', name: 'Getting started' } as never;
+    render(createElement(ApolloProvider, { client, children: createElement(DeleteGraphModal, { isOpen: true, onClose: vi.fn(), graph: project }) }));
+    expect(screen.getByRole('alert').textContent).toBe('Getting started holds 4 graphs. Delete or move them first.');
+    expect(screen.getByText('This project still holds graphs')).not.toBeNull();
+    expect(screen.queryByRole('textbox')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Delete/ })).toBeNull();
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)); });
+    expect(asked).toEqual([]);
     client.stop();
   });
 
@@ -244,7 +273,7 @@ describe('offline graph hierarchy', () => {
 
   it('refuses to delete a project that still has graphs, so none is left without its parent', async () => {
     const child = await create({ name: 'Inside', type: 'SUBGRAPH', parentGraphId: 'other' });
-    await expect(run(DELETE_GRAPH, { id: 'other' })).rejects.toThrow('Cannot delete graph: it contains 1 graph. Please delete them first.');
+    await expect(run(DELETE_GRAPH, { id: 'other' })).rejects.toThrow('other holds 1 graph. Delete or move them first.');
     expect(fixture.account!.projects.other.local).not.toBeNull();
     await run(DELETE_GRAPH, { id: child.id });
     await run(DELETE_GRAPH, { id: 'other' });

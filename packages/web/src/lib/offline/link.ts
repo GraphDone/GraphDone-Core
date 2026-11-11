@@ -6,6 +6,7 @@ import { getUserRaw } from '../authStorage';
 import { offlineEnabled,ownerId,localGuest,primaryProjectId,sessionAccountId,listProjects,getProject } from './engine';
 import { readAccount,editAccount } from './store';
 import { Account,Row,Snapshot,GRAPH_TYPES,OFFLINE_PROJECT_LIMIT,graphType,graphPath,createsCycle } from './model';
+import { projectDeleteMessage } from '../workspaceRules';
 const iso=(n:number)=>new Date(n*1000).toISOString();
 const now=()=>Math.floor(Date.now()/1000);
 /** Every graph row the account can see, as listProjects reads them. */
@@ -143,7 +144,7 @@ export const offlineLink=new ApolloLink((operation,forward)=>{
       }
       if(name==='deleteGraphs'){
        const children=[...accountRows(a).values()].filter(r=>r.parent_id===pid).length;
-       if(children)throw Error(`Cannot delete graph: it contains ${children} graph${children===1?'':'s'}. Please delete them first.`);
+       if(children)throw Error(projectDeleteMessage(s.project.name,children));
        const count=s.nodes.length;p.local=null;return {__typename:'DeleteResponse',nodesDeleted:count,relationshipsDeleted:s.edges.length};
       }
       const deleted=name.startsWith('delete'),created=name.startsWith('create');
