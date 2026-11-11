@@ -35,6 +35,20 @@ function assertSmokeGateRuns(sequence, { out, xvfb }) {
   assert.equal(entries[0].display, xvfb ? 'xvfb' : '');
 }
 
+test('relationship-edit as a hosted guest leaves out the self-hosted second-tab path instead of skipping it', t => {
+  const report = { suites: [{ specs: [{ title: 'fixture', ok: true,
+    tests: [{ status: 'expected', expectedStatus: 'passed', results: [{ status: 'passed' }] }],
+  }] }], stats: { expected: 1, unexpected: 0, flaky: 0, skipped: 0 }, errors: [] };
+  for (const [backend, inverted] of [['selfhost', []], ['hosted-guest', ['--grep-invert=relationship-edit second-tab']]]) {
+    const { dir, run } = fixture(t);
+    writeFileSync(join(dir, 'bin/npx'), `#!${process.execPath}\nconst fs=require('node:fs'); fs.writeFileSync('bin/argv.json', JSON.stringify(process.argv.slice(2))); process.stdout.write(${JSON.stringify(JSON.stringify(report))});\n`, { mode: 0o700 });
+    const result = run(['--sequence', 'relationship-edit'], { JOURNEY_BACKEND: backend });
+    assert.equal(result.status, 0, result.stdout);
+    const args = JSON.parse(readFileSync(join(dir, 'bin/argv.json')));
+    assert.deepEqual(args.filter(arg => arg.startsWith('--grep')), inverted, backend);
+  }
+});
+
 test('required performance and mobile gates select their bounded suites without retries', () => {
   assert.deepEqual(SEQUENCES['perf-budgets'].args, ['tests/perf/graph-perf.spec.ts', '--project=perf', '--workers=1', '--retries=0', '--trace=retain-on-failure']);
   assert.equal(SEQUENCES['perf-budgets'].blocking, true);
@@ -61,8 +75,8 @@ function fixture(t) {
   execFileSync('git', ['add', '.'], { cwd: dir });
   execFileSync('git', ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'fixture'], { cwd: dir, env: { ...process.env, GIT_TRACE2_EVENT: join(dir, 'bin/git-trace.jsonl') } });
   t.after(() => rmSync(dir, { recursive: true, force: true }));
-  const run = args => spawnSync(process.execPath, ['tests/run-unified.mjs', ...args], {
-    cwd: dir, env: { ...process.env, PATH: `${join(dir, 'bin')}:${process.env.PATH}` }, encoding: 'utf8', timeout: 10000,
+  const run = (args, env = {}) => spawnSync(process.execPath, ['tests/run-unified.mjs', ...args], {
+    cwd: dir, env: { ...process.env, PATH: `${join(dir, 'bin')}:${process.env.PATH}`, ...env }, encoding: 'utf8', timeout: 10000,
   });
   return { dir, run };
 }

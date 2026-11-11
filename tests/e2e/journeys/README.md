@@ -61,7 +61,9 @@ The `journeys` sequence (every journey, repeated) is report-only: not in CI or t
 - `relationship-edit`, once per path and device: self-hosted in CI shard
   "toolchain, schematic, LOD, layout, relationship edit", and as a hosted guest
   (the hosted build served without the dev proxy, its API on a port where nothing
-  listens) in shard "wires, agents, inspector, effects, perf, guest relationship edit".
+  listens; the self-hosted `second-tab` path is left out, since a blocking run
+  allows no skips) in shard "wires, agents, inspector, effects, perf, guest
+  relationship edit".
 - `zoom-out` (`node tests/run-unified.mjs --sequence zoom-out`), once per device:
   CI shard "new user, zoom out".
 

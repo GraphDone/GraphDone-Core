@@ -94,9 +94,12 @@ export const SEQUENCES = {
   // RELATIONSHIP EDIT (#262): change a relationship's type through every type,
   // flip it, reload, delete it, and see a second tab catch up, once per path on
   // desktop, iPad and iPhone. The repeated measurement is the journeys sequence.
+  // A guest's workspace lives in one browser, so with JOURNEY_BACKEND=hosted-guest
+  // the second-tab path is left out rather than skipped (a blocking run allows no skips).
   'relationship-edit': { adapter: 'playwright', title: 'Relationship edit — type, flip, reload, delete on every device', args: [
     'tests/e2e/journeys/relationship-edit.spec.ts', '--project=journeys', '--project=journeys-ipad', '--project=journeys-iphone',
     '--workers=2', '--retries=0', '--trace=retain-on-failure',
+    ...(process.env.JOURNEY_BACKEND === 'hosted-guest' ? ['--grep-invert=relationship-edit second-tab'] : []),
   ], blocking: true },
   // ZOOM OUT (#277): from the Welcome graph to the projects, every step must show
   // readable text and the levels go items → graph → neighbouring graphs →
