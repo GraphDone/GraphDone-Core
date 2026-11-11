@@ -12,6 +12,8 @@
  * as item positions): nothing enters the simulation or the position-save queue.
  */
 
+import { CARD_TITLES_HIDE_BELOW, CARD_TITLES_SHOW_ABOVE } from './cardTitleZoom';
+
 export interface ZoomGraph {
   id: string;
   name: string;
@@ -221,10 +223,10 @@ export interface ZoomLevelState {
 
 export const INITIAL_ZOOM_STATE: ZoomLevelState = { cardsHidden: false, siblings: false, projects: false };
 
-/** Below this scale compact card titles are fragments (they hide entirely below
- * 0.3), so the graph's own label takes over. */
-export const CARD_TITLES_HIDE_BELOW = 0.34;
-export const CARD_TITLES_SHOW_ABOVE = 0.38;
+/** Below CARD_TITLES_HIDE_BELOW compact card titles are fragments (they hide
+ * entirely below 0.3), so the graph's own label takes over. The relationship
+ * labels share the cutoff, so both live in cardTitleZoom. */
+export { CARD_TITLES_HIDE_BELOW, CARD_TITLES_SHOW_ABOVE };
 
 export interface ZoomLevelInput {
   scale: number;

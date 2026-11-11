@@ -23,24 +23,27 @@ export const ITEM_LABEL_BUDGET = {
   checks: 200000,
 } as const;
 
+export type ItemLabelBudget = { labels: number; attempts: number; checks: number };
+
 export function placeItemLabels(
   candidates: readonly ItemLabelCandidate[],
   options: {
     viewport: ObstacleBox;
     obstacles: readonly ObstacleBox[];
     segments: readonly Pick<EdgeRouteSegment, 'source' | 'target'>[];
-  }
+  },
+  limits: ItemLabelBudget = ITEM_LABEL_BUDGET
 ) {
   const placements = new Map<string, EdgeRouteLabel>();
   const occupied: ObstacleBox[] = [];
-  const budget = { remaining: ITEM_LABEL_BUDGET.checks as number };
+  const budget = { remaining: limits.checks };
   let attempts = 0;
   for (const candidate of [...candidates].sort((a, b) =>
     (a.priority ?? 0) - (b.priority ?? 0) || a.id.localeCompare(b.id)
   )) {
     if (
-      placements.size >= ITEM_LABEL_BUDGET.labels ||
-      attempts >= ITEM_LABEL_BUDGET.attempts ||
+      placements.size >= limits.labels ||
+      attempts >= limits.attempts ||
       budget.remaining <= 0
     )
       break;
@@ -65,21 +68,29 @@ export function placeItemLabels(
     });
     if (!placement) continue;
     placements.set(candidate.id, placement);
-    const angle = (placement.rotation * Math.PI) / 180;
     occupied.push({
       x: placement.x,
       y: placement.y,
-      width:
-        Math.abs(Math.cos(angle)) * candidate.dims.width +
-        Math.abs(Math.sin(angle)) * candidate.dims.height,
-      height:
-        Math.abs(Math.sin(angle)) * candidate.dims.width +
-        Math.abs(Math.cos(angle)) * candidate.dims.height,
+      width: candidate.dims.width,
+      height: candidate.dims.height,
+      rotation: placement.rotation,
     });
   }
   return {
     placements,
     attempts,
-    checks: ITEM_LABEL_BUDGET.checks - budget.remaining,
+    checks: limits.checks - budget.remaining,
   };
+}
+
+/**
+ * Whether placing the same labels again from other spots could show more: a
+ * label on screen was tried and found no spot, and the label cap leaves room
+ * for it. Labels off screen, not drawn, or past the cap are never tried.
+ */
+export function labelsMissed(
+  result: { placements: ReadonlyMap<string, unknown>; attempts: number },
+  limits: ItemLabelBudget = ITEM_LABEL_BUDGET
+) {
+  return result.placements.size < Math.min(result.attempts, limits.labels);
 }

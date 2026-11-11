@@ -349,3 +349,31 @@ it('packs loose cards side by side on a landscape phone instead of stacking them
   const three = organizeTopology([...nodes, { id: 'third' }], [], () => ({ width: 240, height: 140 }), { width: 390, height: 844 });
   expect(new Set([...three.positions.values()].map(point => Math.round(point.x))).size).toBe(1);
 });
+
+it('gives every edge the visible length its edgeGap asks for, in chains, cycles and hub rings', () => {
+  const visible = (result: ReturnType<typeof organizeTopology>, a: string, b: string, nodes: { id: string }[]) => {
+    const p = result.positions.get(a)!, q = result.positions.get(b)!;
+    const da = size(nodes.find(node => node.id === a)!), db = size(nodes.find(node => node.id === b)!);
+    const dx = q.x - p.x, dy = q.y - p.y, length = Math.hypot(dx, dy);
+    const reach = (d: { width: number; height: number }) => {
+      const s = Math.min(dx ? d.width / 2 / Math.abs(dx) : Infinity, dy ? d.height / 2 / Math.abs(dy) : Infinity);
+      return Math.hypot(dx * s, dy * s);
+    };
+    return length - reach(da) - reach(db);
+  };
+  const shapes = {
+    chain: { nodes: ['a', 'b', 'c', 'd'], edges: [edge('a', 'b'), edge('b', 'c'), edge('c', 'd')] },
+    cycle: { nodes: ['a', 'b', 'c', 'd', 'e'], edges: [edge('a', 'b'), edge('b', 'c'), edge('c', 'd'), edge('d', 'e'), edge('e', 'a')] },
+    hub: { nodes: ['hub', ...Array.from({ length: 9 }, (_, i) => `leaf-${i}`)], edges: Array.from({ length: 9 }, (_, i) => edge('hub', `leaf-${i}`)) },
+  };
+  for (const [name, shape] of Object.entries(shapes)) {
+    const nodes = shape.nodes.map(id => ({ id }));
+    const plain = organizeTopology(nodes, shape.edges, size, view);
+    const roomy = organizeTopology(nodes, shape.edges, size, view, 64, { edgeGap: () => 260 });
+    for (const e of shape.edges) {
+      expect(visible(roomy, e.source, e.target, nodes), `${name} ${e.source}-${e.target}`).toBeGreaterThanOrEqual(259.5);
+    }
+    expect(Math.min(...shape.edges.map(e => visible(plain, e.source, e.target, nodes)))).toBeLessThan(259.5);
+    checkClearance(roomy, nodes);
+  }
+});

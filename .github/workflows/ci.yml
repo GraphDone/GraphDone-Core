@@ -191,6 +191,7 @@ jobs:
               semantic-lod ci-semantic-lod xvfb
               layout-recovery ci-layout-recovery xvfb
               example-resume ci-example-resume
+              organize-labels ci-organize-labels
               relationship-edit ci-relationship-edit
     services:
       neo4j:

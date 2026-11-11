@@ -60,12 +60,13 @@ import { mergeSimulationNodes, mergeSimulationEdges } from '../lib/graphDataMerg
 import type { ObstacleBox } from '../lib/edgeLabelLayout';
 import { createParallelEdgeRoute, edgeRouteLabel, edgeRouteArrowBounds, edgeSegmentHitsBox, projectEdgeRoutePointer, type EdgeRouteGeometry, type EdgeRouteLabel } from '../lib/edgeRouteGeometry';
 import { PerfMeter, DriftMeter } from '../lib/perfMeter';
-import { computeGraphFit } from '../lib/graphFit';
+import { computeGraphFit, type FitObstacle } from '../lib/graphFit';
 import { appendNodeControlGlyph, nodeControlGlyphTransform } from '../lib/nodeControlIcons';
 import { graphItemLayout, itemTitleScale, measureGraphText, edgeLabelDimensions, GRAPH_FONT_FAMILY, ITEM_TITLE_SIZE, ITEM_TITLE_LINE, ITEM_HEADER_HEIGHT, EDGE_LABEL_SIZE, ITEM_WIRE_WIDTH } from '../lib/graphSymbolLayout';
-import { placeItemLabels } from '../lib/edgeLabelPlacement';
+import { placeItemLabels, labelsMissed } from '../lib/edgeLabelPlacement';
 import { separateCards } from '../lib/separateCards';
 import { organizeTopology } from '../lib/topologyOrganization';
+import { clearFreeCards, framedZoom, labelGap, LABEL_MIN_ZOOM, LAYOUT_CHECKS, organizeWithLabelRoom, ORGANIZED_ZOOM_FLOOR, SMALL_GRAPH_ZOOM_FLOOR, WHOLE_FIT_MAX_CARDS, type LabelEdge, type LabelRoomOptions } from '../lib/labelClearance';
 import { LocalItemNeighborhood } from './LocalItemNeighborhood';
 import { frameOrganizedNeighborhood } from '../lib/organizationCamera';
 import { DEFAULT_PHYSICS, collisionRadius, linkDistance, linkMaxDistance, linkStrength } from '../lib/physicsConfig';
@@ -88,7 +89,7 @@ import type { ZoomLevel } from '../lib/graphZoomContext';
 const LOD_THRESHOLDS = {
   VERY_FAR: 0.3, // below: viewport-cull, basic shapes only
   FAR: 0.5,      // below: hide type text + edit/grow/expand/descend icons
-  CLOSE: 0.6,    // below: hide descriptions, edge labels, sub-graph counts
+  CLOSE: 0.6,    // below: hide descriptions, sub-graph counts (edge labels follow card titles)
 };
 
 // Above this node count a graph is "dense": the continuous living-graph effects
@@ -113,6 +114,43 @@ const DOT_SCALE = 0.2;
 // The smallest zoom a phone frames the graph at: small cards still show their
 // title (kept at 14 px on screen) and status stripe.
 const PHONE_READABLE_SCALE = 0.5;
+
+// The label size the automatic layouts leave room for: a drawn relationship's
+// measured label ("+N" included once the renderer has set it), else none.
+const drawnLabel = (edge: any) => edge._priorityVisible === false ? null
+  : edge._labelDims ?? edgeLabelDimensions(measureGraphText(getRelationshipConfig(edge.type as RelationshipType)?.label || '', EDGE_LABEL_SIZE));
+
+// A new arrangement places labels afresh from the middle of their edges, where
+// the layout left them room; the renderer otherwise starts from each label's
+// last spot. A label a person dragged keeps its place.
+/** Graphs with at most this many relationships retry a missing label from fresh spots. */
+const FRESH_LABEL_RETRY_MAX = 60;
+
+const forgetLabelSpots = (edges: any[]) => {
+  for (const edge of edges) if (!edge.labelTUser) delete edge.labelT;
+};
+
+// Screen rectangles of the fixed graph controls and MiniMap, inside the graph
+// area, that a camera fit keeps cards out of.
+function graphFitObstacles(container: HTMLElement, minimumScale: number): FitObstacle[] {
+  const width = container.clientWidth;
+  const height = container.clientHeight;
+  const containerRect = container.getBoundingClientRect();
+  const gap = 12;
+  return Array.from(document.querySelectorAll<HTMLElement>('[data-graph-fit-obstacle="true"]'))
+    // A passive save note lets taps through and disappears on its own; it
+    // must not reframe the camera under a person's first touch.
+    .filter(element => element.dataset.layoutSavePassive !== 'true' && !(minimumScale > 0 && element.dataset.layoutSaveProgress === 'true'))
+    .map(element => {
+      const rect = element.getBoundingClientRect();
+      return {
+        left: Math.max(0, Math.min(width, rect.left - containerRect.left - gap)),
+        top: Math.max(0, Math.min(height, rect.top - containerRect.top - gap)),
+        right: Math.max(0, Math.min(width, rect.right - containerRect.left + gap)),
+        bottom: Math.max(0, Math.min(height, rect.bottom - containerRect.top + gap)),
+      };
+    });
+}
 
 // Utility functions
 const getSmoothedOpacity = (scale: number, threshold: number, fadeRange: number = 0.2) => {
@@ -1799,6 +1837,16 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     }
     return layout;
   }, [getNodeDimensions]);
+  // Room for every relationship label in "Organize", the hierarchical rows and
+  // a settled force layout, framed as fitViewToNodes will frame it.
+  const labelRoom = useCallback((width: number, height: number, floor: number): LabelRoomOptions<WorkItem, any> => ({
+    dimensionsAt: getNodeDimensionsAt,
+    labelFor: drawnLabel,
+    priority: (edge: any) => relationshipPriorityTier(edge.type),
+    viewport: { width, height },
+    obstacles: containerRef.current ? graphFitObstacles(containerRef.current, floor) : [],
+    floor,
+  }), [getNodeDimensionsAt]);
 
   // Smart data update function - only reinitializes when necessary, preserves camera position
   const updateVisualizationData = useCallback(() => {
@@ -2201,17 +2249,14 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           const maxDistance = linkMaxDistance(width, height, phys);
           const preferred = currentDistance > maxDistance ? maxDistance : linkDistance(width, height, phys);
           // Floor: never pull connected nodes closer than their edge label
-          // needs to display — the label width sets a minimum edge length so
-          // it always fits in the border-to-border gap (edgeGeometry.minEdgeLength).
-          const label = getRelationshipConfig(d.type as RelationshipType)?.label || '';
-          // Slightly generous estimate of the rendered label box (10px/600 text
-          // + icon + padding) so the gap never UNDER-shoots the real label.
-          const labelW = label.length * 7 + 34;
+          // needs to display — the border-to-border gap its measured label,
+          // clearance and arrowhead take at 100% (labelClearance.labelGap).
           // Pass the edge direction so the minimum is just the per-angle border
-          // reach + label + a small margin (not an oversized half-diagonal buffer).
+          // reach + that gap (not an oversized half-diagonal buffer).
+          const label = drawnLabel(d);
           const dx = (d.target.x || 0) - (d.source.x || 0);
           const dy = (d.target.y || 0) - (d.source.y || 0);
-          const minLen = minEdgeLength(getNodeDimensions(d.source), getNodeDimensions(d.target), labelW, dx, dy);
+          const minLen = label ? minEdgeLength(getNodeDimensions(d.source), getNodeDimensions(d.target), labelGap(label, 1), dx, dy, 0) : 0;
           d._minLen = minLen; // cached for the hard min-edge constraint below
           return Math.max(preferred, minLen);
         })
@@ -3168,11 +3213,11 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       // Every connection label is a button: it opens the connection editor
       // (or, for a summarized pair, the list of its relationships).
       .attr('role', 'button')
-      .attr('tabindex', liveScale >= 0.6 ? 0 : -1)
-      .attr('aria-hidden', liveScale >= 0.6 ? null : 'true')
+      .attr('tabindex', liveScale >= LABEL_MIN_ZOOM ? 0 : -1)
+      .attr('aria-hidden', liveScale >= LABEL_MIN_ZOOM ? null : 'true')
       .attr('aria-label', (d: WorkItemEdge) => editEdgeLabel(d))
-      .style('opacity', (d: any) => (liveScale >= 0.6 ? 1 : 0))
-      .style('pointer-events', (d: any) => (liveScale >= 0.6 ? 1 : 0) > 0 ? 'all' : 'none')
+      .style('opacity', (d: any) => (liveScale >= LABEL_MIN_ZOOM ? 1 : 0))
+      .style('pointer-events', (d: any) => (liveScale >= LABEL_MIN_ZOOM ? 1 : 0) > 0 ? 'all' : 'none')
       .style('cursor', 'pointer')
       .on('click', (event: MouseEvent, edge: WorkItemEdge) => {
         if (!openPriorityPair(event, edge)) openEdgeEditor(event, edge);
@@ -3653,11 +3698,12 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       const center = d._labelIconCenter;
       label.select('.edge-label-icon').attr('transform', placement.iconRotation
         ? `rotate(${placement.iconRotation}, ${center.x}, ${center.y})` : null);
-      const angle = placement.rotation * Math.PI / 180;
+      // The turned label itself (edgeRouteLabel tests turned boxes exactly).
       labelRects.set(d.id, {
         x: placement.x, y: placement.y,
-        width: (Math.abs(Math.cos(angle)) * d._labelDims.width + Math.abs(Math.sin(angle)) * d._labelDims.height) * (d._labelScale || 1),
-        height: (Math.abs(Math.sin(angle)) * d._labelDims.width + Math.abs(Math.cos(angle)) * d._labelDims.height) * (d._labelScale || 1)
+        width: d._labelDims.width * (d._labelScale || 1),
+        height: d._labelDims.height * (d._labelScale || 1),
+        rotation: placement.rotation,
       });
     };
     let displayedPriority: typeof priorityProjection | null = null;
@@ -3738,14 +3784,25 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       const drawnEdges = visibleEdges.filter((edge: any) => edgeDisplay(edge) !== 'none');
       routeSegments = drawnEdges.flatMap((edge: any) => edge._route?.segments ?? []).filter(segment => edgeSegmentHitsBox(segment, labelViewport!, 8));
       routeObstacles = drawnEdges.map((edge: any) => edgeRouteArrowBounds(edge._route, arrowVisibility(liveK, edge._pTotal || 1).scale)).filter(intersectsViewport);
-      const result = placeItemLabels(edgeLabelGroups.data().map((d: any) => {
+      const candidates = edgeLabelGroups.data().map((d: any) => {
         d._labelScale = Math.max(1, 1 / liveK);
         return {
-          id: d.id, route: d._route, eligible: liveK >= 0.6 && edgeDisplay(d) !== 'none', priority: relationshipPriorityTier(d.type),
+          id: d.id, route: d._route, eligible: liveK >= LABEL_MIN_ZOOM && edgeDisplay(d) !== 'none', priority: relationshipPriorityTier(d.type),
           dims: { width: d._labelDims.width * d._labelScale, height: d._labelDims.height * d._labelScale },
-          t: d.labelT, offset: (d._routeLabel?.offset < 0 ? -1 : 1) * (26 * d._labelScale + 3),
+          t: d.labelT, offset: (d._routeLabel?.offset < 0 ? -1 : 1) * (26 * d._labelScale + 3), dragged: !!d.labelTUser,
         };
-      }), { viewport: labelViewport, obstacles: nodeLabelObstacles.concat(uiLabelObstacles.filter(intersectsViewport), routeObstacles), segments: routeSegments });
+      });
+      const placeOptions = { viewport: labelViewport, obstacles: nodeLabelObstacles.concat(uiLabelObstacles.filter(intersectsViewport), routeObstacles), segments: routeSegments };
+      let result = placeItemLabels(candidates, placeOptions);
+      // Spots remembered from earlier frames keep labels steady while cards
+      // move, but they can box out a label that a fresh placement shows (the
+      // layouts leave room for a fresh one, see labelClearance): in a small
+      // graph, when a label on screen found no spot (labelsMissed), try fresh
+      // spots and keep them if they show more.
+      if (candidates.length <= FRESH_LABEL_RETRY_MAX && labelsMissed(result)) {
+        const fresh = placeItemLabels(candidates.map(c => c.dragged ? c : { ...c, t: 0.5, offset: Math.abs(c.offset) }), placeOptions);
+        if (fresh.placements.size > result.placements.size) result = fresh;
+      }
       edgeLabelGroups.each(function(d: any) {
         const placement = result.placements.get(d.id) ?? null;
         d._labelBlocked = !placement;
@@ -3954,7 +4011,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     });
 
     // Update zoom with LOD updates
-    let labelsShownAtScale = liveScale >= 0.6;
+    // Relationship labels show while card titles do (they keep their screen size).
+    let labelsShownAtScale = liveScale >= LABEL_MIN_ZOOM;
     const updateZoomPresentation = (scale: number) => {
       if (itemPresentation.isOverview()) return;
       // Smooth opacity transitions based on zoom level
@@ -3976,8 +4034,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       activeNodes.selectAll('.node-description-text' as any)
         .style('opacity', getSmoothedOpacity(LOD_THRESHOLDS.CLOSE));
       // Edge labels + arrows follow the edge LOD module (zoom-aware, crowd-aware).
-      if (labelsShownAtScale !== (scale >= 0.6)) {
-        labelsShownAtScale = scale >= 0.6;
+      if (labelsShownAtScale !== (scale >= LABEL_MIN_ZOOM)) {
+        labelsShownAtScale = scale >= LABEL_MIN_ZOOM;
         edgeLabelGroups.style('opacity', labelsShownAtScale ? 1 : 0).style('pointer-events', labelsShownAtScale ? 'all' : 'none')
           .attr('tabindex', labelsShownAtScale ? 0 : -1).attr('aria-hidden', labelsShownAtScale ? null : 'true');
       }
@@ -4077,8 +4135,41 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // When the layout settles: record settle time, persist the arrangement so
     // it's durable across reloads, run a final edge-label de-overlap pass, and
     // center the camera. After this the simulation is idle (one-shot physics).
+    // A settled layout can leave cards the simulation placed itself too close
+    // for a label at the zoom the camera will frame them. Move only those free
+    // cards apart, never a saved or organized one (labelClearance.clearFreeCards).
+    // Larger graphs keep the settled layout (WHOLE_FIT_MAX_CARDS), and the
+    // work is bounded like a click's layout (LAYOUT_CHECKS): this runs on the
+    // main thread when the simulation ends.
+    const clearLabelsOfFreeCards = () => {
+      const simNodes = simulation.nodes() as any[];
+      if (simNodes.length > WHOLE_FIT_MAX_CARDS || !simNodes.some(node => node.fx == null)) return false;
+      const work = { remaining: LAYOUT_CHECKS };
+      forgetLabelSpots(validatedEdges as any[]);
+      const byId = new Map(simNodes.map(node => [node.id, node]));
+      const room = labelRoom(width, height, 0);
+      const labelled: LabelEdge[] = (validatedEdges as any[]).flatMap(edge => {
+        const label = drawnLabel(edge);
+        return label && byId.has(edge.source?.id) && byId.has(edge.target?.id)
+          ? [{ id: edge.id, source: edge.source.id, target: edge.target.id, label, priority: relationshipPriorityTier(edge.type) }]
+          : [];
+      });
+      let moved = false;
+      for (let pass = 0; pass < 2 && labelled.length; pass++) {
+        const positions = new Map(simNodes.map(node => [node.id, { x: node.x, y: node.y }]));
+        const zoom = Math.max(LABEL_MIN_ZOOM, framedZoom(simNodes, positions, room, 0));
+        const cards = simNodes.map(node => ({ id: node.id, x: node.x, y: node.y, ...getNodeDimensionsAt(node, zoom) }));
+        const cleared = clearFreeCards(cards, labelled, { zoom, free: id => byId.get(id)?.fx == null, work });
+        for (const [id, point] of cleared.moved) Object.assign(byId.get(id), { x: point.x, y: point.y, vx: 0, vy: 0 });
+        moved ||= cleared.moved.size > 0;
+        if (!cleared.moved.size || !cleared.hidden.length) break;
+      }
+      return moved;
+    };
+
     simulation.on('end.persist', () => {
       if (simulationRef.current !== simulation) return;
+      if (clearLabelsOfFreeCards()) nodeElements.attr('transform', (d: any) => `translate(${d.x || 0},${d.y || 0})`);
       publishPerf(performance.now(), true);
       if (layoutStartRef.current != null && lastSettleMsRef.current == null) {
         lastSettleMsRef.current = Math.round(performance.now() - layoutStartRef.current);
@@ -4212,9 +4303,15 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const altDragSourceRef = useRef<any>(null); // Alt-drag: item being dragged from
   const organizationZoomFloorRef = useRef(0);
   const organizationFocusRef = useRef<string>();
+  // Organize on a graph of at most WHOLE_FIT_MAX_CARDS: frame the whole graph
+  // down to the zoom where card titles and relationship labels still show (no
+  // phone floor). When even that is too small, stay centred if the graph
+  // nearly fits and frame the busiest card's neighbourhood otherwise.
+  const wholeGraphFitRef = useRef(false);
   useEffect(() => {
     organizationZoomFloorRef.current = 0;
     organizationFocusRef.current = undefined;
+    wholeGraphFitRef.current = false;
   }, [layoutScope]);
 
   // Fit view to show all nodes. Returns true if a fit transform was applied,
@@ -4238,21 +4335,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // the cards inside the largest rectangle that avoids every control and the
     // MiniMap, measuring each card with the geometry it will have at the fitted
     // scale (full at 100% and above, compact below) so repeated fits settle.
-    const containerRect = container.getBoundingClientRect();
-    const gap = 12;
-    const obstacles = Array.from(document.querySelectorAll<HTMLElement>('[data-graph-fit-obstacle="true"]'))
-      // A passive save note lets taps through and disappears on its own; it
-      // must not reframe the camera under a person's first touch.
-      .filter(element => element.dataset.layoutSavePassive !== 'true' && !(minimumScale > 0 && element.dataset.layoutSaveProgress === 'true'))
-      .map(element => {
-        const rect = element.getBoundingClientRect();
-        return {
-          left: Math.max(0, Math.min(width, rect.left - containerRect.left - gap)),
-          top: Math.max(0, Math.min(height, rect.top - containerRect.top - gap)),
-          right: Math.max(0, Math.min(width, rect.right - containerRect.left + gap)),
-          bottom: Math.max(0, Math.min(height, rect.bottom - containerRect.top + gap)),
-        };
-      });
+    const obstacles = graphFitObstacles(container, minimumScale);
     const cards = simNodes.filter((node: any) => typeof node.x === 'number' && typeof node.y === 'number');
     const fit = computeGraphFit({
       width,
@@ -4268,9 +4351,11 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // most important item; the rest is a pan away.
     // (Graphs of 40+ items open as a group overview, and a focused item has
     // its own camera; both zoom out on purpose and are left alone.)
-    const phoneFloor = window.matchMedia(COMPACT_WORKSPACE_QUERY).matches && cards.length < 40 && !localItemActiveRef.current
+    const phoneFloor = window.matchMedia(COMPACT_WORKSPACE_QUERY).matches && cards.length < 40 && !localItemActiveRef.current && !wholeGraphFitRef.current
       && PHONE_READABLE_SCALE > Math.max(scale, minimumScale);
     if (phoneFloor) minimumScale = PHONE_READABLE_SCALE;
+    // A small graph that nearly fits stays centred whole rather than on its hub.
+    const nearlyWhole = wholeGraphFitRef.current && scale >= 0.8 * minimumScale;
     if (minimumScale > scale) {
       // A freshly organized graph keeps a readable floor instead of shrinking
       // every card to fit: stay centred on the same cards at that scale.
@@ -4282,7 +4367,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     }
     const focus = (organizationFocusRef.current && cards.find(node => node.id === organizationFocusRef.current))
       || (phoneFloor ? [...cards].sort((a, b) => ((b as WorkItem).priority ?? 0) - ((a as WorkItem).priority ?? 0))[0] : undefined);
-    if (minimumScale > 0 && focus) {
+    if (minimumScale > 0 && focus && !nearlyWhole) {
       const at = frameOrganizedNeighborhood(
         cards.map(node => ({ id: node.id, x: node.x, y: node.y, ...getNodeDimensionsAt(node, scale) })),
         focus.id,
@@ -4539,7 +4624,15 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     layoutModeRef.current = 'force';
     try { window.localStorage.setItem(LAYOUT_MODE_STORAGE_KEY, 'force'); } catch (error) { console.warn('Unable to save layout mode', error); }
     window.dispatchEvent(new CustomEvent('graphdone-layout-mode-change', { detail: 'force' }));
-    const arranged = organizeTopology(simulation.nodes() as WorkItem[], validatedEdges as any[], node => graphItemLayout(node, measureGraphText), {width:container.clientWidth,height:container.clientHeight});
+    // Room for every relationship label at the zoom the organized graph is framed at.
+    // A small graph is framed whole while its titles and labels still read; a
+    // large one keeps the organized floor.
+    // A phone keeps the organized floor and frames the busiest part: a 390 px
+    // screen cannot hold two compact cards and a label side by side at a zoom
+    // where their titles still fit whole (compact label chips: #283).
+    const whole = simulation.nodes().length <= WHOLE_FIT_MAX_CARDS && !window.matchMedia(COMPACT_WORKSPACE_QUERY).matches;
+    const floor = whole ? SMALL_GRAPH_ZOOM_FLOOR : ORGANIZED_ZOOM_FLOOR;
+    const arranged = organizeWithLabelRoom(simulation.nodes() as WorkItem[], validatedEdges as any[], labelRoom(container.clientWidth, container.clientHeight, floor));
     for (const node of simulation.nodes() as any[]) {
       const point = arranged.positions.get(node.id);
       if (!point) continue;
@@ -4553,8 +4646,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       node.userPreferredPosition = null;
       node.userPreferenceVector = null;
     }
+    forgetLabelSpots(validatedEdges as any[]);
     (window as any).__graphOrganization = {components:arranged.components,work:arranged.work};
-    organizationZoomFloorRef.current = 0.65;
+    organizationZoomFloorRef.current = floor;
+    wholeGraphFitRef.current = whole;
     organizationFocusRef.current = arranged.components[0]?.focus;
     cameraManuallyPositionedRef.current = true;
     if (currentGraphIdRef.current) fittedGraphsRef.current.add(currentGraphIdRef.current);
@@ -4566,7 +4661,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       runLabelAvoidanceRef.current?.();
       fitViewToNodes();
     });
-  }, [validatedEdges, fitViewToNodes, persistAllPositions]);
+  }, [validatedEdges, fitViewToNodes, persistAllPositions, labelRoom]);
 
   // Hierarchical mode packs actual card sizes into compact dependency rows.
   // Pin both axes so repulsion cannot spread a finished row across the viewport.
@@ -4988,6 +5083,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   useEffect(() => {
     (window as any).triggerZoomToFit = () => {
       organizationZoomFloorRef.current = 0;
+      wholeGraphFitRef.current = false;
       return fitViewRef.current();
     };
     return () => {

@@ -488,6 +488,7 @@ export function Workspace() {
       {/* Mini-Map Toggle Button - Shows when mini-map is hidden (desktop only) */}
       {viewMode === 'graph' && currentGraph && !showMiniMap && !isMobile && createPortal(
         <button
+          data-graph-fit-obstacle="true"
           onClick={() => setShowMiniMap(true)}
           className="fixed bottom-4 right-4 bg-gray-800/90 backdrop-blur-sm border border-gray-600 rounded-lg p-3 shadow-xl hover:bg-gray-700/90 transition-all duration-200 z-50"
           title="Show Mini-Map"

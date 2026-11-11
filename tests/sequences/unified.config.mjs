@@ -91,6 +91,15 @@ export const SEQUENCES = {
     `--repeat-each=${JOURNEY_REPEAT}`, '--workers=4', '--retries=0',
     ...(process.env.JOURNEY_GREP ? [`--grep=${process.env.JOURNEY_GREP}`] : []),
   ], timeoutMs: Number(process.env.JOURNEY_TIMEOUT_MINUTES || JOURNEY_REPEAT * 6) * 60_000, blocking: false },
+  // ORGANIZE LABELS: after "Organize around connections" every relationship
+  // label is readable (not under a card or another label, inside its edge's
+  // gap) and no card title splits a word, on desktop and iPhone, for Welcome
+  // and a launch checklist; a graph of unplaced items opens no smaller than
+  // its titles and labels show.
+  'organize-labels': { adapter: 'playwright', title: 'Organize — every relationship label readable', args: [
+    'tests/e2e/journeys/organize-labels.spec.ts', '--project=journeys', '--project=journeys-iphone',
+    '--workers=1', '--retries=0', '--trace=retain-on-failure',
+  ], blocking: true },
   // RELATIONSHIP EDIT (#262): change a relationship's type through every type,
   // flip it, reload, delete it, and see a second tab catch up, once per path on
   // desktop, iPad and iPhone. The repeated measurement is the journeys sequence.
@@ -116,8 +125,8 @@ export const SEQUENCES = {
 
 export const PROFILES = {
   smoke: ['unit-web', 'smoke', 'e2e-auth'],
-  pr: ['unit-web', 'smoke', 'e2e-auth', 'e2e-graph', 'agent-connection', 'inspector-readability', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'devices', 'perf-budgets', 'relationship-edit', 'zoom-out'],
-  full: ['unit-web', 'smoke', 'e2e-auth', 'e2e-graph', 'agent-connection', 'inspector-readability', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'devices', 'perf-budgets', 'relationship-edit', 'zoom-out', 'diagnostics', 'showcase', 'matrix', 'vlm', 'perf-scale', 'cloud-audit'],
+  pr: ['unit-web', 'smoke', 'e2e-auth', 'e2e-graph', 'agent-connection', 'inspector-readability', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'organize-labels', 'router-navigation', 'mobile', 'devices', 'perf-budgets', 'relationship-edit', 'zoom-out'],
+  full: ['unit-web', 'smoke', 'e2e-auth', 'e2e-graph', 'agent-connection', 'inspector-readability', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'organize-labels', 'router-navigation', 'mobile', 'devices', 'perf-budgets', 'relationship-edit', 'zoom-out', 'diagnostics', 'showcase', 'matrix', 'vlm', 'perf-scale', 'cloud-audit'],
   report: ['diagnostics', 'showcase', 'matrix', 'vlm', 'perf-scale', 'cloud-audit'],
   live: ['live-journey'],
   journeys: ['journeys'],

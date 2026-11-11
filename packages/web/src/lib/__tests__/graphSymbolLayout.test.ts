@@ -31,6 +31,68 @@ describe('graph symbol content geometry', () => {
     }
   });
 
+  it('breaks titles only at spaces and ends a word too wide for a line in "…"', () => {
+    // Every line is whole words of the title; only a line ending in "…" may
+    // end in part of a word (its start), and no line starts inside a word.
+    const broken = (title: string, lines: string[]) => {
+      const words = title.split(' ');
+      return lines.filter(line => {
+        const clipped = line.endsWith('…');
+        const tokens = (clipped ? line.slice(0, -1) : line).split(' ').filter(Boolean);
+        return !tokens.every((token, index) =>
+          clipped && index === tokens.length - 1
+            ? words.some(word => word.startsWith(token))
+            : words.includes(token)
+        );
+      });
+    };
+    const titles = [
+      'System coordinator',
+      'Design mockups',
+      'Set up analytics',
+      'Email campaign',
+      'coordinator of the subsystems',
+      'Review the gateway settlement reconciliation and retry policy',
+      'Coordinator, then subsystems.',
+    ];
+    for (const title of titles)
+      for (let width = 40; width <= 320; width += 10) {
+        const result = fitGraphText(title, width, ITEM_TITLE_SIZE, measure);
+        expect(broken(title, result.lines), `${title} at ${width}`).toEqual([]);
+        for (const line of result.lines)
+          if (line !== '…') expect(measure(line, ITEM_TITLE_SIZE)).toBeLessThanOrEqual(width);
+        if (result.truncated) expect(result.lines.some(line => line.endsWith('…'))).toBe(true);
+      }
+    // A word too wide for the line is cut where it is, never carried over.
+    expect(fitGraphText('System coordinator', 110, ITEM_TITLE_SIZE, measure).lines).toEqual(['System', 'coordinat…']);
+  });
+
+  it('shows a path, URL or identifier wider than the line in full while lines are left, "…" only when they run out', () => {
+    const fit = (title: string, width: number) => fitGraphText(title, width, ITEM_TITLE_SIZE, measure);
+    expect(fit('Update packages/web/src/lib/labelClearance.ts', 240)).toEqual({
+      lines: ['Update', 'packages/web/src/lib/', 'labelClearance.ts'], truncated: false,
+    });
+    expect(fit('PaymentGatewayRetryReconciliationHandler', 240)).toEqual({
+      lines: ['PaymentGatewayRetry', 'ReconciliationHandler'], truncated: false,
+    });
+    expect(fit('See https://example.com/docs/graph?view=labels', 240)).toEqual({
+      lines: ['See', 'https://example.com/', 'docs/graph?view=labels'], truncated: false,
+    });
+    // Out of lines: the last one ends in "…".
+    const long = fit('packages/web/src/lib/__tests__/graphSymbolLayout.test.ts', 120);
+    expect(long.lines).toHaveLength(3);
+    expect(long.truncated).toBe(true);
+    expect(long.lines[2]).toMatch(/…$/);
+    for (const line of long.lines) expect(measure(line, ITEM_TITLE_SIZE)).toBeLessThanOrEqual(120);
+    // Shown in full: the lines put back together are the title.
+    for (const title of ['src/lib/labelClearance.ts', 'PaymentGatewayRetryReconciliationHandler', 'https://example.com/a/b'])
+      for (let width = 60; width <= 320; width += 10) {
+        const result = fit(title, width);
+        if (!result.truncated) expect(result.lines.join(''), `${title} at ${width}`).toBe(title);
+        else expect(result.lines, `${title} at ${width}`).toHaveLength(3);
+      }
+  });
+
   it('makes short cards compact and reserves title, description and metadata rows', () => {
     const short = graphItemLayout({ title: 'Review', type: 'TASK' }, measure);
     const long = graphItemLayout(
