@@ -149,13 +149,9 @@ export interface OrganizationOptions<E extends OrganizationEdge> {
   edgeGap?: (edge: E) => number;
   /**
    * How much to spread one finished component about its first card before
-   * packing (1 keeps it), the same along both axes or one factor per axis.
-   * Called with the component's own coordinates.
+   * packing (1 keeps it). Called with the component's own coordinates.
    */
-  spread?: (
-    ids: readonly string[],
-    points: ReadonlyMap<string, Point>
-  ) => number | { x: number; y: number };
+  spread?: (ids: readonly string[], points: ReadonlyMap<string, Point>) => number;
 }
 
 export function organizeTopology<
@@ -471,13 +467,11 @@ export function organizeTopology<
       }
     }
     const factor = options.spread?.(ids, points) ?? 1;
-    const fx = typeof factor === 'number' ? factor : factor.x,
-      fy = typeof factor === 'number' ? factor : factor.y;
-    if (fx > 1 || fy > 1) {
+    if (factor > 1) {
       const anchor = { ...points.get(root)! };
       for (const point of points.values()) {
-        point.x = anchor.x + (point.x - anchor.x) * Math.max(1, fx);
-        point.y = anchor.y + (point.y - anchor.y) * Math.max(1, fy);
+        point.x = anchor.x + (point.x - anchor.x) * factor;
+        point.y = anchor.y + (point.y - anchor.y) * factor;
       }
       work.spreadComponents++;
     }
