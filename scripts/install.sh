@@ -437,27 +437,37 @@ check_disk_space() {
     fi
 }
 
+# Whether GitHub answers. One dropped request is not "no network": it asks up
+# to GRAPHDONE_NETWORK_TRIES times (default 3), GRAPHDONE_NETWORK_PAUSE
+# seconds apart (default 2), before saying it is unreachable.
+network_reachable() {
+    local test_url="https://github.com"
+    local tries="${GRAPHDONE_NETWORK_TRIES:-3}"
+    local pause="${GRAPHDONE_NETWORK_PAUSE:-2}"
+    local attempt=1
+
+    while :; do
+        if command -v curl >/dev/null 2>&1; then
+            curl -sf --max-time 5 "$test_url" >/dev/null 2>&1 && return 0
+        elif command -v wget >/dev/null 2>&1; then
+            wget -q --timeout=5 --spider "$test_url" 2>/dev/null && return 0
+        else
+            return 0  # nothing to test with; the downloads will say
+        fi
+        [ "$attempt" -ge "$tries" ] && return 1
+        attempt=$((attempt + 1))
+        sleep "$pause"
+    done
+}
+
 # Check network connectivity
 check_network() {
-    local test_url="https://github.com"
-
-    if command -v curl >/dev/null 2>&1; then
-        if ! curl -sf --max-time 5 "$test_url" >/dev/null 2>&1; then
-            warn "Network connectivity test failed"
-            printf "${CYAN}ℹ${NC} This may cause download failures. Continue? ${GRAY}[y/N]${NC} "
-            read -r response || response="n"
-            if [ "$response" != "y" ] && [ "$response" != "Y" ]; then
-                error "Installation cancelled - network required"
-            fi
-        fi
-    elif command -v wget >/dev/null 2>&1; then
-        if ! wget -q --timeout=5 --spider "$test_url" 2>/dev/null; then
-            warn "Network connectivity test failed"
-            printf "${CYAN}ℹ${NC} This may cause download failures. Continue? ${GRAY}[y/N]${NC} "
-            read -r response || response="n"
-            if [ "$response" != "y" ] && [ "$response" != "Y" ]; then
-                error "Installation cancelled - network required"
-            fi
+    if ! network_reachable; then
+        warn "Network connectivity test failed"
+        printf "${CYAN}ℹ${NC} This may cause download failures. Continue? ${GRAY}[y/N]${NC} "
+        read -r response || response="n"
+        if [ "$response" != "y" ] && [ "$response" != "Y" ]; then
+            error "Installation cancelled - network required"
         fi
     fi
 }

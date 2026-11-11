@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
@@ -155,4 +156,41 @@ test('documented one-line install URLs serve the installer from main', () => {
   assert.ok(listed.status === 0 || listed.status === 1, listed.stderr);
   const wrong = listed.stdout.split('\n').filter(Boolean).filter((row) => !row.includes('/GraphDone-Core/main/scripts/install.sh'));
   assert.deepEqual(wrong, [], `Install URLs must point at /main/scripts/install.sh:\n${wrong.join('\n')}`);
+});
+
+// The pre-flight network check once made a single 5 s request; on a run with
+// no terminal one dropped request cancelled the whole install (CI saw it on
+// 2026-11-11). It now asks up to three times before calling the network down.
+function networkCheck(curlFailures, tries) {
+  const source = readFileSync(resolve(root, INSTALLER), 'utf8');
+  const fn = (name) => source.match(new RegExp(`^${name}\\(\\) \\{\\n[\\s\\S]*?\\n\\}`, 'm'))?.[0];
+  assert.ok(fn('network_reachable') && fn('check_network'), 'install.sh defines network_reachable and check_network');
+  const dir = mkdtempSync(join(tmpdir(), 'gd-net-'));
+  try {
+    writeFileSync(join(dir, 'curl'), `#!/bin/sh\nn=$(cat "${dir}/calls" 2>/dev/null || echo 0); n=$((n + 1)); echo $n > "${dir}/calls"\n[ "$n" -gt ${curlFailures} ]\n`, { mode: 0o755 });
+    const script = [
+      'warn() { echo "WARN $*"; }', 'error() { echo "ERROR $*"; exit 1; }',
+      fn('network_reachable'), fn('check_network'), 'check_network </dev/null && echo CONTINUED',
+    ].join('\n');
+    const run = spawnSync('bash', ['-c', script], {
+      encoding: 'utf8',
+      env: { PATH: `${dir}:/usr/bin:/bin`, GRAPHDONE_NETWORK_PAUSE: '0', ...(tries && { GRAPHDONE_NETWORK_TRIES: String(tries) }) },
+    });
+    return { out: run.stdout, calls: Number(readFileSync(join(dir, 'calls'), 'utf8')) };
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test('installer network check survives two dropped requests and gives up after three', () => {
+  const flaky = networkCheck(2);
+  assert.match(flaky.out, /CONTINUED/, flaky.out);
+  assert.doesNotMatch(flaky.out, /WARN/);
+  assert.equal(flaky.calls, 3);
+
+  const down = networkCheck(99);
+  assert.match(down.out, /ERROR Installation cancelled - network required/, down.out);
+  assert.equal(down.calls, 3);
+
+  assert.equal(networkCheck(99, 1).calls, 1, 'GRAPHDONE_NETWORK_TRIES=1 asks once');
 });
