@@ -74,7 +74,7 @@ test('disposable Git fixture commits do not spawn background maintenance', t => 
   assert.deepEqual(events.filter(event => event.event === 'child_start' && event.argv?.includes('maintenance')), []);
 });
 
-for (const sequence of ['new-user', 'agent-connection', 'inspector-readability', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'devices', 'perf-budgets']) {
+for (const sequence of ['new-user', 'example-resume', 'agent-connection', 'inspector-readability', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'devices', 'perf-budgets']) {
   test(`CLI forwards failure-only tracing without retries for ${sequence}`, t => {
     const { dir, run } = fixture(t);
     const report = { suites: [{ specs: [{ title: 'fixture', ok: true,
@@ -88,6 +88,13 @@ for (const sequence of ['new-user', 'agent-connection', 'inspector-readability',
       assert.ok(!args.includes('tests/e2e/graph/semantic-lod.spec.ts'));
       assert.ok(!args.includes('tests/e2e/auth/router-navigation.spec.ts'));
       assert.ok(!args.includes('tests/e2e/graph/inspector-readability.spec.ts'));
+      assert.ok(!args.includes('tests/e2e/quality/example-resume.spec.ts'));
+    }
+    if (sequence === 'example-resume') {
+      assert.deepEqual(args.filter(arg => arg.endsWith('.spec.ts')), ['tests/e2e/quality/example-resume.spec.ts']);
+      assert.ok(!args.includes('--headed'));
+      assert.equal(SEQUENCES[sequence].blocking, true);
+      assertSmokeGateRuns(sequence, { out: 'ci-example-resume', xvfb: false });
     }
     if (sequence === 'agent-connection') {
       assert.deepEqual(args.filter(arg => arg.endsWith('.spec.ts')), ['tests/e2e/quality/agent-collaboration.spec.ts']);
@@ -333,7 +340,7 @@ test('every Smoke Gate shard warms up with THE GATE, and the summary job keeps t
   // and toolchain steps are checked above), so a sequence dropped from every
   // shard fails here. Change this list on purpose only.
   assert.deepEqual(Object.keys(runs).sort(), [
-    'agent-connection', 'inspector-readability', 'item-wires', 'large-symbols', 'layout-recovery',
+    'agent-connection', 'example-resume', 'inspector-readability', 'item-wires', 'large-symbols', 'layout-recovery',
     'living-graph-effects', 'mobile', 'nested-lod', 'new-user', 'perf-budgets', 'router-navigation',
     'semantic-lod', 'smoke',
   ]);
