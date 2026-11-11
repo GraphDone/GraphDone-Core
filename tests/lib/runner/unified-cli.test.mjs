@@ -117,6 +117,14 @@ for (const sequence of ['new-user', 'example-resume', 'agent-connection', 'inspe
       assert.equal(SEQUENCES[sequence].blocking, true);
       for (const profile of ['pr', 'full']) assert.ok(PROFILES[profile].includes(sequence));
       assertSmokeGateRuns(sequence, { out: 'ci-relationship-edit', xvfb: false });
+      // ...and once more as a hosted guest, on the hosted build, in one shard.
+      const { ci } = smokeGateRuns();
+      const guest = ci.jobs['smoke-gate-shard'].steps.filter(step => step.env?.JOURNEY_BACKEND === 'hosted-guest');
+      assert.equal(guest.length, 1);
+      assert.equal(guest[0].if, 'matrix.guest && !cancelled()');
+      assert.match(guest[0].run, /VITE_OFFLINE_SYNC=true VITE_HOSTED_USAGE=true .* vite build --outDir \/tmp\/graphdone-guest\)/);
+      assert.match(guest[0].run, /\nnode tests\/run-unified\.mjs --sequence relationship-edit --out test-artifacts\/ci-relationship-edit-guest\n/);
+      assert.equal(ci.jobs['smoke-gate-shard'].strategy.matrix.include.filter(shard => shard.guest).length, 1);
     }
     if (sequence === 'large-symbols') {
       assert.ok(args.includes('tests/e2e/graph/large-graph-symbols.spec.ts'));

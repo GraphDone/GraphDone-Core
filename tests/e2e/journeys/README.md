@@ -54,6 +54,9 @@ The run may take 6 minutes per repeat before the harness stops it
 run that is stopped.
 The `journeys` sequence is report-only: not in CI or the `pr`/`full` profiles. The
 `relationship-edit` sequence runs that journey once per path and device and is
-blocking (CI shard "toolchain, schematic, LOD, layout, relationship edit").
+blocking: self-hosted in CI shard "toolchain, schematic, LOD, layout, relationship
+edit", and as a hosted guest (the hosted build served without the dev proxy, its
+API on a port where nothing listens) in shard "wires, agents, inspector, effects,
+perf, guest relationship edit".
 
 Up: [`tests/e2e/`](../README.md)
