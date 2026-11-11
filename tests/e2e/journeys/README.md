@@ -1,15 +1,17 @@
 # `tests/e2e/journeys/` — basic user journeys
 
 Measures how reliably a person can do a basic thing, by every way the app offers,
-on desktop, iPad and iPhone. The journeys are "connect two items" and "edit a
-relationship". Each trial starts on the real landing page in a fresh browser, makes
-two items with the normal controls, connects them, and checks what is drawn, what
-was saved, and that it survives a reload. Repeats become a success rate per path and
-device, with a 95% Wilson lower bound, in the unified report.
+on desktop, iPad and iPhone. The journeys are "connect two items", "edit a
+relationship" and "zoom out". Each link and relationship-edit trial starts on the
+real landing page in a fresh browser, makes two items with the normal controls,
+connects them, and checks what is drawn, what was saved, and that it survives a
+reload. Repeats become a success rate per path and device, with a 95% Wilson lower
+bound, in the unified report.
 
 ```mermaid
 flowchart LR
   paths["lib/journeys/linkPaths.ts"] --> spec["link.spec.ts"]
+  labels["lib/journeys/readableLabels.ts"] --> zoom["zoom-out.spec.ts"]
   ws["lib/journeys/workspace.ts"] --> spec
   ed["lib/journeys/relationshipEditor.ts"] --> rel["relationship-edit.spec.ts"]
   rel --> proj
@@ -22,6 +24,7 @@ flowchart LR
 
 | Path | What it is |
 | --- | --- |
+| [`zoom-out.spec.ts`](zoom-out.spec.ts) | `JOURNEY zoom-out` (#277): from the Welcome graph of the example project, zoom out to the limit. Every step must show readable text, the level (`data-zoom-level`: items, graph frame, neighbouring graphs, projects) never goes back, the neighbouring graphs and both projects are read by name, nothing is saved, a small wobble does not change the level, and clicking a neighbouring graph opens it. Blocking in CI as the `zoom-out` sequence (desktop, iPad, iPhone); screenshots per level and the steps are attached. |
 | [`link.spec.ts`](link.spec.ts) | One `JOURNEY link <path>` test per way to connect (from [`tests/lib/journeys/`](../../lib/journeys/README.md)), plus a duplicate check: connecting an already-connected pair says "Already connected" and saves nothing new. Each trial records a `friction` annotation (zoom and pan steps) and `saved-after-ms`. |
 | [`relationship-edit.spec.ts`](relationship-edit.spec.ts) | `JOURNEY relationship-edit <path>` (#262): connect two items, open the editor as the device's person does (the label or wire on desktop and iPad, "Browse all relationships" on a phone), then `type` (every type in `RELATIONSHIP_OPTIONS`, then back), `flip` (change type, flip at once without reopening, flip back), `reload`, `delete`, and `second-tab` (self-hosted: another tab shows the change after its one-minute refetch). After each change, with the editor open, it checks the saved data (one relationship for the pair, direction, type, weight), the editor (still "Edit relationship", the direction line, the pressed type) and the canvas (one wire, arrow and label; the type's colour, label text and icon; the arrow at the target); then it closes the editor, brings the arrow into view as a person would (zoom in, drag; a phone opens at half size, where arrows are hidden) and checks that the wire shows the type's colour and the arrow is seen at the target. On a phone the editor fills the screen, so the canvas is checked only once it is closed; then the relationship list entry. A step's findings are compared at once, so a failure lists all that is wrong. No page or GraphQL errors and no "Failed" toast. |
 
@@ -52,11 +55,14 @@ JOURNEY_REPEAT=30 TEST_URL=http://localhost:3127 node tests/run-unified.mjs --se
 The run may take 6 minutes per repeat before the harness stops it
 (`JOURNEY_TIMEOUT_MINUTES` overrides that); Playwright writes no results for a
 run that is stopped.
-The `journeys` sequence is report-only: not in CI or the `pr`/`full` profiles. The
-`relationship-edit` sequence runs that journey once per path and device and is
-blocking: self-hosted in CI shard "toolchain, schematic, LOD, layout, relationship
-edit", and as a hosted guest (the hosted build served without the dev proxy, its
-API on a port where nothing listens) in shard "wires, agents, inspector, effects,
-perf, guest relationship edit".
+The `journeys` sequence (every journey, repeated) is report-only: not in CI or the
+`pr`/`full` profiles. Two journeys also run once as blocking sequences:
+
+- `relationship-edit`, once per path and device: self-hosted in CI shard
+  "toolchain, schematic, LOD, layout, relationship edit", and as a hosted guest
+  (the hosted build served without the dev proxy, its API on a port where nothing
+  listens) in shard "wires, agents, inspector, effects, perf, guest relationship edit".
+- `zoom-out` (`node tests/run-unified.mjs --sequence zoom-out`), once per device:
+  CI shard "new user, zoom out".
 
 Up: [`tests/e2e/`](../README.md)
