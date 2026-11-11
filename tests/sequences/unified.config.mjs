@@ -91,10 +91,11 @@ export const SEQUENCES = {
     `--repeat-each=${JOURNEY_REPEAT}`, '--workers=4', '--retries=0',
     ...(process.env.JOURNEY_GREP ? [`--grep=${process.env.JOURNEY_GREP}`] : []),
   ], timeoutMs: Number(process.env.JOURNEY_TIMEOUT_MINUTES || JOURNEY_REPEAT * 6) * 60_000, blocking: false },
-  // ORGANIZE LABELS: after "Organize around connections", in the hierarchical
-  // layout and once the force layout settles, every relationship label is
-  // readable (not under a card or another label, inside its edge's gap), on
-  // desktop, iPad and iPhone, for the example graphs and hard shapes.
+  // ORGANIZE LABELS: after "Organize around connections" and in the
+  // hierarchical layout every relationship label is readable (not under a card
+  // or another label, inside its edge's gap) and no card title splits a word,
+  // on desktop and iPhone, for Welcome and a launch checklist; a graph of
+  // unplaced items opens no smaller than its titles and labels show.
   'organize-labels': { adapter: 'playwright', title: 'Organize — every relationship label readable', args: [
     'tests/e2e/journeys/organize-labels.spec.ts', '--project=journeys', '--project=journeys-iphone',
     '--workers=1', '--retries=0', '--trace=retain-on-failure',

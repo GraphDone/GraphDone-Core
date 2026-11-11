@@ -65,6 +65,7 @@ import { appendNodeControlGlyph, nodeControlGlyphTransform } from '../lib/nodeCo
 import { graphItemLayout, itemTitleScale, measureGraphText, edgeLabelDimensions, GRAPH_FONT_FAMILY, ITEM_TITLE_SIZE, ITEM_TITLE_LINE, ITEM_HEADER_HEIGHT, EDGE_LABEL_SIZE, ITEM_WIRE_WIDTH } from '../lib/graphSymbolLayout';
 import { placeItemLabels } from '../lib/edgeLabelPlacement';
 import { separateCards } from '../lib/separateCards';
+import { organizeTopology } from '../lib/topologyOrganization';
 import { PHONE_READABLE_SCALE } from '../lib/cardTitleZoom';
 import { clearFreeCards, framedZoom, hierarchyWithLabelRoom, labelGap, LABEL_MIN_ZOOM, LAYOUT_CHECKS, organizeWithLabelRoom, ORGANIZED_ZOOM_FLOOR, SMALL_GRAPH_ZOOM_FLOOR, WHOLE_FIT_MAX_CARDS, type LabelEdge, type LabelRoomOptions } from '../lib/labelClearance';
 import { LocalItemNeighborhood } from './LocalItemNeighborhood';
@@ -2145,7 +2146,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // (This block used to null every node's fx/fy unconditionally, which is
     //  why arrangements never survived a reload — the real drift bug.)
     const initialOrganization = nodes.length && nodes.every(node => !(node.positionX || node.positionY))
-      ? organizeWithLabelRoom(nodes, validatedEdges as any[], labelRoom(width, height, 0))
+      ? organizeTopology(nodes, validatedEdges as any[], node => graphItemLayout(node, measureGraphText), {width, height})
       : null;
     const spreadCols = Math.max(1, Math.ceil(Math.sqrt(nodes.length)));
     const spreadSpacing = 260; // > collision diameter so the spread has no overlaps

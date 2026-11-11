@@ -6,7 +6,7 @@ import { TEST_GRAPH_PREFIX } from '../../lib/dbHealing';
 import { deleteGraphDeep } from '../../lib/seedGraph';
 import { openGraphView } from '../../lib/journeys/workspace';
 import { auditEdgeLabels, labelProblems, layoutSpread, problemCount, type LabelProblems } from '../../lib/edgeLabelAudit';
-import { LAUNCH_CHECKLIST_SHAPE, WELCOME_SHAPE, type LabelShape } from '../../../packages/web/src/lib/labelClearanceShapes';
+import { LAUNCH_CHECKLIST_SHAPE, PLAN_A_LAUNCH_SHAPE, WELCOME_SHAPE, type LabelShape } from '../../../packages/web/src/lib/labelClearanceShapes';
 import { CARD_TITLES_HIDE_BELOW, PHONE_READABLE_SCALE } from '../../../packages/web/src/lib/cardTitleZoom';
 import { ORGANIZED_ZOOM_FLOOR } from '../../../packages/web/src/lib/labelClearance';
 
@@ -36,6 +36,10 @@ import { ORGANIZED_ZOOM_FLOOR } from '../../../packages/web/src/lib/labelClearan
  * it. Phones have no layout toggle, so hierarchical mode there goes through
  * the hook the toggle calls. "As loaded" is the graph's saved arrangement,
  * which no layout moves: it is recorded for comparison, not checked.
+ *
+ * A graph whose items all arrive unplaced (an import, an agent) opens
+ * organized as it always has, and never below the zoom where titles and
+ * labels show.
  */
 
 const LABEL_MIN_ZOOM = CARD_TITLES_HIDE_BELOW;
@@ -55,14 +59,14 @@ const test = base.extend<{ owned: Owned }>({
         });
         const graphId = created.createGraphs.graphs[0].id as string;
         ids.push(graphId);
-        // "unplaced": every item but the first has no saved position, as when an
-        // agent adds them, so the force simulation lays them out.
+        // "unplaced": no item has a saved position, as when an import or an
+        // agent makes them, so the graph is organized when it opens.
         const items = await gql(page, 'mutation($input:[WorkItemCreateInput!]!){createWorkItems(input:$input){workItems{id title}}}', {
-          input: shape.items.map((item, i) => ({
+          input: shape.items.map(item => ({
             type: item.type, title: item.title, status: item.status, priority: 0.5,
             description: item.description ?? null,
-            positionX: mode === 'placed' ? item.x ?? 0 : i === 0 ? 1 : 0,
-            positionY: mode === 'placed' ? item.y ?? 0 : i === 0 ? 1 : 0,
+            positionX: mode === 'placed' ? item.x ?? 0 : 0,
+            positionY: mode === 'placed' ? item.y ?? 0 : 0,
             positionZ: 0,
             owner: { connect: { where: { node: { id: me } } } },
             graph: { connect: { where: { node: { id: graphId } } } },
@@ -255,3 +259,12 @@ for (const shape of [WELCOME_SHAPE, LAUNCH_CHECKLIST_SHAPE])
     test.setTimeout(150_000);
     await report(info, await organizeAndCheck(page, owned, info, shape), !crowdedPhone);
   });
+
+test('JOURNEY organize-labels: a graph of unplaced items opens no smaller than its titles and labels show', async ({ page, owned }, info) => {
+  const shape = PLAN_A_LAUNCH_SHAPE;
+  await openGraph(page, await owned.create(shape, 'unplaced'), shape.items.length);
+  const opened = await measure(page, shape, 'opened unplaced', undefined, false);
+  await evidence(info, `${slug(shape.name)}-opened-unplaced.png`, await page.screenshot(), 'image/png');
+  await evidence(info, 'label-summary.txt', summary([opened]), 'text/plain');
+  expect(opened.scale, summary([opened])).toBeGreaterThanOrEqual(LABEL_MIN_ZOOM);
+});
