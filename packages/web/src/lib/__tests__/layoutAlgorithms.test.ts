@@ -158,45 +158,45 @@ describe('hierarchical rows with room for relationship labels', () => {
   const borderGapX = (points: Map<string, { x: number; y: number }>, a: string, b: string) => Math.abs(points.get(b)!.x - points.get(a)!.x) - 170;
 
   it('keeps linked cards in a row apart by what the edge between them asks, and only them', async () => {
-    const { computeCompactLayout } = await import('../layoutAlgorithms');
+    const { computeLabelRoomLayout } = await import('../layoutAlgorithms');
     const edges = [link('A', 'B'), link('B', 'C')];
-    const points = computeCompactLayout([n('A'), n('B'), n('C')], edges, view, card, {
+    const points = computeLabelRoomLayout([n('A'), n('B'), n('C')], edges, view, card, {
       edgeGap: edge => (edge.source === 'A' ? 200 : 100),
     });
     expect(new Set([...points.values()].map(p => p.y)).size).toBe(1);
     expect(borderGapX(points, 'A', 'B')).toBeCloseTo(200);
     expect(borderGapX(points, 'B', 'C')).toBeCloseTo(100);
-    const plain = computeCompactLayout([n('A'), n('B'), n('C')], edges, view, card);
+    const plain = computeLabelRoomLayout([n('A'), n('B'), n('C')], edges, view, card);
     expect(borderGapX(plain, 'A', 'B')).toBeCloseTo(36);
   });
 
   it('keeps rows apart by what the edges across them ask', async () => {
-    const { computeCompactLayout } = await import('../layoutAlgorithms');
-    const points = computeCompactLayout([n('A'), n('B')], [dep('A', 'B')], view, card, { edgeGap: () => 250 });
+    const { computeLabelRoomLayout } = await import('../layoutAlgorithms');
+    const points = computeLabelRoomLayout([n('A'), n('B')], [dep('A', 'B')], view, card, { edgeGap: () => 250 });
     expect(points.get('A')!.y - points.get('B')!.y - 120).toBeCloseTo(250);
   });
 
   it('puts a card under the prerequisite it depends on, not in the middle of its row', async () => {
-    const { computeCompactLayout } = await import('../layoutAlgorithms');
+    const { computeLabelRoomLayout } = await import('../layoutAlgorithms');
     const nodes = ['P1', 'P2', 'P3', 'P4', 'X'].map(n);
-    const points = computeCompactLayout(nodes, [dep('X', 'P4')], view, card);
+    const points = computeLabelRoomLayout(nodes, [dep('X', 'P4')], view, card);
     expect(points.get('X')!.y).toBeGreaterThan(points.get('P4')!.y);
     expect(points.get('X')!.x).toBeCloseTo(points.get('P4')!.x);
   });
 
   it('splits cards linked inside one dependency layer into rows instead of wiring through a row', async () => {
-    const { computeCompactLayout } = await import('../layoutAlgorithms');
+    const { computeLabelRoomLayout } = await import('../layoutAlgorithms');
     // A hub with four spokes: the spokes go on their own row under the hub.
     const edges = ['S1', 'S2', 'S3', 'S4'].map(id => link('H', id));
-    const points = computeCompactLayout(['H', 'S1', 'S2', 'S3', 'S4'].map(n), edges, view, card);
+    const points = computeLabelRoomLayout(['H', 'S1', 'S2', 'S3', 'S4'].map(n), edges, view, card);
     for (const id of ['S1', 'S2', 'S3', 'S4']) expect(points.get(id)!.y).toBeGreaterThan(points.get('H')!.y);
   });
 
   it('wraps a long chain back and forth so every link stays short', async () => {
-    const { computeCompactLayout } = await import('../layoutAlgorithms');
+    const { computeLabelRoomLayout } = await import('../layoutAlgorithms');
     const ids = Array.from({ length: 12 }, (_, i) => `step-${String(i).padStart(2, '0')}`);
     const edges = ids.slice(1).map((id, i) => link(ids[i], id, 'FOLLOWS'));
-    const points = computeCompactLayout(ids.map(n), edges, { width: 390, height: 800 }, card, { edgeGap: () => 150 });
+    const points = computeLabelRoomLayout(ids.map(n), edges, { width: 390, height: 800 }, card, { edgeGap: () => 150 });
     expect(new Set([...points.values()].map(p => p.y)).size).toBeGreaterThan(1);
     for (const edge of edges) {
       const a = points.get(edge.source)!, b = points.get(edge.target)!;
@@ -204,5 +204,38 @@ describe('hierarchical rows with room for relationship labels', () => {
       if (a.y === b.y) expect(borderGapX(points, edge.source, edge.target)).toBeCloseTo(150);
       else expect(Math.abs(a.x - b.x)).toBeLessThan(170);
     }
+  });
+});
+
+// The hierarchical layout of a graph too large to frame whole keeps the rows
+// it always had: every row wraps at the screen's reading width, whatever
+// edges leave it. These numbers are what computeCompactLayout gave before the
+// label room (#280) and must not change.
+describe('compact hierarchical rows of a large graph', () => {
+  const card = () => ({ width: 220, height: 80 });
+  const extent = (points: Map<string, { x: number; y: number }>) => {
+    const xs = [...points.values()].map(p => p.x), ys = [...points.values()].map(p => p.y);
+    return { width: Math.max(...xs) - Math.min(...xs) + 220, height: Math.max(...ys) - Math.min(...ys) + 80 };
+  };
+
+  it('a hub with 100 dependents wraps its dependents into rows of four', async () => {
+    const { computeCompactLayout } = await import('../layoutAlgorithms');
+    const ids = Array.from({ length: 100 }, (_, i) => `dependent-${String(i).padStart(3, '0')}`);
+    const points = computeCompactLayout(['hub', ...ids].map(n), ids.map(id => dep(id, 'hub')), { width: 1440, height: 900 }, card);
+    expect(extent(points)).toEqual({ width: 988, height: 3680 });
+  });
+
+  it('2,000 items and 4,000 relationships stay as compact as they were', async () => {
+    const { computeCompactLayout } = await import('../layoutAlgorithms');
+    let seed = 11;
+    const random = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+    const ids = Array.from({ length: 2000 }, (_, i) => `item-${String(i).padStart(4, '0')}`);
+    const types = ['DEPENDS_ON', 'BLOCKS', 'RELATES_TO', 'PART_OF'];
+    const edges = Array.from({ length: 4000 }, () => {
+      const a = Math.floor(random() * ids.length), b = Math.floor(random() * ids.length);
+      return { source: ids[a], target: ids[b === a ? (b + 1) % ids.length : b], type: types[Math.floor(random() * types.length)] };
+    });
+    const points = computeCompactLayout(ids.map(n), edges, { width: 1440, height: 900 }, card);
+    expect(extent(points)).toEqual({ width: 988, height: 72656 });
   });
 });

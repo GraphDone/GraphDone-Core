@@ -248,7 +248,8 @@ describe('bounded work', () => {
     expect(performance.now() - start).toBeLessThan(1000);
   });
 
-  it.each([0, ORGANIZED_ZOOM_FLOOR])('above WHOLE_FIT_MAX_CARDS (floor %s, as when items arrive unplaced) the layouts are the plain ones', floor => {
+  // The plain rows are pinned to their old output in layoutAlgorithms.test.
+  it.each([SMALL_GRAPH_ZOOM_FLOOR, ORGANIZED_ZOOM_FLOOR])('above WHOLE_FIT_MAX_CARDS (floor %s) the layouts are the plain ones', floor => {
     const g = graph(generated(WHOLE_FIT_MAX_CARDS + 1, 90));
     const options = { ...g, viewport: SCREENS.desktop, floor };
     const dims = (item: (typeof g.items)[number]) => g.dimensionsAt(item, 1);

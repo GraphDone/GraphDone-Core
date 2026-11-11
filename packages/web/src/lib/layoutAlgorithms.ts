@@ -109,7 +109,7 @@ export function computeNodeLayerY(
  * connected group is split into sub-rows by breadth-first distance from its
  * busiest card; a simple path stays in one row in path order. Cards in a row
  * are ordered by where their neighbours in the rows above sit. Cards with no
- * relationship at all wrap like a reading list; computeCompactLayout wraps
+ * relationship at all wrap like a reading list; computeLabelRoomLayout wraps
  * the other rows once it knows their gaps.
  */
 function hierarchyRows<T extends NodeLike>(nodes: T[], edges: EdgeLike[], width: (node: T) => number, maxRowWidth: number): T[][] {
@@ -271,10 +271,55 @@ function isotonic(values: number[], weights: number[]): number[] {
 
 /** Compact rows use actual card sizes, independent of viewport expansion.
  * Pin both axes so repulsion cannot stretch a row after it has been arranged.
- * `edgeGap` widens the gap between two rows (or two cards in a row) to the
- * largest border-to-border room any edge across it asks for, e.g. its label.
  */
-export function computeCompactLayout<T extends NodeLike, E extends EdgeLike = EdgeLike>(
+export function computeCompactLayout<T extends NodeLike>(
+  nodes: T[], edges: EdgeLike[], viewport: { width: number; height: number },
+  dimensions: (node: T) => { width: number; height: number },
+): Map<string, { x: number; y: number }> {
+  const layers = assignLayersByDependencyDirection(nodes, edges);
+  const rows = new Map<number, T[]>();
+  for (const node of nodes) {
+    const layer = layers.get(node.id)!;
+    rows.set(layer, [...(rows.get(layer) || []), node]);
+  }
+  const ordered: T[][] = [];
+  const maxRowWidth = Math.max(560, Math.min(viewport.width - 64, 1100));
+  for (const [, layer] of [...rows.entries()].sort(([a], [b]) => a - b)) {
+    let row: T[] = [], width = 0;
+    for (const node of layer.sort((a, b) => a.id.localeCompare(b.id))) {
+      const nextWidth = width + (row.length ? 36 : 0) + dimensions(node).width;
+      if (row.length && nextWidth > maxRowWidth) { ordered.push(row); row = []; width = 0; }
+      width += (row.length ? 36 : 0) + dimensions(node).width;
+      row.push(node);
+    }
+    if (row.length) ordered.push(row);
+  }
+  const heights = ordered.map(row => Math.max(...row.map(n => dimensions(n).height)));
+  const totalHeight = heights.reduce((sum, h) => sum + h, 0) + Math.max(0, ordered.length - 1) * 64;
+  let y = (viewport.height - totalHeight) / 2;
+  const out = new Map<string, { x: number; y: number }>();
+  ordered.forEach((row, index) => {
+    const width = row.reduce((sum, n) => sum + dimensions(n).width, 0) + (row.length - 1) * 36;
+    let x = (viewport.width - width) / 2;
+    for (const node of row) {
+      const size = dimensions(node);
+      out.set(node.id, { x: x + size.width / 2, y: y + heights[index] / 2 });
+      x += size.width + 36;
+    }
+    y += heights[index] + 64;
+  });
+  return out;
+}
+
+/**
+ * The hierarchical rows with room for relationship labels, for graphs small
+ * enough to frame whole (labelClearance.hierarchyWithLabelRoom; larger ones
+ * keep computeCompactLayout). `edgeGap` widens the gap between two rows (or two
+ * cards in a row) to the largest border-to-border room any edge across it asks
+ * for, e.g. its label. A row that edges leave for other rows does not wrap, so
+ * those edges never run through wrapped cards.
+ */
+export function computeLabelRoomLayout<T extends NodeLike, E extends EdgeLike = EdgeLike>(
   nodes: T[], edges: E[], viewport: { width: number; height: number },
   dimensions: (node: T) => { width: number; height: number },
   options: { edgeGap?: (edge: E) => number } = {},

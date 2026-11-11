@@ -36,7 +36,7 @@ import {
   type OrganizationEdge,
   type OrganizationNode,
 } from './topologyOrganization';
-import { computeCompactLayout } from './layoutAlgorithms';
+import { computeCompactLayout, computeLabelRoomLayout } from './layoutAlgorithms';
 import { CARD_TITLES_HIDE_BELOW } from './cardTitleZoom';
 
 type Point = { x: number; y: number };
@@ -572,7 +572,7 @@ export function hierarchyWithLabelRoom<
       const drawn = byEdge.get(edge.id);
       return drawn ? labelGap(drawn.label, labelZoom) : 0;
     };
-    let positions = computeCompactLayout(
+    let positions = computeLabelRoomLayout(
       nodes as unknown as (T & { id: string })[],
       edges as never,
       options.viewport,
