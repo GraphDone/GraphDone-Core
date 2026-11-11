@@ -56,6 +56,27 @@ async function enterWelcome(page: Page) {
   await expect.poll(async () => (await readableLabels(page)).join(' '), { timeout: 20000 }).toContain('Welcome to');
 }
 
+/** Hovering a card dims the cards it isn't connected to; check what a graph
+ * shows with the pointer resting on empty canvas (not a card, bar or button),
+ * as after a person moves away. */
+async function restPointer(page: Page) {
+  const point = await page.evaluate(() => {
+    const area = document.querySelector('.graph-container')!.getBoundingClientRect();
+    for (const [fx, fy] of [[0.03, 0.9], [0.97, 0.9], [0.03, 0.3], [0.97, 0.3], [0.5, 0.9], [0.5, 0.3]]) {
+      const x = area.left + area.width * fx, y = area.top + area.height * fy;
+      if (document.elementFromPoint(x, y)?.matches('rect.background, .graph-container svg')) return { x, y };
+    }
+    return null;
+  });
+  if (point) await page.mouse.move(point.x, point.y);
+}
+
+/** Wheel gestures zoom around the pointer, so aim them at the middle of the graph. */
+async function pointAtGraph(page: Page) {
+  const area = (await page.locator('.graph-container').first().boundingBox())!;
+  await page.mouse.move(area.x + area.width / 2, area.y + area.height / 2);
+}
+
 async function camera(page: Page) {
   return page.evaluate(() => {
     const t = document.querySelector('svg g.main-graph-group')?.getAttribute('transform') ?? '';
@@ -135,10 +156,12 @@ test('JOURNEY zoom-out: every level is labelled, from items to projects', async 
   await expect(tile).toBeVisible();
   await tile.click();
   await expect(selector(page)).toContainText('Plan a launch', { timeout: 15000 });
+  await restPointer(page);
   await expect.poll(async () => (await settle(page)).labels.join(' '), { timeout: 20000 }).toContain('Launch day');
 
   // Zooming in over a neighbouring graph opens it too, and the rest of that
   // wheel gesture must not leave the new graph off-centre and tiny.
+  await pointAtGraph(page);
   for (let i = 0; i < 40 && (await settle(page)).level < 2; i++) await page.mouse.wheel(0, 250);
   // Pick a neighbour whose tile is on screen (phones stack them above and below).
   const area2 = (await page.locator('.graph-container').first().boundingBox())!;
@@ -159,6 +182,7 @@ test('JOURNEY zoom-out: every level is labelled, from items to projects', async 
   await expect(selector(page), `zooming in over "${next}" did not open it`).toContainText(next, { timeout: 15000 });
   // Keep scrolling a little, as a person does at the end of a gesture.
   for (let i = 0; i < 2; i++) await page.mouse.wheel(0, -50);
+  await restPointer(page);
   await expect.poll(async () => (await settle(page)).labels.join(' '), { timeout: 20000 }).toContain(nextTitle);
   await evidence(info, 'zoom-in-opened.png', await page.screenshot(), 'image/png');
 });
