@@ -12,7 +12,7 @@ import {
 } from '../../lib/ownedGraphIdsFixture';
 import type { SeededGraph } from '../../lib/seedGraph';
 import { inspectSchematicOverview } from '../../lib/schematicOverview';
-import { isExampleWrite } from '../../packages/web/src/lib/exampleOperations';
+import { isExampleWrite } from '../../../packages/web/src/lib/exampleOperations';
 
 const test = base.extend<{
   ownedGraphIds: OwnedGraphs;

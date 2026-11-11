@@ -9,7 +9,7 @@ import {
   ownedGraphIdsFixture,
   type OwnedGraphs,
 } from '../../lib/ownedGraphIdsFixture';
-import { isExampleWrite } from '../../packages/web/src/lib/exampleOperations';
+import { isExampleWrite } from '../../../packages/web/src/lib/exampleOperations';
 
 // Cold Neo4j query planning belongs to fixture setup, not the interaction
 // budget. Both budgets are bounded; slow clicks and assertions still fail.

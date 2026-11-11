@@ -11,7 +11,7 @@ import {
   ownedGraphIdsFixture,
   type OwnedGraphs,
 } from '../../lib/ownedGraphIdsFixture';
-import { isExampleWrite } from '../../packages/web/src/lib/exampleOperations';
+import { isExampleWrite } from '../../../packages/web/src/lib/exampleOperations';
 
 type Item = {
   id: string;

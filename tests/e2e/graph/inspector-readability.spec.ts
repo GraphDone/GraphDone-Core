@@ -6,7 +6,7 @@ import {
   ownedGraphIdsFixture,
   type OwnedGraphs,
 } from '../../lib/ownedGraphIdsFixture';
-import { isExampleWrite } from '../../packages/web/src/lib/exampleOperations';
+import { isExampleWrite } from '../../../packages/web/src/lib/exampleOperations';
 
 const test = base.extend<{ ownedGraphIds: OwnedGraphs }>({
   ownedGraphIds: [ownedGraphIdsFixture, { timeout: 60000 }],
