@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
-  EXAMPLE_PENDING_MAX_AGE_MS,
+  EXAMPLE_ITEM_TAG,
+  EXAMPLE_MAX_FAILURES,
   EXAMPLE_PENDING_TAG,
+  exampleFailures,
+  withExampleFailure,
+  withoutPendingTag,
   STARTER_POSITION_BOX,
   examplePendingParts,
   awaitExampleIdle,
@@ -184,7 +188,7 @@ function fakeBackend() {
     await Promise.resolve();
     try { return await run(); } finally { busy--; }
   };
-  const items = new Map<string, { graphId: string; title: string }>();
+  const items = new Map<string, { graphId: string; title: string; tags?: string[] }>();
   const edges: Array<StarterLink & { id: string }> = [];
   const counts = new Map<string, { nodeCount: number; edgeCount: number }>();
   const opened: string[] = [];
@@ -204,7 +208,7 @@ function fakeBackend() {
     },
     async createItems(graphId: string, list: StarterItem[]) {
       log.push(`items ${name(graphId)}`);
-      return list.map(entry => { const itemId = id('item'); items.set(itemId, { graphId, title: entry.title }); return itemId; });
+      return list.map(entry => { const itemId = id('item'); items.set(itemId, { graphId, title: entry.title, tags: entry.tags }); return itemId; });
     },
     async createEdges(list: StarterLink[]) {
       log.push(`edges ${name(items.get(list[0].sourceId)!.graphId)}`);
@@ -243,14 +247,14 @@ function fakeBackend() {
     async content(graphId) {
       await land();
       return {
-        items: [...items].filter(([, entry]) => entry.graphId === graphId).map(([itemId, entry]) => ({ id: itemId, title: entry.title })),
-        edges: edges.filter(edge => items.get(edge.sourceId)!.graphId === graphId),
+        items: [...items].filter(([, entry]) => entry.graphId === graphId).map(([itemId, entry]) => ({ id: itemId, title: entry.title, tags: entry.tags })),
+        edges: edges.filter(edge => items.get(edge.sourceId)?.graphId === graphId),
       };
     },
     async deleteContent(itemIds, edgeIds) {
       await land();
       log.push(`delete ${itemIds.length} items, ${edgeIds.length} connections`);
-      for (let i = edges.length - 1; i >= 0; i--) if (edgeIds.includes(edges[i].id)) edges.splice(i, 1);
+      for (let i = edges.length - 1; i >= 0; i--) if (edgeIds.includes(edges[i].id) || itemIds.includes(edges[i].sourceId) || itemIds.includes(edges[i].targetId)) edges.splice(i, 1);
       for (const itemId of itemIds) items.delete(itemId);
     },
     async setTags(graphId, tags) {
@@ -612,18 +616,61 @@ describe('resuming without races', () => {
     expect(pendingTags(backend)).toEqual([]);
   });
 
-  it('gives up on a part still pending ten minutes after it was created', () => {
-    const at = (minutes: number) => new Date(Date.UTC(2026, 10, 10, 12, minutes)).toISOString();
-    const now = Date.parse(at(30));
-    const graphs = [
-      { id: 'new', name: 'Welcome', type: 'SUBGRAPH', createdAt: at(25), tags: ['example', EXAMPLE_PENDING_TAG] },
-      { id: 'old', name: 'Ideas', type: 'SUBGRAPH', createdAt: at(30 - EXAMPLE_PENDING_MAX_AGE_MS / 60_000 - 1), tags: [EXAMPLE_PENDING_TAG] },
-      { id: 'unknown', name: 'Fix bugs', type: 'SUBGRAPH', createdAt: null, tags: [EXAMPLE_PENDING_TAG] },
-      { id: 'done', name: 'Home', type: 'PROJECT', createdAt: at(0), tags: ['example'] },
-    ];
-    const { open, stale } = examplePendingParts(graphs, now);
-    expect(open.map(graph => graph.id)).toEqual(['new', 'unknown']);
-    expect(stale.map(graph => graph.id)).toEqual(['old']);
+  it('keeps a user item titled like an example item, and its connections', async () => {
+    const backend = fakeBackend();
+    await createStarterWorkspace(plan, reloadAfter(backend, placed() + 2 + 3, () => false), { pending: true, clock: backend.clock }).catch(() => undefined);
+    const launch = graphId(backend, 'Plan a launch');
+    const title = graphNamed('Plan a launch').items[0].title;
+    expect(titlesIn(backend, launch), 'the example item exists').toContain(title);
+    backend.items.set('item-0-mine', { graphId: launch, title, tags: ['mine'] });
+    backend.items.set('item-0-mine-too', { graphId: launch, title: 'My own step', tags: [] });
+    backend.edges.push({ id: 'edge-0-mine', sourceId: 'item-0-mine', targetId: 'item-0-mine-too', type: 'DEPENDS_ON' });
+
+    await createStarterWorkspace(plan, backend.api, { resume: true, pending: true, clock: backend.clock });
+
+    expect(backend.items.has('item-0-mine'), "the user's item stays").toBe(true);
+    expect(backend.edges.some(edge => edge.id === 'edge-0-mine'), "the user's connection stays").toBe(true);
+    const example = [...backend.items].filter(([, entry]) => entry.graphId === launch && entry.tags?.includes(EXAMPLE_ITEM_TAG)).map(([, entry]) => entry.title);
+    expect(example.sort(), 'each example item once').toEqual(graphNamed('Plan a launch').items.map(entry => entry.title).sort());
+    expect(pendingTags(backend)).toEqual([]);
+  });
+
+  it('removes a duplicate example item with every connection to it, from other graphs too', async () => {
+    const backend = fakeBackend();
+    await createStarterWorkspace(plan, reloadAfter(backend, placed() + 2 + 3, () => false), { pending: true, clock: backend.clock }).catch(() => undefined);
+    const launch = graphId(backend, 'Plan a launch');
+    const title = graphNamed('Plan a launch').items[0].title;
+    backend.items.set('item-zzz-duplicate', { graphId: launch, title, tags: ['example', EXAMPLE_ITEM_TAG] });
+    const welcomeItem = [...backend.items].find(([, entry]) => entry.graphId === graphId(backend, 'Welcome'))![0];
+    backend.edges.push({ id: 'edge-cross', sourceId: welcomeItem, targetId: 'item-zzz-duplicate', type: 'RELATES_TO' });
+
+    await createStarterWorkspace(plan, backend.api, { resume: true, pending: true, clock: backend.clock });
+
+    expect(backend.items.has('item-zzz-duplicate')).toBe(false);
+    expect(backend.edges.filter(edge => !backend.items.has(edge.sourceId) || !backend.items.has(edge.targetId)), 'no connection left pointing at a removed item').toEqual([]);
+    expect(titlesIn(backend, launch).sort()).toEqual(graphNamed('Plan a launch').items.map(entry => entry.title).sort());
+  });
+
+  it('still finishes a part left pending a day ago', async () => {
+    const backend = fakeBackend();
+    await createStarterWorkspace(plan, reloadAfter(backend, placed() + 4, () => false), { pending: true, clock: backend.clock }).catch(() => undefined);
+    await backend.clock.sleep(24 * 60 * 60_000);
+    expect(await awaitExampleIdle(backend.api, 40_000, backend.clock), 'a day-old part is still open').toBe(true);
+    await createStarterWorkspace(plan, backend.api, { resume: true, pending: true, clock: backend.clock });
+    expect(pendingTags(backend)).toEqual([]);
+    for (const graph of plan.graphs) expect(titlesIn(backend, graphId(backend, graph.name)).sort(), graph.name).toEqual(graph.items.map(entry => entry.title).sort());
+  });
+
+  it('gives up on a part after three failed resumes, and forgets the count once it is finished', () => {
+    let graph = { id: 'p', name: 'Plan a launch', type: 'SUBGRAPH', tags: ['example', 'mine', EXAMPLE_PENDING_TAG] };
+    const parts = () => examplePendingParts([graph]);
+    for (let failure = 1; failure <= EXAMPLE_MAX_FAILURES; failure++) {
+      expect(parts().open, `open before failure ${failure}`).toHaveLength(1);
+      graph = { ...graph, tags: withExampleFailure(graph) };
+      expect(exampleFailures(graph)).toBe(failure);
+    }
+    expect(parts()).toEqual({ open: [], abandoned: [graph] });
+    expect(withoutPendingTag(graph.tags)).toEqual(['example', 'mine']);
   });
 });
 

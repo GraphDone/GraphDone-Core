@@ -5,7 +5,7 @@ import { ApolloClient, ApolloLink, ApolloProvider, InMemoryCache, Observable } f
 import { getMainDefinition } from '@apollo/client/utilities';
 import { valueFromASTUntyped, type FieldNode, type SelectionSetNode } from 'graphql';
 import { GraphProvider, useGraph } from './GraphContext';
-import { EXAMPLE_PENDING_TAG, buildStarterWorkspace } from '../lib/starterWorkspace';
+import { EXAMPLE_ITEM_TAG, EXAMPLE_MAX_FAILURES, EXAMPLE_PENDING_TAG, buildStarterWorkspace, exampleFailures } from '../lib/starterWorkspace';
 import type { GraphContextType } from '../types/graph';
 
 const user = { id: 'me', role: 'USER', name: 'New user' };
@@ -15,6 +15,13 @@ vi.mock('../lib/offline/engine', () => ({ offlineEnabled: false, localGuest: () 
 
 type Row = Record<string, unknown>;
 const get = (value: unknown, path: string): unknown => path.split('.').reduce<unknown>((at, key) => (at as Row | undefined)?.[key], value);
+/** A GraphQL `where` as the server reads it: OR, `<field>_IN`, a related record's own where, or equality. */
+const matches = (record: Row | undefined, where: Row): boolean => !!record && Object.entries(where).every(([key, value]) => {
+  if (key === 'OR') return (value as Row[]).some(each => matches(record, each));
+  if (key.endsWith('_IN')) return (value as unknown[]).includes(record[key.slice(0, -3)]);
+  if (value && typeof value === 'object') return matches(record[key] as Row | undefined, value as Row);
+  return record[key] === value;
+});
 
 /**
  * The self-hosted backend in memory, answering the operations GraphProvider
@@ -29,6 +36,7 @@ function fakeBackend() {
   let next = 0;
   let release: () => void = () => undefined;
   let held = false;
+  const failing = { items: false };
   const gate = new Promise<void>(resolve => { release = resolve; });
   const id = (prefix: string) => `${prefix}-${++next}`;
   const graphRow = (input: Row): Row => ({
@@ -61,12 +69,20 @@ function fakeBackend() {
       case 'deleteGraphs':
         graphs.splice(graphs.findIndex(g => g.id === get(args, 'where.id')), 1);
         return { __typename: 'DeleteInfo', nodesDeleted: 1 };
+      case 'deleteEdges':
+      case 'deleteWorkItems': {
+        const list = name === 'deleteEdges' ? edges : items;
+        const gone = list.filter(record => matches(record, args.where as Row));
+        for (const record of gone) list.splice(list.indexOf(record), 1);
+        return { __typename: 'DeleteInfo', nodesDeleted: gone.length };
+      }
       case 'workItems':
         return items.filter(item => get(item, 'graph.id') === inGraph(args.where));
       case 'edges':
         return edges.filter(edge => get(edge, 'source.graph.id') === inGraph(args.where));
       case 'createWorkItems': {
         const inputs = args.input as Row[];
+        if (failing.items) throw new Error('The backend is down');
         const graph = graphs.find(g => g.id === get(inputs[0], 'graph.connect.where.node.id'))!;
         const created = inputs.map(({ owner: _owner, graph: _graph, ...input }) => ({ __typename: 'WorkItem', id: id('item'), ...input, graph }));
         items.push(...created);
@@ -109,7 +125,7 @@ function fakeBackend() {
       observer.complete();
     })().catch(error => observer.error(error));
   }));
-  return { graphs, items, edges, operations, link, release, isHeld: () => held };
+  return { graphs, items, edges, operations, link, release, isHeld: () => held, failing };
 }
 
 let graph: GraphContextType;
@@ -193,13 +209,55 @@ describe('a new user while the example project is still being written', () => {
     expect(backend.graphs.filter(g => g.name === 'Getting started'), 'the resume kept the existing project').toHaveLength(1);
   });
 
-  it('gives up on an example still pending ten minutes after it was created: clears the tag, keeps the others, writes nothing', async () => {
+  it('removes a duplicate example item together with connections to it from other graphs', async () => {
     const backend = fakeBackend();
-    const createdAt = new Date(Date.now() - 11 * 60_000).toISOString();
-    backend.graphs.push({ __typename: 'Graph', id: 'gs', name: 'Getting started', type: 'PROJECT', createdBy: 'me', parentGraphId: null, tags: ['example', EXAMPLE_PENDING_TAG, 'mine'], path: [], depth: 0, createdAt });
+    const graphRow = (id: string, name: string, parentGraphId: string | null, tags: string[]) =>
+      ({ __typename: 'Graph', id, name, type: parentGraphId ? 'SUBGRAPH' : 'PROJECT', createdBy: 'me', parentGraphId, tags, path: parentGraphId ? [parentGraphId] : [], depth: parentGraphId ? 1 : 0, createdAt: '2026-11-09T12:00:00Z' });
+    backend.graphs.push(
+      graphRow('gs', 'Getting started', null, ['example', EXAMPLE_PENDING_TAG]),
+      graphRow('w', 'Welcome', 'gs', ['tutorial', 'welcome', 'getting-started']),
+      graphRow('launch', 'Plan a launch', 'gs', ['example', EXAMPLE_PENDING_TAG]),
+    );
+    const [, welcome, launch] = backend.graphs;
+    const steps = plan.graphs.find(g => g.name === 'Plan a launch')!.items;
+    steps.forEach((step, n) => backend.items.push({ __typename: 'WorkItem', id: `item-${n}`, title: step.title, tags: ['example', EXAMPLE_ITEM_TAG], graph: launch }));
+    backend.items.push({ __typename: 'WorkItem', id: 'item-zzz', title: steps[0].title, tags: ['example', EXAMPLE_ITEM_TAG], graph: launch });
+    backend.items.push({ __typename: 'WorkItem', id: 'item-w', title: 'Welcome to GraphDone', tags: [], graph: welcome });
+    backend.edges.push({ __typename: 'Edge', id: 'edge-cross', type: 'RELATES_TO', source: backend.items.at(-1), target: backend.items.at(-2) });
+    localStorage.setItem('graphdone:starter-pending:me', JSON.stringify({ hierarchy: true, startedAt: Date.now(), inflight: [] }));
     await start(backend);
-    await waitFor(() => expect(backend.graphs[0].tags).toEqual(['example', 'mine']), { timeout: 5000 });
+    await waitFor(() => expect(exampleDone(backend)).toBe(true), { timeout: 10000 });
 
-    expect(backend.operations.filter(operation => operation.startsWith('CreateStarter') || operation.startsWith('Starter'))).toEqual([]);
+    expect(backend.items.some(item => item.id === 'item-zzz'), 'the duplicate is removed').toBe(false);
+    expect(backend.edges.filter(edge => !backend.items.includes(edge.source as Row) || !backend.items.includes(edge.target as Row)), 'no connection is left without its item').toEqual([]);
+    expect(backend.items.filter(item => item.graph === launch).map(item => item.title).sort()).toEqual(steps.map(step => step.title).sort());
+  });
+
+  it('stops resuming a part after three failed tries: clears its tag, keeps its other tags, and leaves what exists', async () => {
+    const backend = fakeBackend();
+    backend.failing.items = true;
+    const graphRow = (id: string, name: string, type: string, parentGraphId: string | null, tags: string[]) =>
+      ({ __typename: 'Graph', id, name, type, createdBy: 'me', parentGraphId, tags, path: parentGraphId ? [parentGraphId] : [], depth: parentGraphId ? 1 : 0, createdAt: '2026-11-09T12:00:00Z' });
+    backend.graphs.push(
+      graphRow('gs', 'Getting started', 'PROJECT', null, ['example', EXAMPLE_PENDING_TAG]),
+      graphRow('w', 'Welcome', 'SUBGRAPH', 'gs', ['tutorial', 'welcome', 'getting-started']),
+      graphRow('launch', 'Plan a launch', 'SUBGRAPH', 'gs', ['example', 'mine', EXAMPLE_PENDING_TAG]),
+    );
+    const launch = () => backend.graphs.find(g => g.id === 'launch')!;
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    for (let load = 1; load <= EXAMPLE_MAX_FAILURES; load++) {
+      localStorage.setItem('graphdone:starter-pending:me', JSON.stringify({ hierarchy: true, startedAt: Date.now(), inflight: [] }));
+      await start(backend);
+      await waitFor(() => expect(exampleFailures(launch() as { tags: string[] })).toBe(load), { timeout: 5000 });
+      cleanup();
+    }
+    const before = backend.operations.length;
+    await start(backend);
+    await waitFor(() => expect(launch().tags).toEqual(['example', 'mine']), { timeout: 5000 });
+    error.mockRestore();
+
+    expect(backend.graphs.filter(g => (g.tags as string[]).includes(EXAMPLE_PENDING_TAG)).map(g => g.name)).toEqual([]);
+    expect(backend.operations.slice(before).filter(operation => operation.startsWith('CreateStarter'))).toEqual([]);
+    expect(localStorage.getItem('graphdone:starter-pending:me')).toBeNull();
   });
 });

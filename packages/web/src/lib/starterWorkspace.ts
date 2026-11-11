@@ -290,19 +290,31 @@ export interface ExistingGraph {
  */
 export const EXAMPLE_PENDING_TAG = 'example:pending';
 export const isExamplePending = (graph: { tags?: string[] | null }) => !!graph.tags?.includes(EXAMPLE_PENDING_TAG);
-/** A part still pending this long after it was created is given up on: no sign-in resumes it, and its tag is cleared. */
-export const EXAMPLE_PENDING_MAX_AGE_MS = 10 * 60_000;
-export const withoutPendingTag = (tags: string[] | null | undefined) => (tags || []).filter(tag => tag !== EXAMPLE_PENDING_TAG);
+/** Marks each item the example writes on the self-hosted server, so its duplicate cleanup never touches the user's own items. */
+export const EXAMPLE_ITEM_TAG = 'example:item';
+/** A resume that failed this many times on a part gives up on it: its tag is cleared and what exists is left. */
+export const EXAMPLE_MAX_FAILURES = 3;
+const FAILED_PREFIX = 'example:failed:';
+export const exampleFailures = (graph: { tags?: string[] | null }) =>
+  Math.max(0, ...(graph.tags || []).filter(tag => tag.startsWith(FAILED_PREFIX)).map(tag => Number(tag.slice(FAILED_PREFIX.length)) || 0));
+export const withExampleFailure = (graph: { tags?: string[] | null }) =>
+  [...(graph.tags || []).filter(tag => !tag.startsWith(FAILED_PREFIX)), `${FAILED_PREFIX}${exampleFailures(graph) + 1}`];
+export const withoutPendingTag = (tags: string[] | null | undefined) =>
+  (tags || []).filter(tag => tag !== EXAMPLE_PENDING_TAG && !tag.startsWith(FAILED_PREFIX));
 
-/** Pending parts a sign-in may still finish (`open`), and those too old to (`stale`). A part of unknown age is open. */
-export function examplePendingParts<G extends ExistingGraph>(graphs: G[], now: number): { open: G[]; stale: G[] } {
+/** Pending parts a sign-in should finish (`open`), and those a resume failed on too often (`abandoned`). */
+export function examplePendingParts<G extends ExistingGraph>(graphs: G[]): { open: G[]; abandoned: G[] } {
   const pending = graphs.filter(isExamplePending);
-  const stale = pending.filter(graph => now - Date.parse(graph.createdAt ?? '') > EXAMPLE_PENDING_MAX_AGE_MS);
-  return { open: pending.filter(graph => !stale.includes(graph)), stale };
+  return {
+    open: pending.filter(graph => exampleFailures(graph) < EXAMPLE_MAX_FAILURES),
+    abandoned: pending.filter(graph => exampleFailures(graph) >= EXAMPLE_MAX_FAILURES),
+  };
 }
 
+const byId = (a: { id?: string }, b: { id?: string }) => ((a.id ?? '') < (b.id ?? '') ? -1 : (a.id ?? '') > (b.id ?? '') ? 1 : 0);
+
 export interface StarterContent {
-  items: Array<{ id: string; title: string }>;
+  items: Array<{ id: string; title: string; tags?: string[] | null }>;
   edges: Array<StarterLink & { id?: string }>;
 }
 
@@ -318,7 +330,7 @@ export interface StarterApi {
   ownGraphs?(): Promise<ExistingGraph[]>;
   content?(graphId: string): Promise<StarterContent>;
   deleteGraph?(graphId: string): Promise<void>;
-  /** Removes items and connections by id; connections first. */
+  /** Removes connections by id and every connection to or from the items, then the items. */
   deleteContent?(itemIds: string[], edgeIds: string[]): Promise<void>;
   /** Replaces a graph's tags. */
   setTags?(graphId: string, tags: string[]): Promise<void>;
@@ -415,7 +427,7 @@ export function starterDuplicateGroups(plan: StarterWorkspace, own: ExistingGrap
 export function duplicateStarterGraphs(plan: StarterWorkspace, own: ExistingGraph[], itemCounts: Map<string, number>): string[] {
   const used = (g: ExistingGraph) => own.some(other => other.parentGraphId === g.id) || (itemCounts.get(g.id) ?? 1) > 0;
   return starterDuplicateGroups(plan, own).flatMap(group => [...group]
-    .sort((a, b) => Number(used(b)) - Number(used(a)) || (a.createdAt ?? '').localeCompare(b.createdAt ?? '') || a.id.localeCompare(b.id))
+    .sort((a, b) => Number(used(b)) - Number(used(a)) || ((a.createdAt ?? '') < (b.createdAt ?? '') ? -1 : (a.createdAt ?? '') > (b.createdAt ?? '') ? 1 : 0) || byId(a, b))
     .slice(1)
     .filter(g => !used(g))
     .map(g => g.id));
@@ -457,10 +469,10 @@ export async function awaitExampleIdle(api: StarterApi, idleMs: number, clock: S
   let since = clock.now();
   for (;;) {
     await api.idle?.();
-    const { open } = examplePendingParts(await api.ownGraphs(), clock.now());
+    const { open } = examplePendingParts(await api.ownGraphs());
     if (!open.length) return false;
     const parts: string[] = [];
-    for (const graph of [...open].sort((a, b) => a.id.localeCompare(b.id))) {
+    for (const graph of [...open].sort(byId)) {
       const content = graph.parentGraphId && api.content ? await api.content(graph.id) : null;
       parts.push(`${graph.id}:${content?.items.length ?? '-'}:${content?.edges.length ?? '-'}`);
     }
@@ -566,8 +578,8 @@ export async function createStarterWorkspace(
     if (graph.project && finished(graph.project) && !inPlace) return;
     await ensureGraph(graph.key, { name: graph.name, description: graph.description, type: graph.type, tags: graph.tags, parentGraphId: parent, depth: parent ? 1 : 0, path: parent ? [parent] : [] });
   };
-  const canonical = (items: StarterContent['items'], title: string) =>
-    items.filter(item => item.title === title).sort((a, b) => a.id.localeCompare(b.id))[0];
+  const ours = (items: StarterContent['items']) => (pending ? items.filter(item => item.tags?.includes(EXAMPLE_ITEM_TAG)) : items);
+  const canonical = (items: StarterContent['items'], title: string) => ours(items).filter(item => item.title === title).sort(byId)[0];
   const fill = async (graph: StarterGraph) => {
     const graphId = ids[graph.key];
     if (!graphId || finished(graph.key)) return;
@@ -585,7 +597,7 @@ export async function createStarterWorkspace(
       }
       const [itemId] = await tracked(
         { id: writeId(), sentAt: clock.now(), kind: 'items', graphId, titles: [entry.title] },
-        () => api.createItems(graphId, [entry])
+        () => api.createItems(graphId, [pending ? { ...entry, tags: [...entry.tags, EXAMPLE_ITEM_TAG] } : entry])
       );
       if (!itemId) throw new Error(`The example item "${entry.title}" was not created in "${graph.name}".`);
       byKey.set(entry.key, itemId);
@@ -603,18 +615,15 @@ export async function createStarterWorkspace(
     await connect();
     if (resume && pending && api.deleteContent) {
       const have = await read();
-      const titles = new Set(graph.items.map(entry => entry.title));
       const kept = new Set(graph.items.map(entry => canonical(have.items, entry.title)?.id));
-      const extraItems = have.items.filter(item => titles.has(item.title) && !kept.has(item.id)).map(item => item.id);
-      const seen = new Set<string>();
+      const titles = new Set(graph.items.map(entry => entry.title));
+      const extraItems = ours(have.items).filter(item => titles.has(item.title) && !kept.has(item.id)).map(item => item.id);
       const extraEdges: string[] = [];
-      for (const edge of [...have.edges].sort((a, b) => (a.id ?? '').localeCompare(b.id ?? ''))) {
-        const key = `${edge.sourceId}|${edge.targetId}|${edge.type}`;
-        if (extraItems.includes(edge.sourceId) || extraItems.includes(edge.targetId) || seen.has(key)) {
-          if (edge.id) extraEdges.push(edge.id);
-        } else {
-          seen.add(key);
-        }
+      for (const edge of graph.edges) {
+        const sourceId = canonical(have.items, titleOf(edge.source))?.id;
+        const targetId = canonical(have.items, titleOf(edge.target))?.id;
+        const same = have.edges.filter(e => e.sourceId === sourceId && e.targetId === targetId && e.type === edge.type).sort(byId);
+        extraEdges.push(...same.slice(1).flatMap(e => (e.id ? [e.id] : [])));
       }
       if (extraItems.length || extraEdges.length) {
         await api.idle?.();
