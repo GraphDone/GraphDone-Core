@@ -1,7 +1,8 @@
 import { test, expect, Page } from '@playwright/test';
+import { isDeepStrictEqual } from 'node:util';
 import { backend, createItem, enterWorkspace, Item, linked, openGraphView, SetupError, storedEdges, StoredEdge } from '../../lib/journeys/workspace';
 import { LINK_PATHS } from '../../lib/journeys/linkPaths';
-import { drawnRelationship, editorOf, expectEditor, expectListed, openEditor, press, watchProblems } from '../../lib/journeys/relationshipEditor';
+import { closeEditor, drawnRelationship, editorOf, editorShows, expectListed, openEditor, press, showPair, watchProblems } from '../../lib/journeys/relationshipEditor';
 import { RELATIONSHIP_OPTIONS } from '../../../packages/web/src/constants/workItemConstants';
 
 /**
@@ -9,13 +10,16 @@ import { RELATIONSHIP_OPTIONS } from '../../../packages/web/src/constants/workIt
  * landing page in a fresh browser, makes two items, connects them with the
  * inspector's Connect, and opens the relationship editor the way this device's
  * person reaches it (the connection's label or wire on desktop and iPad,
- * "Browse all relationships" on a phone). After every change it checks three
- * things a person relies on: the editor (still "Edit relationship", the
- * direction line, the pressed type), the saved data (exactly one relationship
- * between the pair, with the expected direction, type and weight) and the
- * canvas (one wire, its colour, label text and icon for the type, the arrow at
- * the target), plus the relationship list's entry. Run with --repeat-each=N for
- * a success rate per path and device.
+ * "Browse all relationships" on a phone). After every change it checks, with
+ * the editor still open, the saved data (exactly one relationship between the
+ * pair, with the expected direction, type and weight), the editor (still "Edit
+ * relationship", the direction line, the pressed type) and the canvas (one
+ * wire, its colour, label text and icon for the type, the arrow at the
+ * target); then it closes the editor, zooms in if the arrow is not drawn at
+ * this zoom, and checks that a person sees the wire in the type's colour and
+ * the arrow at the target; then the relationship list's entry. Everything a
+ * step shows is compared at once, so a failure lists all that is wrong. Run
+ * with --repeat-each=N for a success rate per path and device.
  */
 const TYPES = RELATIONSHIP_OPTIONS.map(o => ({ type: o.type as string, label: o.label, color: o.hexColor }));
 const typeInfo = (type: string) => {
@@ -54,25 +58,72 @@ async function expectSaved(page: Page, t: Trial, want: Want, step: string): Prom
 }
 
 /** The canvas draws that one relationship: one wire, arrow and label, in the type's colour, label and icon, pointing at the target. */
-async function expectDrawn(page: Page, t: Trial, want: Want, step: string, timeout = 10000) {
+const drawnAs = (want: Want) => {
   const expected = typeInfo(want.type);
-  await expect.poll(async () => drawnRelationship(page, t.a.id, t.b.id, want.type), {
-    message: `${step}: the canvas must draw exactly one ${expected.label} wire ${want.source.title} → ${want.target.title} in ${expected.color}, with its label, icon and arrow`,
-    timeout,
-  }).toEqual({
+  return {
     wires: 1, arrows: 1, labels: 1, hitAreas: 1,
     source: want.source.id, target: want.target.id,
     stroke: expected.color, arrowFill: expected.color, arrowAt: 'target',
     labelText: expected.label, labelIcon: 'matches the type',
-  });
+  };
+};
+/** ...and a person sees the wire and the arrow. */
+const seenAs = (want: Want) => ({ ...drawnAs(want), seen: { wire: true, arrow: true } });
+
+/** Read until it is as wanted or the time is up; the caller compares the last reading. */
+async function settle<T>(page: Page, read: () => Promise<T>, wanted: unknown, timeout: number): Promise<T> {
+  const end = Date.now() + timeout;
+  let last = await read();
+  while (!isDeepStrictEqual(last, wanted) && Date.now() < end) {
+    await page.waitForTimeout(250);
+    last = await read();
+  }
+  return last;
 }
 
-async function expectAll(page: Page, t: Trial, want: Want, step: string) {
-  await expectEditor(page, want.source.title, want.target.title, typeInfo(want.type).label, step);
-  const saved = await expectSaved(page, t, want, step);
-  await expectDrawn(page, t, want, step);
-  await expectListed(page, saved.id, want.source.title, want.target.title, want.type, step);
-  return saved;
+/** With the editor closed: a person sees the wire in the type's colour and the arrow at the target (zooming in first if needed). */
+async function expectSeen(page: Page, t: Trial, want: Want, step: string, timeout = 10000) {
+  await showPair(page, t.a.id, t.b.id, want.type);
+  const seen = await settle(page, () => drawnRelationship(page, t.a.id, t.b.id, want.type, { seen: true }), seenAs(want), timeout);
+  expect(seen, `${step}: a person must see one ${typeInfo(want.type).label} wire ${want.source.title} → ${want.target.title} in ${typeInfo(want.type).color}, with its label, icon and arrow`).toEqual(seenAs(want));
+}
+
+/**
+ * After a change: the saved data, the editor and the canvas while the editor
+ * is open, then the canvas as a person sees it once the editor is closed,
+ * compared in one go so a failure lists everything that is wrong; then the
+ * relationship list, which reopens the editor.
+ */
+async function expectStep(page: Page, t: Trial, want: Want, step: string): Promise<StoredEdge> {
+  const label = typeInfo(want.type).label;
+  let pair: StoredEdge[] = [];
+  const wantOpen = {
+    saved: [{ source: want.source.id, target: want.target.id, type: want.type, weight: want.weight }],
+    editor: { line: `Editing relationship: ${want.source.title} → ${want.target.title}`, pressed: [label], editWindows: 1, createWindows: 0 },
+    canvas: drawnAs(want),
+  };
+  const open = await settle(page, async () => {
+    pair = (await storedEdges(page, t.graphId)).filter(e => linked([e], t.a.id, t.b.id));
+    return {
+      saved: pair.map(({ source, target, type, weight }) => ({ source, target, type, weight })),
+      editor: await editorShows(page),
+      canvas: await drawnRelationship(page, t.a.id, t.b.id, want.type),
+    };
+  }, wantOpen, 15000);
+  const wantClosed = { windows: { editWindows: 0, createWindows: 0 }, canvas: seenAs(want) };
+  let closed: unknown = 'not checked: the editor was not open to close';
+  if (open.editor.editWindows === 1) {
+    await closeEditor(page, step);
+    await showPair(page, t.a.id, t.b.id, want.type);
+    closed = await settle(page, async () => {
+      const { editWindows, createWindows } = await editorShows(page);
+      return { windows: { editWindows, createWindows }, canvas: await drawnRelationship(page, t.a.id, t.b.id, want.type, { seen: true }) };
+    }, wantClosed, 10000);
+  }
+  expect({ open, closed }, `${step}: with the editor open, one ${want.type} relationship ${want.source.title} → ${want.target.title} weight ${want.weight} saved, the editor reading it with ${label} pressed, and the canvas drawing it; with the editor closed, a person seeing it`)
+    .toEqual({ open: wantOpen, closed: wantClosed });
+  await expectListed(page, pair[0].id, want.source.title, want.target.title, want.type, step);
+  return pair[0];
 }
 
 /** Problems seen anywhere in the trial; checked at the end of every path. */
@@ -88,11 +139,10 @@ test('JOURNEY relationship-edit type: change through every type and back @journe
   const { problems, toasts } = await watchProblems(page);
   const t = await setup(page, run(info.repeatEachIndex));
   const opened = [await openEditor(page, t.edge.id)];
-  await expectEditor(page, t.from.title, t.to.title, typeInfo(t.edge.type).label, 'opened');
   const walk = [...TYPES.map(x => x.type).filter(type => type !== t.edge.type), t.edge.type];
   for (const type of walk) {
     await press(page, editorOf(page).getByRole('button', { name: typeInfo(type).label, exact: true }));
-    await expectAll(page, t, { source: t.from, target: t.to, type, weight: t.edge.weight }, `changed to ${type}`);
+    await expectStep(page, t, { source: t.from, target: t.to, type, weight: t.edge.weight }, `changed to ${type}`);
   }
   info.annotations.push({ type: 'journey', description: JSON.stringify({ backend, opened, steps: walk.length }) });
   expectNoProblems(problems, toasts);
@@ -105,12 +155,14 @@ test('JOURNEY relationship-edit flip: change type, flip, flip back @journey', as
   const type = t.edge.type === 'BLOCKS' ? 'ENABLES' : 'BLOCKS';
   const weight = t.edge.weight;
   const opened = [await openEditor(page, t.edge.id)];
+  // Change the type, then flip at once, without reopening the editor: the flip
+  // must keep the new type and the weight.
   await press(page, editorOf(page).getByRole('button', { name: typeInfo(type).label, exact: true }));
-  await expectAll(page, t, { source: t.from, target: t.to, type, weight }, 'type changed');
+  await expectSaved(page, t, { source: t.from, target: t.to, type, weight }, 'type changed');
   await press(page, editorOf(page).getByRole('button', { name: 'Flip Direction', exact: true }));
-  await expectAll(page, t, { source: t.to, target: t.from, type, weight }, 'flipped');
+  await expectStep(page, t, { source: t.to, target: t.from, type, weight }, 'flipped');
   await press(page, editorOf(page).getByRole('button', { name: 'Flip Direction', exact: true }));
-  await expectAll(page, t, { source: t.from, target: t.to, type, weight }, 'flipped back');
+  await expectStep(page, t, { source: t.from, target: t.to, type, weight }, 'flipped back');
   info.annotations.push({ type: 'journey', description: JSON.stringify({ backend, opened }) });
   expectNoProblems(problems, toasts);
 });
@@ -124,14 +176,13 @@ test('JOURNEY relationship-edit reload: a changed, flipped relationship survives
   await press(page, editorOf(page).getByRole('button', { name: typeInfo(want.type).label, exact: true }));
   await expectSaved(page, t, { ...want, source: t.from, target: t.to }, 'type changed');
   await press(page, editorOf(page).getByRole('button', { name: 'Flip Direction', exact: true }));
-  await expectEditor(page, want.source.title, want.target.title, typeInfo(want.type).label, 'flipped');
-  await expectSaved(page, t, want, 'flipped');
+  await expectStep(page, t, want, 'flipped');
   await page.reload();
   await openGraphView(page);
   const saved = await expectSaved(page, t, want, 'after reload');
-  await expectDrawn(page, t, want, 'after reload', 15000);
+  await expectSeen(page, t, want, 'after reload', 15000);
   opened.push(await openEditor(page, saved.id));
-  await expectAll(page, t, want, 'after reload');
+  await expectStep(page, t, want, 'after reload, reopened');
   info.annotations.push({ type: 'journey', description: JSON.stringify({ backend, opened }) });
   expectNoProblems(problems, toasts);
 });
@@ -167,7 +218,7 @@ test('JOURNEY relationship-edit second-tab: another tab shows the change after i
   const otherWatch = await watchProblems(other);
   await other.goto('/');
   await openGraphView(other);
-  await expectDrawn(other, t, { source: t.from, target: t.to, type: t.edge.type, weight: t.edge.weight }, 'second tab before', 20000);
+  await expectSeen(other, t, { source: t.from, target: t.to, type: t.edge.type, weight: t.edge.weight }, 'second tab before', 20000);
   const want = { source: t.to, target: t.from, type: t.edge.type === 'CONFLICTS_WITH' ? 'FOLLOWS' : 'CONFLICTS_WITH', weight: t.edge.weight };
   await page.bringToFront();
   await openEditor(page, t.edge.id);
@@ -178,7 +229,7 @@ test('JOURNEY relationship-edit second-tab: another tab shows the change after i
   await other.bringToFront();
   const started = Date.now();
   // The graph refetches every minute while visible; allow one full cycle.
-  await expectDrawn(other, t, want, 'second tab after its refetch', 75000);
+  await expectSeen(other, t, want, 'second tab after its refetch', 75000);
   info.annotations.push({ type: 'second-tab-ms', description: String(Date.now() - started) });
   expectNoProblems([...problems, ...otherWatch.problems], [...toasts, ...otherWatch.toasts]);
 });

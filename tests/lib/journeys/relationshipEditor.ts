@@ -96,6 +96,88 @@ export async function openEditor(page: Page, edgeId: string): Promise<string> {
   return target.how;
 }
 
+/**
+ * What the relationship windows show: the edit editor's "Editing relationship:
+ * A → B" line, the type buttons it presses, and how many edit and "Create
+ * relationship" windows are open. Read at once, without waiting.
+ */
+export async function editorShows(page: Page) {
+  return page.evaluate(() => {
+    const dialogs = (name: string) => Array.from(document.querySelectorAll(`[role="dialog"][aria-label="${name}"]`));
+    const [editor] = dialogs('Edit relationship');
+    const lines = editor ? Array.from(editor.querySelectorAll('div, p, span')).filter(el =>
+      el.children.length === 0 && (el.textContent ?? '').trim().startsWith('Editing relationship: ')) : [];
+    return {
+      line: lines.length ? (lines[0].textContent ?? '').replace(/\s+/g, ' ').trim() : null,
+      pressed: editor ? Array.from(editor.querySelectorAll('button[aria-pressed="true"]')).map(b => (b as HTMLElement).innerText.trim()) : [],
+      editWindows: dialogs('Edit relationship').length,
+      createWindows: dialogs('Create relationship').length,
+    };
+  });
+}
+
+/** Close the editor with its close button, as a person does. */
+export async function closeEditor(page: Page, step: string) {
+  const editor = editorOf(page);
+  await press(page, editor.getByRole('button', { name: 'Close relationship editor', exact: true }));
+  await expect(editor, `${step}: closing must close the editor`).toHaveCount(0);
+}
+
+/** The camera's zoom, from the graph group's transform. */
+const zoomOf = (page: Page) => page.evaluate(() => {
+  const m = /scale\(\s*([\d.e-]+)/.exec(document.querySelector('.graph-container svg g.main-graph-group')?.getAttribute('transform') || '');
+  return m ? Number(m[1]) : 1;
+});
+
+/**
+ * Zoom in on the pair, as a person does to see which way a connection points,
+ * when its arrow is not drawn at this zoom (a phone opens the graph at half
+ * size, where arrows and labels are hidden): a pinch on touch screens, the
+ * wheel otherwise, centred on empty canvas beside the wire.
+ */
+export async function showPair(page: Page, aId: string, bId: string, type: string) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const drawn = await drawnRelationship(page, aId, bId, type, { seen: true });
+    const k = await zoomOf(page);
+    if (drawn.seen?.arrow || k >= 0.9) return;
+    const spot = await page.evaluate(({ aId, bId }) => {
+      const id = (end: any) => end?.id ?? end;
+      const wire = (Array.from(document.querySelectorAll('.graph-container svg path.edge')) as any[]).find(el => {
+        const d = el.__data__; return d && [id(d.source), id(d.target)].sort().join() === [aId, bId].sort().join();
+      }) as SVGPathElement | undefined;
+      const svg = document.querySelector('.graph-container svg') as SVGSVGElement | null;
+      if (!svg) return null;
+      const box = svg.getBoundingClientRect();
+      let centre = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+      if (wire) {
+        const p = wire.getPointAtLength(wire.getTotalLength() / 2);
+        const q = new DOMPoint(p.x, p.y).matrixTransform(wire.getScreenCTM()!);
+        centre = { x: q.x, y: q.y };
+      }
+      const empty = (x: number, y: number) => {
+        const hit = document.elementFromPoint(x, y);
+        return !!hit && (hit === svg || hit.classList.contains('grid-overlay'));
+      };
+      for (const r of [0, 30, 60, 90, 120]) for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const x = centre.x + dx * r, y = centre.y + dy * r;
+        if (x > box.x + 30 && x < box.right - 30 && y > box.y + 30 && y < box.bottom - 30 && empty(x, y)) return { x, y };
+      }
+      return null;
+    }, { aId, bId });
+    if (!spot) return;
+    const factor = Math.min(3, 1 / k);
+    if (await isTouch(page)) {
+      const cdp = await page.context().newCDPSession(page);
+      await cdp.send('Input.synthesizePinchGesture', { x: spot.x, y: spot.y, scaleFactor: factor, gestureSourceType: 'touch' });
+      await cdp.detach();
+    } else {
+      await page.mouse.move(spot.x, spot.y);
+      await page.mouse.wheel(0, -Math.log2(factor) / 0.002);
+    }
+    await page.waitForTimeout(500);
+  }
+}
+
 /** The editor is still the edit editor, reads from → to, and presses the saved type. */
 export async function expectEditor(page: Page, fromTitle: string, toTitle: string, typeLabel: string, step: string) {
   const editor = editorOf(page);
@@ -105,14 +187,12 @@ export async function expectEditor(page: Page, fromTitle: string, toTitle: strin
 }
 
 /**
- * Close the editor, read the relationship's entry in "Browse all
+ * With the editor closed, read the relationship's entry in "Browse all
  * relationships" (one entry for the pair, from → TYPE → to), and reopen the
  * editor from it, as a person checking the list would.
  */
 export async function expectListed(page: Page, edgeId: string, fromTitle: string, toTitle: string, type: string, step: string) {
   const editor = editorOf(page);
-  await press(page, editor.getByRole('button', { name: 'Close relationship editor', exact: true }));
-  await expect(editor, `${step}: closing must close the editor`).toHaveCount(0);
   await press(page, browseButton(page));
   const list = listOf(page);
   await expect(list.locator('li[data-lod-edge-id]').filter({ hasText: fromTitle }).filter({ hasText: toTitle }),
@@ -133,10 +213,12 @@ const iconMarkup = (type: string) => renderToStaticMarkup(createElement(getRelat
  * What the canvas draws for the relationships between two items: how many
  * wires, arrows, labels and hit areas; the wire's direction, painted stroke and
  * arrow colour (computed style, as hex); which end the arrow sits at; and the
- * label's text and whether its icon is the type's icon.
+ * label's text and whether its icon is the type's icon. With `seen`, also
+ * whether a person can see the wire and the arrow: displayed, at least half
+ * opaque through every parent, and on screen.
  */
-export async function drawnRelationship(page: Page, aId: string, bId: string, type: string) {
-  return page.evaluate(({ aId, bId, reference }) => {
+export async function drawnRelationship(page: Page, aId: string, bId: string, type: string, options: { seen?: boolean } = {}) {
+  return page.evaluate(({ aId, bId, reference, withSeen }) => {
     const id = (end: any) => end?.id ?? end;
     const ofPair = (selector: string) => (Array.from(document.querySelectorAll(`.graph-container svg ${selector}`)) as any[]).filter(el => {
       const d = el.__data__;
@@ -163,6 +245,17 @@ export async function drawnRelationship(page: Page, aId: string, bId: string, ty
     const template = document.createElement('template');
     template.innerHTML = reference;
     const icon = label?.querySelector('.edge-label-icon svg');
+    const visible = (el: Element | undefined) => {
+      if (!el) return false;
+      let opacity = 1;
+      for (let n: Element | null = el; n && n.tagName.toLowerCase() !== 'svg'; n = n.parentElement) {
+        const style = getComputedStyle(n);
+        if (style.display === 'none' || style.visibility === 'hidden') return false;
+        opacity *= Number(style.opacity);
+      }
+      const r = el.getBoundingClientRect();
+      return opacity >= 0.5 && r.width + r.height > 0 && r.right > 0 && r.bottom > 0 && r.left < innerWidth && r.top < innerHeight;
+    };
     return {
       wires: wires.length, arrows: arrows.length, labels: labels.length, hitAreas: hitAreas.length,
       source: wire ? id(wire.__data__.source) : null, target: wire ? id(wire.__data__.target) : null,
@@ -171,6 +264,7 @@ export async function drawnRelationship(page: Page, aId: string, bId: string, ty
       arrowAt,
       labelText: label?.querySelector('.edge-label')?.textContent ?? null,
       labelIcon: !icon ? 'missing' : shape(icon) === shape(template.content.firstElementChild) ? 'matches the type' : 'another icon',
+      ...(withSeen ? { seen: { wire: visible(wire), arrow: visible(arrow) } } : {}),
     };
-  }, { aId, bId, reference: iconMarkup(type) });
+  }, { aId, bId, reference: iconMarkup(type), withSeen: !!options.seen });
 }
