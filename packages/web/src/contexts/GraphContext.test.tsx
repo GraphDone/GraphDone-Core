@@ -192,4 +192,14 @@ describe('a new user while the example project is still being written', () => {
     expect(backend.operations).not.toContain('GetEdges');
     expect(backend.graphs.filter(g => g.name === 'Getting started'), 'the resume kept the existing project').toHaveLength(1);
   });
+
+  it('gives up on an example still pending ten minutes after it was created: clears the tag, keeps the others, writes nothing', async () => {
+    const backend = fakeBackend();
+    const createdAt = new Date(Date.now() - 11 * 60_000).toISOString();
+    backend.graphs.push({ __typename: 'Graph', id: 'gs', name: 'Getting started', type: 'PROJECT', createdBy: 'me', parentGraphId: null, tags: ['example', EXAMPLE_PENDING_TAG, 'mine'], path: [], depth: 0, createdAt });
+    await start(backend);
+    await waitFor(() => expect(backend.graphs[0].tags).toEqual(['example', 'mine']), { timeout: 5000 });
+
+    expect(backend.operations.filter(operation => operation.startsWith('CreateStarter') || operation.startsWith('Starter'))).toEqual([]);
+  });
 });

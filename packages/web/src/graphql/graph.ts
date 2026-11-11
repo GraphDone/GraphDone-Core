@@ -254,6 +254,7 @@ export const STARTER_CONTENT = gql`
       title
     }
     edges(where: $edges) {
+      id
       type
       source {
         id
@@ -271,6 +272,17 @@ export const CREATE_STARTER_ITEMS = gql`
       workItems {
         id
       }
+    }
+  }
+`;
+
+export const DELETE_STARTER_CONTENT = gql`
+  mutation DeleteStarterContent($items: [ID!]!, $edges: [ID!]!) {
+    deleteEdges(where: { id_IN: $edges }) {
+      nodesDeleted
+    }
+    deleteWorkItems(where: { id_IN: $items }) {
+      nodesDeleted
     }
   }
 `;
