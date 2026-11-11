@@ -37,6 +37,13 @@ concerns the room between connected cards.
   placing labels exactly as the renderer does (`placeGraphLabels`) and spread
   the group by the smallest factor that frees them (`spreadForLabels`), rows
   apart first in the hierarchical layout.
+- Check the layout the renderer will get, under any ids: real ids are random
+  and break ties in the organizer and the label order. Keep only spreads that
+  were checked, check the finished layout as a whole (`checkedWhole`), and
+  test several id orders (`label room whatever the item ids`). The renderer
+  starts each label from its spot in the previous frame; in a small graph it
+  retries a missing label from fresh spots, the placement the layouts leave
+  room for.
 - Never move a saved or organized (pinned) card to make room; after the force
   layout settles, move only the cards it placed itself (`clearFreeCards`).
 - Test readability with the renderer's own geometry: the browser audit reads

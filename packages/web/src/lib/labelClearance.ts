@@ -338,7 +338,10 @@ export function spreadForLabels(
     if (ok) high = middle;
     else low = middle;
   }
-  return Math.min(maxFactor, high * SPREAD_SLACK);
+  // The slack is kept only where it still frees every label: spreading is not
+  // always monotonic (a wire can swing onto a label further out).
+  const padded = Math.min(maxFactor, high * SPREAD_SLACK);
+  return padded > high && fits(padded) === true ? padded : high;
 }
 
 export interface LabelRoomOptions<T, E> {
@@ -473,8 +476,29 @@ export function organizeWithLabelRoom<
       },
     });
     const turned = turnToScreen(nodes, result.positions, labelled, options, labelZoom, work);
-    return turned ? { ...result, positions: turned } : result;
+    return { ...result, positions: checkedWhole(nodes, turned ?? result.positions, labelled, options, labelZoom, work) };
   });
+}
+
+/**
+ * The finished layout checked as a whole, as the renderer will see it (after
+ * the components are packed and turned): a label still hidden there, for
+ * instance one that only just fitted its component's spread, spreads the whole
+ * layout a little more.
+ */
+function checkedWhole<T extends OrganizationNode>(
+  nodes: readonly T[],
+  positions: Map<string, Point>,
+  labelled: readonly LabelEdge[],
+  options: Pick<LabelRoomOptions<T, never>, 'dimensionsAt'>,
+  zoom: number,
+  work: { remaining: number }
+): Map<string, Point> {
+  if (!nodes.length || nodes.length > SPREAD_MAX_CARDS) return positions;
+  const sizes = new Map(nodes.map(node => [node.id, options.dimensionsAt(node, zoom)]));
+  const anchor = positions.get(nodes[0].id)!;
+  const factor = spreadForLabels(positions, sizes, labelled, { zoom, anchor, work });
+  return factor > 1 ? new Map([...positions].map(([id, p]) => [id, spreadPoint(p, anchor, factor)])) : positions;
 }
 
 /**
@@ -566,7 +590,7 @@ export function hierarchyWithLabelRoom<
       const both = spreadForLabels(positions, sizes, labelled, { zoom: labelZoom, anchor, maxFactor: 2, work });
       positions = new Map([...positions].map(([id, p]) => [id, spreadPoint(p, anchor, both)]));
     }
-    return { positions };
+    return { positions: checkedWhole(nodes, positions, labelled, options, labelZoom, work) };
   });
 }
 

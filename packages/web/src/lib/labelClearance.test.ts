@@ -31,6 +31,7 @@ import {
 import { organizeTopology } from './topologyOrganization';
 import { computeCompactLayout } from './layoutAlgorithms';
 import { LABEL_SHAPES, type LabelShape } from './labelClearanceShapes';
+import { PHONE_READABLE_SCALE } from './cardTitleZoom';
 
 // measureGraphText's own estimate when there is no canvas: wider than the
 // browser's text, so layouts that pass here have room to spare on screen.
@@ -345,5 +346,35 @@ describe('clearFreeCards', () => {
     const stuck = clearFreeCards(tight, g.drawn, { zoom: 1, free: () => false });
     expect(stuck.moved.size).toBe(0);
     expect(stuck.hidden.length).toBeGreaterThan(0);
+  });
+});
+
+// Item ids break ties in the organizer and in the label order, and real ids are
+// random, so the room for labels must not depend on them. These seeds gave
+// orders where a label stayed hidden: the component spread was taken at an
+// unchecked 1.1 slack, and the hierarchical rows were never checked as a whole.
+describe('label room whatever the item ids', () => {
+  const renamed = (shape: LabelShape, seed: number): LabelShape => {
+    let state = seed;
+    const next = () => (state = (state * 1103515245 + 12345) % 2147483648);
+    const key = new Map(shape.items.map(item => [item.key, next().toString(16).padStart(8, '0')]));
+    return {
+      ...shape,
+      items: shape.items.map(item => ({ ...item, key: key.get(item.key)! })),
+      edges: shape.edges.map(edge => ({ ...edge, source: key.get(edge.source)!, target: key.get(edge.target)! })),
+    };
+  };
+  const orders = LABEL_SHAPES.filter(shape => ['Launch checklist', 'Two connected hubs'].includes(shape.name))
+    .flatMap(shape => [3, 10, 29, 36, 78].map(seed => [shape.name, seed, shape] as const));
+  it.each(orders)('%s with ids from seed %i: every label shows after Organize and in the hierarchical layout', (_name, seed, shape) => {
+    const g = graph(renamed(shape, seed));
+    for (const screen of Object.keys(SCREENS) as Screen[]) {
+      const phone = screen === 'iPhone';
+      const options = { ...g, viewport: SCREENS[screen] };
+      const organized = organizeWithLabelRoom(g.items, g.edges, { ...options, floor: phone ? ORGANIZED_ZOOM_FLOOR : SMALL_GRAPH_ZOOM_FLOOR });
+      expect(problems(g, organized.positions, organized.zoom), `organized on ${screen}`).toEqual(NONE);
+      const rows = hierarchyWithLabelRoom(g.items, g.edges, { ...options, floor: phone ? PHONE_READABLE_SCALE : SMALL_GRAPH_ZOOM_FLOOR });
+      expect(problems(g, rows.positions, rows.zoom), `hierarchical on ${screen}`).toEqual(NONE);
+    }
   });
 });
