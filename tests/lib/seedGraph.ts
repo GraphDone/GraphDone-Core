@@ -1,6 +1,6 @@
 import { expect, Page } from '@playwright/test';
 import { TEST_GRAPH_PREFIX } from './dbHealing';
-import { buildStarterWorkspace } from '../../packages/web/src/lib/starterWorkspace';
+import { missingStarterGraphs } from '../../packages/web/src/lib/workspaceRules';
 
 /**
  * Seeds realistically-shaped graphs of arbitrary size through the real GraphQL
@@ -17,34 +17,6 @@ import { buildStarterWorkspace } from '../../packages/web/src/lib/starterWorkspa
  */
 
 type OwnGraph = { id: string; name: string; type: string; parentGraphId: string | null; nodeCount: number | null };
-
-const STARTER = buildStarterWorkspace({ hierarchy: true });
-
-/**
- * What is still missing from the user's starter workspace (#277), by name.
- * Once a "Getting started" project exists the app is building the full example
- * (projects first, then graphs, then items, then each graph's counts last), so
- * every starter project and graph must exist inside the right project with its
- * item count. Without one, only a flat Welcome graph (signed-in hosted, or an
- * account from before #277) is checked, as before.
- */
-export function missingStarterGraphs(own: OwnGraph[]): string[] {
-  const projectIds = (name: string) =>
-    new Set(own.filter(g => g.name === name && g.type === 'PROJECT' && !g.parentGraphId).map(g => g.id));
-  const names = new Map(STARTER.projects.map(p => [p.key, p.name]));
-  if (!projectIds(STARTER.projects[0].name).size) {
-    return own.filter(g => g.name === 'Welcome' && !(g.nodeCount ?? 0)).map(() => 'Welcome items');
-  }
-  return [
-    ...STARTER.projects.filter(p => !projectIds(p.name).size).map(p => `project ${p.name}`),
-    ...STARTER.graphs
-      .filter(graph => {
-        const parents = projectIds(names.get(graph.project!)!);
-        return !own.some(g => g.name === graph.name && parents.has(g.parentGraphId ?? '') && g.nodeCount === graph.items.length);
-      })
-      .map(graph => `${graph.name} (${graph.items.length} items)`),
-  ];
-}
 
 /**
  * A first sign-in makes the app build the user's starter workspace in the

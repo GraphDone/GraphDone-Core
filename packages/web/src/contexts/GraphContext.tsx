@@ -14,15 +14,13 @@ import { GET_WORK_ITEMS, GET_EDGES, DELETE_WORK_ITEM, CREATE_WORK_ITEM, CREATE_E
 import { buildStarterWorkspace, createStarterWorkspace, starterGraphCount, type StarterApi } from '../lib/starterWorkspace';
 import { offlineEnabled, localGuest } from '../lib/offline/engine';
 import { OFFLINE_PROJECT_LIMIT } from '../lib/offline/model';
-import { projectDeleteBlock } from '../lib/workspaceRules';
+import { exampleLimitMessage, projectDeleteBlock, seenGraphCount, starterHierarchy, starterStep } from '../lib/workspaceRules';
 
 const GraphContext = createContext<GraphContextType | undefined>(undefined);
 
 // Using only real GraphQL data from Neo4j database
 
-// Signed-in hosted accounts sync graphs to /api/sync, which keeps no parent
-// yet, so they get the flat Welcome-only starter (#277).
-const starterHierarchy = () => !(offlineEnabled && !localGuest());
+const hierarchyHere = () => starterHierarchy({ offline: offlineEnabled, guest: localGuest() });
 // Kept only while a new user's starter is being written, so the next page
 // load in this browser can finish it. A server write sent just before a reload
 // can still land afterwards, so a resume first waits STARTER_SETTLE_MS from
@@ -243,11 +241,11 @@ export function GraphProvider({ children }: GraphProviderProps) {
       const wait = pending && !offlineEnabled ? pending.sentAt + STARTER_SETTLE_MS - Date.now() : 0;
       if (wait > 0) await new Promise(resolve => setTimeout(resolve, Math.min(wait, STARTER_SETTLE_MS)));
       if (currentUserIdRef.current !== userId) return;
-      const still = readStarterPending(userId);
-      if (still) return writeStarter(userId, still.hierarchy, true);
       const { data } = await refetchGraphs();
-      const seen = (data?.userGraphs?.length || 0) + (data?.sharedGraphs?.length || 0) + (data?.systemGraphs?.length || 0);
-      if (seen === 0) await writeStarter(userId, starterHierarchy(), false);
+      const still = readStarterPending(userId);
+      const step = starterStep({ graphsSeen: seenGraphCount(data), pending: !!still });
+      if (step === 'finish' && still) await writeStarter(userId, still.hierarchy, true);
+      if (step === 'create') await writeStarter(userId, hierarchyHere(), false);
     };
     if (navigator.locks) await navigator.locks.request(`graphdone-starter:${userId}`, run);
     else await run();
@@ -669,14 +667,11 @@ export function GraphProvider({ children }: GraphProviderProps) {
     if (!currentUser) throw new Error('Sign in to add the example project.');
     if (isAddingExampleRef.current) throw new Error('The example project is already being added.');
     const plan = buildStarterWorkspace({
-      hierarchy: starterHierarchy(),
+      hierarchy: hierarchyHere(),
       takenNames: availableGraphs.map(g => g.name)
     });
-    const adds = starterGraphCount(plan);
-    if (offlineEnabled && availableGraphs.length + adds > OFFLINE_PROJECT_LIMIT) {
-      const over = availableGraphs.length + adds - OFFLINE_PROJECT_LIMIT;
-      throw new Error(`This browser workspace holds up to ${OFFLINE_PROJECT_LIMIT} projects and graphs, and the example project adds ${adds}. Delete ${over} first.`);
-    }
+    const full = exampleLimitMessage({ offline: offlineEnabled, existing: availableGraphs.length, adds: starterGraphCount(plan), limit: OFFLINE_PROJECT_LIMIT });
+    if (full) throw new Error(full);
     isAddingExampleRef.current = true;
     setIsCreating(true);
     try {
