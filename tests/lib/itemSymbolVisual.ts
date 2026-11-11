@@ -12,6 +12,32 @@ export async function readItemSymbols(page: Page) {
       a.x + a.width > b.x + 0.5 &&
       a.y < b.y + b.height - 0.5 &&
       a.y + a.height > b.y + 0.5;
+    type Corner = { x: number; y: number };
+    const cornersOf = (box: ReturnType<typeof rect>): Corner[] => [
+      { x: box.x, y: box.y },
+      { x: box.x + box.width, y: box.y },
+      { x: box.x + box.width, y: box.y + box.height },
+      { x: box.x, y: box.y + box.height },
+    ];
+    // Convex outlines overlap (by more than half a pixel) unless an edge of
+    // one of them separates the two.
+    const outlinesOverlap = (a: Corner[], b: Corner[]) =>
+      ![a, b].some(shape =>
+        shape.some((p, i) => {
+          const q = shape[(i + 1) % shape.length],
+            length = Math.hypot(q.x - p.x, q.y - p.y) || 1;
+          const nx = (p.y - q.y) / length,
+            ny = (q.x - p.x) / length;
+          const project = (points: Corner[]) =>
+            points.map(point => point.x * nx + point.y * ny);
+          const pa = project(a),
+            pb = project(b);
+          return (
+            Math.max(...pa) <= Math.min(...pb) + 0.5 ||
+            Math.max(...pb) <= Math.min(...pa) + 0.5
+          );
+        })
+      );
     const contains = (a: ReturnType<typeof rect>, b: ReturnType<typeof rect>) =>
       b.x >= a.x - 0.5 &&
       b.y >= a.y - 0.5 &&
@@ -182,13 +208,18 @@ export async function readItemSymbols(page: Page) {
         violations.push(`label-offscreen:${label.id}`);
       if (label.font < 13.9 || label.opacity < 0.99)
         violations.push(`label-unreadable:${label.id}`);
+      // A turned label is tested by its outline, not its axis-aligned bounds:
+      // two parallel labels beside a diagonal wire have overlapping bounds
+      // while their outlines are well apart.
       if (
         [
           ...cards.map(card => card.box),
           ...arrows,
           ...controls,
-          ...labels.slice(index + 1).map(other => other.box),
-        ].some(box => overlaps(label.box, box))
+        ].some(box => outlinesOverlap(label.corners, cornersOf(box))) ||
+        labels
+          .slice(index + 1)
+          .some(other => outlinesOverlap(label.corners, other.corners))
       )
         violations.push(`label-overlap:${label.id}`);
       if (segments.some(segment => wireHits(segment, label.corners)))

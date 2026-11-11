@@ -3,6 +3,7 @@ import { writeFile } from 'node:fs/promises';
 import { login, TEST_USERS } from '../../lib/auth';
 import { gql } from '../../lib/graphRequest';
 import { inspectItemSymbols } from '../../lib/itemSymbolVisual';
+import { CARD_TITLES_HIDE_BELOW } from '../../../packages/web/src/lib/cardTitleZoom';
 import {
   ownedGraphIdsFixture,
   type OwnedGraphs,
@@ -136,6 +137,17 @@ for (const [width, height, size] of [
               screenWidth: (
                 element.querySelector('.node-bg') as SVGRectElement
               ).getBoundingClientRect().width,
+              titleFont: Math.min(
+                ...Array.from(
+                  element.querySelectorAll<SVGGraphicsElement>('.node-title-text')
+                ).map(line => {
+                  const matrix = line.getScreenCTM();
+                  return matrix
+                    ? parseFloat(getComputedStyle(line).fontSize) *
+                        Math.hypot(matrix.a, matrix.b)
+                    : 0;
+                })
+              ),
             };
           }
         ),
@@ -165,7 +177,18 @@ for (const [width, height, size] of [
         }),
         work: (window as unknown as { __graphOrganization?: unknown })
           .__graphOrganization,
+        scale: (host.querySelector(':scope > svg') as unknown as { __zoom: { k: number } }).__zoom.k,
       }));
+    // The hub must read. On desktop it is at least 132 px wide. On a phone a
+    // small graph is framed whole, with every relationship label, down to the
+    // zoom where card titles and labels still show (CARD_TITLES_HIDE_BELOW):
+    // the card may be narrower there, but its title keeps its 14 px.
+    const hubReads = (scene: Awaited<ReturnType<typeof read>>) => {
+      const hub = scene.cards.find(card => card.id === seeded.nodeIds[0])!;
+      return width >= 600
+        ? hub.screenWidth >= 132
+        : scene.scale >= CARD_TITLES_HIDE_BELOW - 0.005 && hub.titleFont >= 13.9;
+    };
     if (width >= 600) {
       await expect(page.getByTestId('mini-map-node')).toHaveCount(size);
       await page.waitForTimeout(4500);
@@ -225,13 +248,7 @@ for (const [width, height, size] of [
         return Math.max(...radii) - Math.min(...radii);
       })
       .toBeLessThan(0.01);
-    await expect
-      .poll(
-        async () =>
-          (await read()).cards.find(card => card.id === seeded.nodeIds[0])!
-            .screenWidth
-      )
-      .toBeGreaterThanOrEqual(132);
+    await expect.poll(async () => hubReads(await read())).toBe(true);
     await expect
       .poll(() =>
         page.evaluate(
@@ -263,7 +280,7 @@ for (const [width, height, size] of [
         scene.cards.every(card => card.painted),
         'Cards and titles must actually be visible'
       ).toBe(true);
-      expect(hub.screenWidth).toBeGreaterThanOrEqual(132);
+      expect(hubReads(scene), 'The hub card and its title must read').toBe(true);
       for (const card of scene.cards)
         expect(card.title).toBe(
           before.workItems.find((item: { id: string }) => item.id === card.id)
@@ -375,10 +392,7 @@ for (const [width, height, size] of [
     await expect
       .poll(
         async () => {
-          expect(
-            (await read()).cards.find(card => card.id === seeded.nodeIds[0])!
-              .screenWidth
-          ).toBeGreaterThanOrEqual(132);
+          expect(hubReads(await read())).toBe(true);
           const saved = await snapshot();
           return saved.workItems.every(
             (item: { id: string; positionX: number; positionY: number }) => {
@@ -393,10 +407,7 @@ for (const [width, height, size] of [
         { timeout: 20000 }
       )
       .toBe(true);
-    expect(
-      (await read()).cards.find(card => card.id === seeded.nodeIds[0])!
-        .screenWidth
-    ).toBeGreaterThanOrEqual(132);
+    expect(hubReads(await read())).toBe(true);
     const saved = await snapshot();
     expect(saved.edges).toEqual(before.edges);
     await page.evaluate(
@@ -448,12 +459,7 @@ for (const [width, height, size] of [
       })
       .toBe(true);
     expect((await snapshot()).edges).toEqual(before.edges);
-    await expect
-      .poll(
-        async () =>
-          (await read()).cards.find(card => card.id === hub.id)!.screenWidth
-      )
-      .toBeGreaterThanOrEqual(132);
+    await expect.poll(async () => hubReads(await read())).toBe(true);
     await expect
       .poll(() =>
         page.evaluate(() => {

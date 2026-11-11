@@ -3,7 +3,7 @@ import { writeFile } from 'node:fs/promises';
 import { login, TEST_USERS } from '../../lib/auth';
 import { gql } from '../../lib/graphRequest';
 import { TEST_GRAPH_PREFIX } from '../../lib/dbHealing';
-import { deleteGraphDeep, waitForStarterGraph } from '../../lib/seedGraph';
+import { deleteGraphDeep } from '../../lib/seedGraph';
 import { openGraphView } from '../../lib/journeys/workspace';
 import { auditEdgeLabels, labelProblems, layoutSpread, problemCount, type LabelProblems } from '../../lib/edgeLabelAudit';
 import { LAUNCH_CHECKLIST_SHAPE, WELCOME_SHAPE, type LabelShape } from '../../../packages/web/src/lib/labelClearanceShapes';
@@ -35,6 +35,8 @@ import { CARD_TITLES_HIDE_BELOW } from '../../../packages/web/src/lib/cardTitleZ
  */
 
 const LABEL_MIN_ZOOM = CARD_TITLES_HIDE_BELOW;
+/** Compact label chips, hub placement and wires through cards. */
+const FOLLOW_UP = '#283';
 const SMALL_GRAPH_ZOOM_FLOOR = CARD_TITLES_HIDE_BELOW;
 
 type Owned = { create: (shape: LabelShape, mode: 'placed' | 'unplaced') => Promise<string> };
@@ -135,13 +137,13 @@ async function setLayout(page: Page, mode: 'hierarchical' | 'force') {
   return 'hook';
 }
 
-type Stage = { graph: string; stage: string; via?: string; checked: boolean; scale: number; cards: number; offScreen: number; underControlsCards: number; drawn: number; inView: number; underControls: number; shown: number; problems: LabelProblems; count: number; spread: Awaited<ReturnType<typeof layoutSpread>> };
+type Stage = { graph: string; stage: string; via?: string; checked: boolean; edges: number; scale: number; cards: number; offScreen: number; underControlsCards: number; drawn: number; inView: number; underControls: number; shown: number; problems: LabelProblems; count: number; spread: Awaited<ReturnType<typeof layoutSpread>> };
 
-async function measure(page: Page, graph: string, stage: string, via?: string, checked = true): Promise<Stage> {
+async function measure(page: Page, shape: LabelShape, stage: string, via?: string, checked = true): Promise<Stage> {
   const audit = await auditEdgeLabels(page);
   const problems = labelProblems(audit);
   return {
-    graph, stage, via, checked, scale: Math.round(audit.scale * 1000) / 1000, cards: audit.cards, offScreen: audit.offScreenCards, underControlsCards: audit.cardsUnderControls,
+    graph: shape.name, stage, via, checked, edges: shape.edges.length, scale: Math.round(audit.scale * 1000) / 1000, cards: audit.cards, offScreen: audit.offScreenCards, underControlsCards: audit.cardsUnderControls,
     drawn: audit.drawnEdges, inView: audit.inViewEdges, underControls: audit.underControls, shown: audit.shownLabels,
     problems, count: problemCount(problems), spread: await layoutSpread(page),
   };
@@ -157,48 +159,59 @@ async function organizeAndCheck(page: Page, owned: Owned, info: TestInfo, shape:
   const stages: Stage[] = [];
   const graphId = await owned.create(shape, 'placed');
   await openGraph(page, graphId, shape.items.length);
-  stages.push(await measure(page, shape.name, 'as loaded', undefined, false));
+  stages.push(await measure(page, shape, 'as loaded', undefined, false));
   await evidence(info, `${slug(shape.name)}-before.png`, await page.screenshot(), 'image/png');
   await organize(page);
   await settled(page, shape.items.length);
-  stages.push(await measure(page, shape.name, 'organized'));
+  stages.push(await measure(page, shape, 'organized'));
   await evidence(info, `${slug(shape.name)}-organized.png`, await page.screenshot(), 'image/png');
   const via = await setLayout(page, 'hierarchical');
   await settled(page, shape.items.length);
-  stages.push(await measure(page, shape.name, 'hierarchical', via));
+  stages.push(await measure(page, shape, 'hierarchical', via));
   await evidence(info, `${slug(shape.name)}-hierarchical.png`, await page.screenshot(), 'image/png');
   return stages;
 }
 
 /** Why a checked stage fails; empty when every label there reads. */
-function failures(s: Stage): string[] {
+function failures(s: Stage, edgesInView = true): string[] {
   const out: string[] = [];
   if (s.count > 0) out.push(`${s.count} label problems\n  ${Object.entries(s.problems).filter(([, list]) => list.length).map(([kind, list]) => `${kind}: ${list.slice(0, 6).join('; ')}`).join('\n  ')}`);
   if (s.scale < LABEL_MIN_ZOOM) out.push(`rests at zoom ${s.scale}, below the ${LABEL_MIN_ZOOM} where labels show`);
-  if (s.drawn > 0 && s.inView === 0) out.push('no edge has both cards on screen');
+  if (s.drawn !== s.edges) out.push(`${s.drawn} of ${s.edges} relationships drawn`);
+  if (edgesInView && s.inView === 0) out.push('no edge has both cards on screen');
   if (s.scale > SMALL_GRAPH_ZOOM_FLOOR + 0.005 && s.offScreen > 0) out.push(`${s.offScreen} cards off screen although the camera could zoom out further`);
   return out;
 }
 
-async function report(info: TestInfo, stages: Stage[]) {
+async function report(info: TestInfo, stages: Stage[], edgesInView = true) {
   await evidence(info, 'label-stages.json', JSON.stringify(stages, null, 2), 'application/json');
   await evidence(info, 'label-summary.txt', summary(stages), 'text/plain');
-  const failing = stages.filter(s => s.checked).flatMap(s => failures(s).map(reason => `${s.graph} / ${s.stage}: ${reason}`));
+  const failing = stages.filter(s => s.checked).flatMap(s => failures(s, edgesInView).map(reason => `${s.graph} / ${s.stage}: ${reason}`));
   expect(failing, `labels are not all readable:\n${summary(stages)}`).toEqual([]);
 }
 
 test.beforeEach(async ({ page }) => {
   await login(page, TEST_USERS.ADMIN);
-  await waitForStarterGraph(page);
+  // The app makes a Welcome graph at the first sign-in and may switch to it;
+  // wait until it exists so it cannot replace the graph under test. (Its items
+  // may have been changed by earlier tests: only its existence matters here.)
+  await expect.poll(async () => {
+    const me = (await gql(page, '{ me { id } }')).me.id;
+    const own = await gql(page, 'query($id:String!){graphs(where:{createdBy:$id}){name}}', { id: me });
+    return own.graphs.some((graph: { name: string }) => graph.name === 'Welcome');
+  }, { timeout: 60_000 }).toBe(true);
 });
 
 for (const shape of [WELCOME_SHAPE, LAUNCH_CHECKLIST_SHAPE])
   test(`JOURNEY organize-labels: ${shape.name} keeps every relationship label readable after Organize and in hierarchical`, async ({ page, owned }, info) => {
     // A phone at the 0.34 label cutoff is about 1150 graph units wide: the
     // launch checklist's hub and its seven neighbours, each a full 14 px label
-    // apart, do not fit, so no edge has both cards on screen. Compact label
-    // chips (follow-up) are what makes it fit.
-    test.skip(info.project.name === 'journeys-iphone' && shape === LAUNCH_CHECKLIST_SHAPE, 'needs compact label chips on a phone (follow-up)');
+    // apart, do not fit, so the camera rests on the hub with no neighbour
+    // whole beside it. Everything else is still checked there: every
+    // relationship drawn, the zoom, and every label on screen. Compact label
+    // chips (FOLLOW_UP) are what makes the whole graph fit.
+    const crowdedPhone = info.project.name === 'journeys-iphone' && shape === LAUNCH_CHECKLIST_SHAPE;
+    if (crowdedPhone) info.annotations.push({ type: 'limit', description: `no edge has both cards on screen until compact label chips (${FOLLOW_UP})` });
     test.setTimeout(150_000);
-    await report(info, await organizeAndCheck(page, owned, info, shape));
+    await report(info, await organizeAndCheck(page, owned, info, shape), !crowdedPhone);
   });
