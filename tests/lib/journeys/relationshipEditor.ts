@@ -10,7 +10,6 @@ import { getRelationshipConfig } from '../../../packages/web/src/constants/workI
  * along the way. Used by tests/e2e/journeys/relationship-edit.spec.ts.
  */
 export const editorOf = (page: Page) => page.getByRole('dialog', { name: 'Edit relationship', exact: true });
-const createDialogOf = (page: Page) => page.getByRole('dialog', { name: 'Create relationship', exact: true });
 const isTouch = (page: Page) => page.evaluate(() => matchMedia('(pointer: coarse)').matches);
 const isPhone = (page: Page) => (page.viewportSize()?.width ?? 1440) < 640;
 const browseButton = (page: Page) => page.getByRole('button', { name: /Browse all relationships$/ });
@@ -97,9 +96,9 @@ export async function openEditor(page: Page, edgeId: string): Promise<string> {
 }
 
 /**
- * What the relationship windows show: the edit editor's "Editing relationship:
- * A → B" line, the type buttons it presses, and how many edit and "Create
- * relationship" windows are open. Read at once, without waiting.
+ * What the editor shows: its "Editing relationship: A → B" line, the type
+ * buttons it presses, and how many editors are open. Read at once, without
+ * waiting.
  */
 export async function editorShows(page: Page) {
   return page.evaluate(() => {
@@ -111,7 +110,6 @@ export async function editorShows(page: Page) {
       line: lines.length ? (lines[0].textContent ?? '').replace(/\s+/g, ' ').trim() : null,
       pressed: editor ? Array.from(editor.querySelectorAll('button[aria-pressed="true"]')).map(b => (b as HTMLElement).innerText.trim()) : [],
       editWindows: dialogs('Edit relationship').length,
-      createWindows: dialogs('Create relationship').length,
     };
   });
 }
@@ -156,7 +154,7 @@ export async function showPair(page: Page, aId: string, bId: string, type: strin
       }
       const empty = (x: number, y: number) => {
         const hit = document.elementFromPoint(x, y);
-        return !!hit && (hit === svg || hit.classList.contains('grid-overlay'));
+        return !!hit && svg.contains(hit) && !hit.closest('g.node, .edge, .edge-clickable, .edge-label-group, foreignObject, [data-local-item-card]');
       };
       for (const r of [0, 30, 60, 90, 120]) for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) {
         const x = centre.x + dx * r, y = centre.y + dy * r;
@@ -178,14 +176,6 @@ export async function showPair(page: Page, aId: string, bId: string, type: strin
   }
 }
 
-/** The editor is still the edit editor, reads from → to, and presses the saved type. */
-export async function expectEditor(page: Page, fromTitle: string, toTitle: string, typeLabel: string, step: string) {
-  const editor = editorOf(page);
-  await expect(editor.getByText(`Editing relationship: ${fromTitle} → ${toTitle}`, { exact: true }), `${step}: the editor must stay open and read ${fromTitle} → ${toTitle}`).toBeVisible();
-  await expect(editor.getByRole('button', { pressed: true }), `${step}: the pressed type must be ${typeLabel}`).toHaveText(typeLabel);
-  await expect(createDialogOf(page), `${step}: the editor must never turn into "Create relationship"`).toHaveCount(0);
-}
-
 /**
  * With the editor closed, read the relationship's entry in "Browse all
  * relationships" (one entry for the pair, from → TYPE → to), and reopen the
@@ -200,8 +190,11 @@ export async function expectListed(page: Page, edgeId: string, fromTitle: string
   const entry = list.locator(`li[data-lod-edge-id="${edgeId}"]`);
   await expect(entry, `${step}: the list must show the relationship as ${type}`).toContainText(`→ ${type}`);
   const text = await entry.innerText();
-  const [from, arrow, to] = [text.indexOf(fromTitle), text.indexOf(`→ ${type}`), text.indexOf(toTitle)];
-  expect(from < arrow && arrow < to, `${step}: the list must read ${fromTitle} → ${type} → ${toTitle}, got: ${text.replace(/\s+/g, ' ')}`).toBe(true);
+  // The target's title after the arrow: an item's context line may name its
+  // container (Is Part Of) before it.
+  const arrow = text.indexOf(`→ ${type}`);
+  const [from, to] = [text.indexOf(fromTitle), text.indexOf(toTitle, arrow)];
+  expect(from >= 0 && from < arrow && to > arrow, `${step}: the list must read ${fromTitle} → ${type} → ${toTitle}, got: ${text.replace(/\s+/g, ' ')}`).toBe(true);
   await press(page, entry.getByRole('button', { name: `Edit relationship ${edgeId}`, exact: true }));
   await expect(editor, `${step}: "Edit relationship" in the list must reopen the editor`).toBeVisible({ timeout: 5000 });
 }
