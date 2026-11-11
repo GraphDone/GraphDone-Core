@@ -37,16 +37,25 @@ import {
   type OrganizationNode,
 } from './topologyOrganization';
 import { computeCompactLayout } from './layoutAlgorithms';
+import { CARD_TITLES_HIDE_BELOW, CARD_TITLES_SHOW_ABOVE } from './cardTitleZoom';
 
 type Point = { x: number; y: number };
 type Size = { width: number; height: number };
 
 /** Clearance the renderer keeps around a label (edgeRouteLabel's padding). */
 export const LABEL_PADDING = 8;
-/** Labels are placed at this zoom and closer (below it they are hidden). */
-export const LABEL_MIN_ZOOM = 0.6;
-/** "Organize around connections" never frames below this zoom. */
+/** Labels are placed at this zoom and closer: while card titles show. */
+export const LABEL_MIN_ZOOM = CARD_TITLES_HIDE_BELOW;
+/** "Organize around connections" never frames a large graph below this zoom. */
 export const ORGANIZED_ZOOM_FLOOR = 0.65;
+/**
+ * Up to this many cards, Organize and the hierarchical layout frame the whole
+ * graph, down to SMALL_GRAPH_ZOOM_FLOOR (where card titles and labels still
+ * show), with room for each label at that zoom. Larger graphs keep
+ * ORGANIZED_ZOOM_FLOOR and open on a neighbourhood or the overview.
+ */
+export const WHOLE_FIT_MAX_CARDS = 60;
+export const SMALL_GRAPH_ZOOM_FLOOR = CARD_TITLES_SHOW_ABOVE;
 const ARROW_LENGTH = 16;
 
 /** How much bigger than its drawn size a label is in graph units at `zoom`. */
@@ -362,10 +371,12 @@ export function framedZoom<T extends OrganizationNode>(
 }
 
 /**
- * Run `layout` with label room for the zoom it will be shown at. A layout made
- * for 100% may only fit on screen below 100%, where labels are bigger in graph
- * units, so lay out again for that zoom until the room matches the framing
- * (the floor bounds it).
+ * Run `layout` with label room for the zoom it will be shown at. Below 100%
+ * labels are bigger in graph units, so more room spreads the layout and the
+ * camera frames it further out: find the closest zoom (between the floor, or
+ * LABEL_MIN_ZOOM, and 100%) whose layout the camera still frames at that zoom
+ * or closer, by bisection. When even the farthest does not fit, its layout is
+ * returned (labels that do not fit stay hidden).
  */
 function withFramedRoom<T extends OrganizationNode, R extends { positions: Map<string, Point> }>(
   nodes: readonly T[],
@@ -373,20 +384,25 @@ function withFramedRoom<T extends OrganizationNode, R extends { positions: Map<s
   layout: (zoom: number) => R
 ): R & { zoom: number; labelZoom: number } {
   const floor = Math.max(options.floor ?? 0, 0);
-  let labelZoom = 1,
-    result = layout(labelZoom);
-  for (let round = 0; round < 3; round++) {
-    const zoom = framedZoom(nodes, result.positions, options, floor);
-    // Labels below LABEL_MIN_ZOOM are not drawn; leave room for the closest
-    // zoom that draws them.
-    const needed = Math.max(zoom, LABEL_MIN_ZOOM);
-    if (labelWorldScale(needed) <= labelWorldScale(labelZoom) + 1e-3) return { ...result, zoom, labelZoom };
-    labelZoom = needed;
-    result = layout(labelZoom);
+  const at = (labelZoom: number) => {
+    const result = layout(labelZoom);
+    return { ...result, zoom: framedZoom(nodes, result.positions, options, floor), labelZoom };
+  };
+  const closest = at(1);
+  if (closest.zoom >= 1) return closest;
+  let low = Math.min(1, Math.max(floor, LABEL_MIN_ZOOM)),
+    high = 1;
+  let fits = at(low);
+  if (fits.zoom < low) return fits;
+  for (let step = 0; step < 5 && high - low > 0.02; step++) {
+    const middle = (low + high) / 2;
+    const tried = at(middle);
+    if (tried.zoom >= middle) {
+      low = middle;
+      fits = tried;
+    } else high = middle;
   }
-  labelZoom = Math.max(floor, LABEL_MIN_ZOOM);
-  result = layout(labelZoom);
-  return { ...result, zoom: framedZoom(nodes, result.positions, options, floor), labelZoom };
+  return fits;
 }
 
 /**
@@ -402,8 +418,8 @@ export function organizeWithLabelRoom<
   const byEdge = new Map(labelled.map(edge => [edge.id, edge]));
   const byId = new Map(nodes.map(node => [node.id, node]));
   const work = { remaining: SPREAD_CHECKS };
-  return withFramedRoom(nodes, { ...options, floor: options.floor ?? ORGANIZED_ZOOM_FLOOR } as LabelRoomOptions<T, never>, labelZoom =>
-    organizeTopology(nodes, edges, node => options.dimensionsAt(node, 1), options.viewport, 64, {
+  return withFramedRoom(nodes, { ...options, floor: options.floor ?? ORGANIZED_ZOOM_FLOOR } as LabelRoomOptions<T, never>, labelZoom => {
+    const result = organizeTopology(nodes, edges, node => options.dimensionsAt(node, 1), options.viewport, 64, {
       edgeGap: edge => {
         const drawn = byEdge.get(edge.id);
         return drawn ? labelGap(drawn.label, labelZoom) : 0;
@@ -413,8 +429,47 @@ export function organizeWithLabelRoom<
         const sizes = new Map(ids.map(id => [id, options.dimensionsAt(byId.get(id)!, labelZoom)]));
         return spreadForLabels(points, sizes, labelled, { zoom: labelZoom, anchor: points.get(ids[0]), work });
       },
-    })
-  );
+    });
+    const turned = turnToScreen(nodes, result.positions, labelled, options, labelZoom);
+    return turned ? { ...result, positions: turned } : result;
+  });
+}
+
+/**
+ * A tall layout on a wide screen (or a wide one on a tall screen) turned a
+ * quarter turn, so the camera can frame it closer; null when it already
+ * matches, is too large to check, or turning would put cards on cards or hide
+ * a label that shows now.
+ */
+function turnToScreen<T extends OrganizationNode>(
+  nodes: readonly T[],
+  positions: ReadonlyMap<string, Point>,
+  labelled: readonly LabelEdge[],
+  options: Pick<LabelRoomOptions<T, never>, 'dimensionsAt' | 'viewport'>,
+  zoom: number
+): Map<string, Point> | null {
+  if (nodes.length < 2 || nodes.length > SPREAD_MAX_CARDS) return null;
+  const cardsAt = (points: ReadonlyMap<string, Point>, scale = zoom): LabelCard[] =>
+    nodes.map(node => ({ id: node.id, ...points.get(node.id)!, ...options.dimensionsAt(node, scale) }));
+  const extent = (cards: LabelCard[]) => ({
+    width: Math.max(...cards.map(card => card.x + card.width / 2)) - Math.min(...cards.map(card => card.x - card.width / 2)),
+    height: Math.max(...cards.map(card => card.y + card.height / 2)) - Math.min(...cards.map(card => card.y - card.height / 2)),
+  });
+  const before = cardsAt(positions);
+  const size = extent(before);
+  const screenWide = options.viewport.width >= options.viewport.height;
+  if (screenWide === size.width >= size.height) return null;
+  const cx = before.reduce((sum, card) => sum + card.x, 0) / before.length,
+    cy = before.reduce((sum, card) => sum + card.y, 0) / before.length;
+  const turned = new Map([...positions].map(([id, p]) => [id, { x: cx + (p.y - cy), y: cy - (p.x - cx) }]));
+  const after = cardsAt(turned);
+  const fitOf = (box: Size) => Math.min(options.viewport.width / box.width, options.viewport.height / box.height);
+  if (fitOf(extent(after)) <= fitOf(size)) return null;
+  // Cards are largest at 100%: none may touch there.
+  const full = cardsAt(turned, 1);
+  for (const [i, a] of full.entries()) for (const b of full.slice(i + 1)) if (cardsOverlap(a, b, CARD_CLEARANCE)) return null;
+  const hiddenBefore = placeGraphLabels(before, labelled, { zoom }).hidden.length;
+  return placeGraphLabels(after, labelled, { zoom }).hidden.length <= hiddenBefore ? turned : null;
 }
 
 /**

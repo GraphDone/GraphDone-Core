@@ -212,6 +212,43 @@ export const LONG_LABELS_SHAPE: LabelShape = {
   ],
 };
 
+/** Twelve items and fifteen relationships of mixed types around one hub: the
+ * graph a person imported when labels went missing after Organize. */
+export const LAUNCH_CHECKLIST_SHAPE: LabelShape = {
+  name: 'Launch checklist',
+  items: [
+    item('launch-plan', 'Launch plan', 'MILESTONE', 'PROPOSED', -570, -260),
+    item('design-mockups', 'Design mockups', 'TASK', 'PLANNED', -190, -260),
+    item('write-copy', 'Write copy', 'TASK', 'IN_PROGRESS', 190, -260),
+    item('build-landing-page', 'Build landing page', 'TASK', 'COMPLETED', 570, -260),
+    item('set-up-analytics', 'Set up analytics', 'TASK', 'PROPOSED', -570, 0),
+    item('legal-review', 'Legal review', 'TASK', 'PLANNED', -190, 0),
+    item('pricing-decision', 'Pricing decision', 'TASK', 'IN_PROGRESS', 190, 0),
+    item('email-campaign', 'Email campaign', 'TASK', 'COMPLETED', 570, 0),
+    item('qa-pass', 'QA pass', 'TASK', 'PROPOSED', -570, 260),
+    item('press-kit', 'Press kit', 'TASK', 'PLANNED', -190, 260),
+    item('beta-feedback', 'Beta feedback', 'TASK', 'IN_PROGRESS', 190, 260),
+    item('retrospective', 'Retrospective', 'TASK', 'COMPLETED', 570, 260),
+  ],
+  edges: [
+    { source: 'launch-plan', target: 'design-mockups', type: 'DEPENDS_ON' },
+    { source: 'launch-plan', target: 'write-copy', type: 'DEPENDS_ON' },
+    { source: 'launch-plan', target: 'build-landing-page', type: 'BLOCKS' },
+    { source: 'launch-plan', target: 'set-up-analytics', type: 'ENABLES' },
+    { source: 'launch-plan', target: 'legal-review', type: 'RELATES_TO' },
+    { source: 'launch-plan', target: 'pricing-decision', type: 'IS_PART_OF' },
+    { source: 'launch-plan', target: 'email-campaign', type: 'FOLLOWS' },
+    { source: 'design-mockups', target: 'build-landing-page', type: 'DEPENDS_ON' },
+    { source: 'write-copy', target: 'build-landing-page', type: 'DEPENDS_ON' },
+    { source: 'build-landing-page', target: 'qa-pass', type: 'BLOCKS' },
+    { source: 'set-up-analytics', target: 'qa-pass', type: 'VALIDATES' },
+    { source: 'pricing-decision', target: 'email-campaign', type: 'ENABLES' },
+    { source: 'email-campaign', target: 'press-kit', type: 'REFERENCES' },
+    { source: 'qa-pass', target: 'beta-feedback', type: 'FOLLOWS' },
+    { source: 'beta-feedback', target: 'retrospective', type: 'CONTAINS' },
+  ],
+};
+
 /** The graphs a new user gets, in the order the example project lists them. */
 export const EXAMPLE_SHAPES: readonly LabelShape[] = [
   WELCOME_SHAPE,
@@ -228,4 +265,4 @@ export const HARD_SHAPES: readonly LabelShape[] = [
   LONG_LABELS_SHAPE,
 ];
 
-export const LABEL_SHAPES: readonly LabelShape[] = [...EXAMPLE_SHAPES, ...HARD_SHAPES];
+export const LABEL_SHAPES: readonly LabelShape[] = [...EXAMPLE_SHAPES, LAUNCH_CHECKLIST_SHAPE, ...HARD_SHAPES];

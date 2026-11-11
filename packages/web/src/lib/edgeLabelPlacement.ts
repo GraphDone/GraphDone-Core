@@ -18,8 +18,8 @@ export interface ItemLabelCandidate {
 }
 
 export const ITEM_LABEL_BUDGET = {
-  labels: 64,
-  attempts: 160,
+  labels: 32,
+  attempts: 128,
   checks: 200000,
 } as const;
 
