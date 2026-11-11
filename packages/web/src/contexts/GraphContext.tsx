@@ -236,16 +236,20 @@ export function GraphProvider({ children }: GraphProviderProps) {
     await apolloClient.refetchQueries({ include: ['GetWorkItems', 'GetEdges'] });
   };
 
-  const resumeStarter = async (userId: string, pending: StarterPending) => {
-    const wait = offlineEnabled ? 0 : pending.sentAt + STARTER_SETTLE_MS - Date.now();
-    if (wait > 0) await new Promise(resolve => setTimeout(resolve, Math.min(wait, STARTER_SETTLE_MS)));
-    const finish = async () => {
+  const startStarter = async (userId: string) => {
+    const run = async () => {
+      const pending = readStarterPending(userId);
+      const wait = pending && !offlineEnabled ? pending.sentAt + STARTER_SETTLE_MS - Date.now() : 0;
+      if (wait > 0) await new Promise(resolve => setTimeout(resolve, Math.min(wait, STARTER_SETTLE_MS)));
+      if (currentUserIdRef.current !== userId) return;
       const still = readStarterPending(userId);
-      if (!still || currentUserIdRef.current !== userId) return;
-      await writeStarter(userId, still.hierarchy, true);
+      if (still) return writeStarter(userId, still.hierarchy, true);
+      const { data } = await refetchGraphs();
+      const seen = (data?.userGraphs?.length || 0) + (data?.sharedGraphs?.length || 0) + (data?.systemGraphs?.length || 0);
+      if (seen === 0) await writeStarter(userId, starterHierarchy(), false);
     };
-    if (navigator.locks) await navigator.locks.request(`graphdone-starter:${userId}`, { ifAvailable: true }, lock => lock ? finish() : undefined);
-    else await finish();
+    if (navigator.locks) await navigator.locks.request(`graphdone-starter:${userId}`, run);
+    else await run();
   };
 
   // Subscriptions for real-time updates (commented out until properly implemented)
@@ -359,10 +363,9 @@ export function GraphProvider({ children }: GraphProviderProps) {
       }
 
       // A reload interrupted the starter: finish it once per page load.
-      const pending = readStarterPending(currentUser.id);
-      if (pending && !isCreatingWelcomeGraphRef.current) {
+      if (readStarterPending(currentUser.id) && !isCreatingWelcomeGraphRef.current) {
         isCreatingWelcomeGraphRef.current = true;
-        resumeStarter(currentUser.id, pending).catch(error => {
+        startStarter(currentUser.id).catch(error => {
           console.error('❌ Failed to finish the starter workspace:', error);
         });
       }
@@ -399,8 +402,7 @@ export function GraphProvider({ children }: GraphProviderProps) {
         setAvailableGraphs([]);
         setCurrentGraph(null);
 
-        const pending = readStarterPending(currentUser.id);
-        (pending ? resumeStarter(currentUser.id, pending) : writeStarter(currentUser.id, starterHierarchy(), false))
+        startStarter(currentUser.id)
           .catch(error => {
             console.error('❌ Failed to create the starter workspace:', error);
             isCreatingWelcomeGraphRef.current = false; // Allow retry on next attempt
