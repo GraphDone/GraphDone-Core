@@ -7,6 +7,21 @@ export type PendingRequest = {requestId:string;projectId:string;version:number;a
 export type Project = {base:Snapshot|null;local:Snapshot|null;request?:PendingRequest;conflicts?:string[];remote?:Snapshot|null;checkedAt:number};
 export type Account = {user?:Record<string,any>;projects:Record<string,Project>;list:Row[];listedAt:number;retryAt:number;error:string;blocked?:'auth'|'validation';layoutFences?:{version:1;counter:number;floor:number;graphs:Record<string,number>};layoutOutbox?:{version:1;graphs:Record<string,Record<string,LayoutReceipt>>}};
 export const emptyAccount = ():Account=>({projects:{},list:[],listedAt:0,retryAt:0,error:''});
+export const OFFLINE_PROJECT_LIMIT=100;
+export const GRAPH_TYPES:readonly string[]=['PROJECT','WORKSPACE','SUBGRAPH','TEMPLATE'];
+/** Rows written before graphs had a hierarchy have no type or parent_id: top-level projects. */
+export const graphType=(row:Row):string=>GRAPH_TYPES.includes(row.type)?row.type:'PROJECT';
+/** Ancestor ids, root first. A missing parent ends the chain, so its child reads as top-level. */
+export function graphPath(row:Row,rows:Map<string,Row>):string[] {
+ const path:string[]=[],seen=new Set([row.id]);
+ for(let parent=row.parent_id;parent!=null&&rows.has(parent)&&!seen.has(parent);parent=rows.get(parent)!.parent_id){seen.add(parent);path.unshift(parent);}
+ return path;
+}
+export function createsCycle(id:string,parent:string,rows:Map<string,Row>):boolean {
+ const seen=new Set<string>();
+ for(let at:string|null|undefined=parent;at!=null&&!seen.has(at);at=rows.get(at)?.parent_id){if(at===id)return true;seen.add(at);}
+ return false;
+}
 export const same=(a:any,b:any):boolean=>JSON.stringify(a)===JSON.stringify(b);
 const editable:Record<string,string[]>={nodes:['type','title','description','status','priority','position_x','position_y','due_date','tags','metadata'],edges:['source_id','target_id','type','weight'],notes:['work_item_id','body']};
 export function changes(base:Snapshot|null,local:Snapshot|null):Change[] {
@@ -80,6 +95,8 @@ export function validateBackupSnapshot(s:any):asserts s is Snapshot {
  const num=(v:any)=>{if(typeof v!=='number'||!Number.isFinite(v))fail();};
  if(!s?.project||!Array.isArray(s.nodes)||!Array.isArray(s.edges)||!Array.isArray(s.notes))fail();
  text(s.project.name,120);if(!s.project.name.trim()||s.nodes.length>300||s.edges.length>600||s.notes.length>2000)fail();
+ if(s.project.type!=null&&!GRAPH_TYPES.includes(s.project.type))fail();
+ if(s.project.parent_id!=null){text(s.project.parent_id,128);if(s.project.parent_id===s.project.id)fail();}
  const ids=new Set<string>();
  for(const n of s.nodes){text(n.id,128);if(ids.has(n.id))fail();ids.add(n.id);text(n.title,200);if(!n.title.trim())fail();text(n.description,4000,true);text(n.type,60);text(n.status,60);num(n.priority);if(n.priority<0||n.priority>1)fail();num(n.position_x);num(n.position_y);text(n.metadata,10000);text(n.tags,6000);
   try{const tags=JSON.parse(n.tags);if(!Array.isArray(tags)||tags.length>50||tags.some((t:any)=>typeof t!=='string'||t.length>100))fail();}catch{fail();}
@@ -88,6 +105,19 @@ export function validateBackupSnapshot(s:any):asserts s is Snapshot {
  }
  const edgeIds=new Set<string>();for(const e of s.edges){text(e.id,128);if(edgeIds.has(e.id))fail();edgeIds.add(e.id);text(e.type,60);num(e.weight);if(!ids.has(e.source_id)||!ids.has(e.target_id)||e.source_id===e.target_id)fail();if(e.created_at!=null)num(e.created_at);}
  const noteIds=new Set<string>();for(const n of s.notes){text(n.id,128);if(noteIds.has(n.id))fail();noteIds.add(n.id);text(n.body,4000);text(n.actor,254);text(n.actor_type,60);if(typeof n.created_at!=='string'||!Number.isFinite(Date.parse(n.created_at)))fail();text(n.work_item_id,128,true);}
+}
+
+/** A backup's projects as a set: each parent is one of them and no graph is its own ancestor. */
+export function validateBackupProjects(input:unknown[]):asserts input is Snapshot[] {
+ for(const s of input)validateBackupSnapshot(s);
+ const list=input as Snapshot[];
+ const fail=():never=>{throw Error('The backup contains a graph whose project is missing or inside itself. Nothing was imported.');};
+ const rows=new Map<string,Row>(),repeated=new Set<string>();
+ for(const s of list)if(typeof s.project.id==='string'){if(rows.has(s.project.id))repeated.add(s.project.id);rows.set(s.project.id,s.project);}
+ for(const s of list) {
+  const parent=s.project.parent_id;if(parent==null)continue;
+  if(!rows.has(parent)||repeated.has(parent)||createsCycle(s.project.id,parent,rows))fail();
+ }
 }
 
 /** If an old receipt has expired, a retried create followed by a remote delete

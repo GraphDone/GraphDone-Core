@@ -31,7 +31,8 @@ flowchart LR
 | `live` | none | The guest journey on the live hosted site (`live-journey`). |
 | `journeys` | none | Basic user journeys with success rates ([`e2e/journeys/`](../e2e/journeys/README.md)). |
 
-`new-user` and `prod-smoke` are in no profile: CI runs `new-user` by name, and
+`new-user`, `example-resume` and `prod-smoke` are in no profile: CI runs
+`new-user` and `example-resume` by name, and
 `scripts/test-production-stack.mjs` runs `prod-smoke`.
 
 ## How to use
