@@ -263,6 +263,17 @@ export const UPDATE_GRAPH = gql`
   }
 `;
 
+/** The graphs inside a graph, asked of the backend before a delete rather than read from a list that may be stale. */
+export const GET_CHILD_GRAPHS = gql`
+  query GetChildGraphs($id: String!) {
+    graphs(where: { parentGraphId: $id }) {
+      id
+      name
+      parentGraphId
+    }
+  }
+`;
+
 export const DELETE_GRAPH = gql`
   mutation DeleteGraph($id: ID!) {
     deleteGraphs(where: { id: $id }) {

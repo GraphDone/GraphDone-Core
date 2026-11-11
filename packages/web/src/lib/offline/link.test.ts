@@ -118,22 +118,47 @@ describe('offline GraphQL bulk selection', () => {
     client.stop();
   });
 
-  it('refuses a project that still holds graphs before anyone types its name', async () => {
-    fixture.graphs = [
-      { id: 'project', name: 'Getting started', parentGraphId: null },
-      ...['Welcome', 'Plan a launch', 'Fix bugs', 'Ideas'].map(name => ({ id: name, name, parentGraphId: 'project' })),
-    ];
+  const addInside = (parent: string, names: string[]) => {
+    for (const name of names) {
+      const s = snapshot(name, []);
+      s.project = { ...s.project, type: 'SUBGRAPH', parent_id: parent };
+      fixture.account!.projects[name] = { base: null, local: s, checkedAt: 0 };
+    }
+  };
+  const openDelete = (graph: { id: string; name: string }) => {
     const asked: string[] = [];
     const spy = new ApolloLink((operation, forward) => { asked.push(operation.operationName); return forward(operation); });
     const client = new ApolloClient({ link: spy.concat(offlineLink), cache: new InMemoryCache() });
-    const project = { id: 'project', name: 'Getting started' } as never;
-    render(createElement(ApolloProvider, { client, children: createElement(DeleteGraphModal, { isOpen: true, onClose: vi.fn(), graph: project }) }));
-    expect(screen.getByRole('alert').textContent).toBe('Getting started holds 4 graphs. Delete or move them first.');
+    render(createElement(ApolloProvider, { client, children: createElement(DeleteGraphModal, { isOpen: true, onClose: vi.fn(), graph: graph as never }) }));
+    return { asked, client };
+  };
+
+  it('refuses a project that still holds graphs before anyone types its name', async () => {
+    addInside('project', ['Welcome', 'Plan a launch', 'Fix bugs', 'Ideas']);
+    const { asked, client } = openDelete({ id: 'project', name: 'Getting started' });
+    expect((await screen.findByRole('alert')).textContent).toBe('Getting started holds 4 graphs. Delete or move them first.');
     expect(screen.getByText('This project still holds graphs')).not.toBeNull();
     expect(screen.queryByRole('textbox')).toBeNull();
     expect(screen.queryByRole('button', { name: /Delete/ })).toBeNull();
     await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)); });
-    expect(asked).toEqual([]);
+    expect(asked, 'only the graphs inside are asked for').toEqual(['GetChildGraphs']);
+    client.stop();
+  });
+
+  it('asks the backend for the graphs inside, so a stale list in this tab cannot allow the delete', async () => {
+    fixture.graphs = [{ id: 'project', name: 'Home', parentGraphId: null }];
+    addInside('project', ['Added in another tab']);
+    const { client } = openDelete({ id: 'project', name: 'Home' });
+    expect((await screen.findByRole('alert')).textContent).toBe('Home holds 1 graph. Delete or move them first.');
+    expect(screen.queryByRole('button', { name: /Delete All/ })).toBeNull();
+    client.stop();
+  });
+
+  it('goes on to the usual checks once the backend says nothing is inside, whatever this tab listed', async () => {
+    fixture.graphs = [{ id: 'project', name: 'Home', parentGraphId: null }, { id: 'gone', name: 'Moved away', parentGraphId: 'project' }];
+    const { client } = openDelete({ id: 'project', name: 'Home' });
+    expect(await screen.findByRole('button', { name: 'Delete All Unconnected Work Items (3)' })).not.toBeNull();
+    expect(screen.queryByText('This project still holds graphs')).toBeNull();
     client.stop();
   });
 

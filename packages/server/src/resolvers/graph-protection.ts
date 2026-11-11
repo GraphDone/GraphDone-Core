@@ -71,6 +71,24 @@ export const graphProtectionResolvers = {
 
       const session = context.driver.session();
       try {
+        // A graph that still holds graphs is refused, unless they are deleted with it, so none is left without its project.
+        const holding = await session.run(
+          `
+          MATCH (g:Graph {createdBy: $userId}) WHERE g.id IN $ids
+          MATCH (c:Graph) WHERE NOT c.id IN $ids AND (c.parentGraphId = g.id OR (g)-[:PARENT_OF]->(c))
+          RETURN g.name AS name, count(DISTINCT c) AS inside
+          LIMIT 1
+          `,
+          { ids: idsToCheck, userId: context.user.userId }
+        );
+        const full = holding.records[0];
+        if (full) {
+          const inside = Number(full.get('inside')?.toNumber?.() ?? full.get('inside'));
+          throw new GraphQLError(`${full.get('name')} holds ${inside} graph${inside === 1 ? '' : 's'}. Delete or move them first.`, {
+            extensions: { code: 'FAILED_PRECONDITION', graphsInside: inside }
+          });
+        }
+
         const result = await session.run(
           `
           MATCH (g:Graph {createdBy: $userId})

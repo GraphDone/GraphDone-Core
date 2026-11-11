@@ -8,14 +8,15 @@ import {
   CREATE_GRAPH,
   CREATE_STARTER_GRAPHS,
   UPDATE_GRAPH,
-  DELETE_GRAPH
+  DELETE_GRAPH,
+  GET_CHILD_GRAPHS
 } from '../graphql/graph';
 import { GET_WORK_ITEMS, GET_EDGES, DELETE_WORK_ITEM, CREATE_WORK_ITEM, CREATE_EDGE } from '../lib/queries';
 import { buildStarterWorkspace, createStarterWorkspace, starterGraphCount, type StarterApi, type StarterJournal } from '../lib/starterWorkspace';
 import { offlineEnabled, localGuest } from '../lib/offline/engine';
 import { OFFLINE_PROJECT_LIMIT } from '../lib/offline/model';
 import { withStorageLock } from '../lib/storageLock';
-import { exampleLimitMessage, parseStarterMarker, projectDeleteBlock, seenGraphCount, starterHierarchy, starterStep, type StarterMarker } from '../lib/workspaceRules';
+import { exampleLimitMessage, graphTree, parseStarterMarker, projectDeleteBlock, seenGraphCount, starterHierarchy, starterStep, type StarterMarker } from '../lib/workspaceRules';
 
 const GraphContext = createContext<GraphContextType | undefined>(undefined);
 
@@ -428,10 +429,16 @@ export function GraphProvider({ children }: GraphProviderProps) {
     refetchGraphs
   ]);
 
-  // Build graph hierarchy
-  const graphHierarchy: GraphHierarchy[] = availableGraphs
-    .filter(graph => graph.depth === 0)
-    .map(graph => buildHierarchy(graph, availableGraphs));
+  const graphHierarchy: GraphHierarchy[] = graphTree(availableGraphs, (graph, children: GraphHierarchy[]) => ({
+    id: graph.id,
+    name: graph.name,
+    type: graph.type,
+    children,
+    nodeCount: graph.nodeCount,
+    edgeCount: graph.edgeCount,
+    isShared: graph.isShared,
+    permissions: getPermissionLevel(graph)
+  }));
 
   const selectGraph = async (graphId: string): Promise<void> => {
     // setIsLoading is not available, using local loading state if needed
@@ -568,7 +575,9 @@ export function GraphProvider({ children }: GraphProviderProps) {
   const deleteGraph = async (graphId: string): Promise<void> => {
     try {
       const graph = availableGraphs.find(g => g.id === graphId);
-      const blocked = graph && projectDeleteBlock(graph, availableGraphs);
+      const { data: inside } = await apolloClient.query({ query: GET_CHILD_GRAPHS, variables: { id: graphId }, fetchPolicy: 'network-only' });
+      if (!Array.isArray(inside?.graphs)) throw new Error('The graphs inside this project could not be checked. Try again when connected.');
+      const blocked = projectDeleteBlock(graph ?? { id: graphId, name: 'This project' }, inside.graphs);
       if (blocked) throw new Error(blocked);
 
       // First, check if the graph contains any nodes
@@ -828,23 +837,6 @@ export function GraphProvider({ children }: GraphProviderProps) {
       {children}
     </GraphContext.Provider>
   );
-}
-
-function buildHierarchy(graph: Graph, allGraphs: Graph[]): GraphHierarchy {
-  const children = allGraphs
-    .filter(g => g.parentGraphId === graph.id)
-    .map(child => buildHierarchy(child, allGraphs));
-
-  return {
-    id: graph.id,
-    name: graph.name,
-    type: graph.type,
-    children,
-    nodeCount: graph.nodeCount,
-    edgeCount: graph.edgeCount,
-    isShared: graph.isShared,
-    permissions: getPermissionLevel(graph)
-  };
 }
 
 function getPermissionLevel(graph: Graph): 'OWNER' | 'ADMIN' | 'EDIT' | 'VIEW' {
