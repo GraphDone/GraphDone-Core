@@ -45,7 +45,8 @@ describe('which starter a user gets', () => {
 
 describe('the marker of a starter being written', () => {
   const start = 1_000_000;
-  const marker = { hierarchy: true, startedAt: start, sentAt: start + 2000 };
+  const write = { id: 'w1', sentAt: start + 2000, kind: 'graphs', graphs: [{ name: 'Getting started', type: 'PROJECT', parentGraphId: null }] };
+  const marker = { hierarchy: true, startedAt: start, inflight: [write] };
 
   it('is read back while it is fresh', () => {
     expect(parseStarterMarker(JSON.stringify(marker), start + 5000)).toEqual(marker);
@@ -61,8 +62,16 @@ describe('the marker of a starter being written', () => {
   it('ignores a missing or malformed marker', () => {
     expect(parseStarterMarker(null, start)).toBeNull();
     expect(parseStarterMarker('not json', start)).toBeNull();
-    expect(parseStarterMarker(JSON.stringify({ hierarchy: true, sentAt: start }), start), 'no start time').toBeNull();
+    expect(parseStarterMarker(JSON.stringify({ hierarchy: true, inflight: [] }), start), 'no start time').toBeNull();
     expect(parseStarterMarker(JSON.stringify({ ...marker, hierarchy: 'yes' }), start)).toBeNull();
+  });
+
+  it('keeps only well-formed unanswered writes, and reads without an expiry while it is being written', () => {
+    const items = { id: 'w2', sentAt: start, kind: 'items', graphId: 'g', titles: ['Launch day'] };
+    const raw = JSON.stringify({ ...marker, inflight: [write, items, { id: 'w3', kind: 'items' }, 'junk'] });
+    expect(parseStarterMarker(raw, start)!.inflight).toEqual([write, items]);
+    expect(parseStarterMarker(JSON.stringify(marker))).toEqual(marker);
+    expect(parseStarterMarker(JSON.stringify(marker), start + STARTER_MARKER_TTL_MS + 1)).toBeNull();
   });
 });
 

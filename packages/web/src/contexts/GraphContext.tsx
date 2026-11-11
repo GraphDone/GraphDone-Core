@@ -11,7 +11,7 @@ import {
   DELETE_GRAPH
 } from '../graphql/graph';
 import { GET_WORK_ITEMS, GET_EDGES, DELETE_WORK_ITEM, CREATE_WORK_ITEM, CREATE_EDGE } from '../lib/queries';
-import { buildStarterWorkspace, createStarterWorkspace, starterGraphCount, type StarterApi } from '../lib/starterWorkspace';
+import { buildStarterWorkspace, createStarterWorkspace, starterGraphCount, type StarterApi, type StarterJournal } from '../lib/starterWorkspace';
 import { offlineEnabled, localGuest } from '../lib/offline/engine';
 import { OFFLINE_PROJECT_LIMIT } from '../lib/offline/model';
 import { withStorageLock } from '../lib/storageLock';
@@ -22,11 +22,9 @@ const GraphContext = createContext<GraphContextType | undefined>(undefined);
 // Using only real GraphQL data from Neo4j database
 
 const hierarchyHere = () => starterHierarchy({ offline: offlineEnabled, guest: localGuest() });
-// Kept only while a new user's starter is being written, so the next page
-// load in this browser can finish it. A server write sent just before a reload
-// can still land afterwards, so a resume first waits STARTER_SETTLE_MS from
-// the last write sent; browser-local writes need no wait.
-const STARTER_SETTLE_MS = 15000;
+// A server write sent just before a reload can still land afterwards; a resume
+// waits up to this long after it was sent. Browser-local writes never land late.
+const STARTER_WRITE_LIMIT_MS = 30000;
 const starterPendingKey = (userId: string) => `graphdone:starter-pending:${userId}`;
 const readStarterPending = (userId: string): StarterMarker | null => {
   const raw = localStorage.getItem(starterPendingKey(userId));
@@ -34,10 +32,17 @@ const readStarterPending = (userId: string): StarterMarker | null => {
   if (raw && !marker) localStorage.removeItem(starterPendingKey(userId));
   return marker;
 };
-const markStarterSent = (userId: string, hierarchy: boolean) => {
-  const now = Date.now();
-  const startedAt = readStarterPending(userId)?.startedAt ?? now;
-  localStorage.setItem(starterPendingKey(userId), JSON.stringify({ hierarchy, startedAt, sentAt: now }));
+const saveStarterMarker = (userId: string, marker: StarterMarker) =>
+  localStorage.setItem(starterPendingKey(userId), JSON.stringify(marker));
+const starterJournal = (userId: string, marker: StarterMarker): StarterJournal => {
+  const update = (change: (inflight: StarterMarker['inflight']) => StarterMarker['inflight']) => {
+    const current = parseStarterMarker(localStorage.getItem(starterPendingKey(userId))) ?? marker;
+    saveStarterMarker(userId, { ...current, inflight: change(current.inflight) });
+  };
+  return {
+    begin: write => update(inflight => [...inflight, write]),
+    end: id => update(inflight => inflight.filter(write => write.id !== id))
+  };
 };
 const STARTER_PROJECTS = new Set(buildStarterWorkspace({ hierarchy: true }).projects.map(project => project.name));
 const isEmptyStarterProject = (graph: Graph) =>
@@ -204,19 +209,17 @@ export function GraphProvider({ children }: GraphProviderProps) {
     }
   });
 
-  const writeStarter = async (userId: string, hierarchy: boolean, resume: boolean) => {
+  const writeStarter = async (userId: string, interrupted: StarterMarker | null) => {
     const api = starterApi(userId, currentTeam?.id || 'team-1');
-    const sent = <A extends unknown[], R>(write: (...args: A) => Promise<R>) => (...args: A) => {
-      markStarterSent(userId, hierarchy);
-      return write(...args);
-    };
-    markStarterSent(userId, hierarchy);
-    const plan = buildStarterWorkspace({ hierarchy });
+    const resume = !!interrupted;
+    const marker = interrupted ?? { hierarchy: hierarchyHere(), startedAt: Date.now(), inflight: [] };
+    saveStarterMarker(userId, marker);
+    const plan = buildStarterWorkspace({ hierarchy: marker.hierarchy });
     await createStarterWorkspace(plan, {
       ...api,
-      createGraphs: sent(api.createGraphs),
-      createItems: sent(api.createItems),
-      createEdges: sent(api.createEdges),
+      deleteGraph: async graphId => {
+        await deleteGraphMutation({ variables: { id: graphId } });
+      },
       opened: async graphId => {
         const { data } = await refetchGraphs();
         const current = currentGraphRef.current;
@@ -227,7 +230,12 @@ export function GraphProvider({ children }: GraphProviderProps) {
         }
         await apolloClient.refetchQueries({ include: ['GetWorkItems', 'GetEdges'] });
       }
-    }, { resume });
+    }, {
+      resume,
+      journal: starterJournal(userId, marker),
+      inflight: marker.inflight,
+      writeLimitMs: offlineEnabled ? 0 : STARTER_WRITE_LIMIT_MS
+    });
     localStorage.removeItem(starterPendingKey(userId));
     console.log('✅ Starter workspace ready:', plan.projects.length, 'projects,', plan.graphs.length, 'graphs');
     // Refetch every open item/connection list (List view, header counts)
@@ -238,15 +246,12 @@ export function GraphProvider({ children }: GraphProviderProps) {
 
   const startStarter = async (userId: string) => {
     const run = async () => {
-      const pending = readStarterPending(userId);
-      const wait = pending && !offlineEnabled ? pending.sentAt + STARTER_SETTLE_MS - Date.now() : 0;
-      if (wait > 0) await new Promise(resolve => setTimeout(resolve, Math.min(wait, STARTER_SETTLE_MS)));
       if (currentUserIdRef.current !== userId) return;
       const { data } = await refetchGraphs();
-      const still = readStarterPending(userId);
-      const step = starterStep({ graphsSeen: seenGraphCount(data), pending: !!still });
-      if (step === 'finish' && still) await writeStarter(userId, still.hierarchy, true);
-      if (step === 'create') await writeStarter(userId, hierarchyHere(), false);
+      const pending = readStarterPending(userId);
+      const step = starterStep({ graphsSeen: seenGraphCount(data), pending: !!pending });
+      if (step === 'finish' && pending) await writeStarter(userId, pending);
+      if (step === 'create') await writeStarter(userId, null);
     };
     if (navigator.locks) await navigator.locks.request(`graphdone-starter:${userId}`, run);
     else await withStorageLock(`starter:${userId}`, run, { store: localStorage });

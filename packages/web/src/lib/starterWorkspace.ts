@@ -280,6 +280,12 @@ export interface ExistingGraph {
   name: string;
   type: string;
   parentGraphId?: string | null;
+  createdAt?: string | null;
+}
+
+export interface StarterContent {
+  items: Array<{ id: string; title: string }>;
+  edges: StarterLink[];
 }
 
 export interface StarterApi {
@@ -289,7 +295,43 @@ export interface StarterApi {
   setCounts(graphId: string, counts: { nodeCount: number; edgeCount: number }): Promise<void>;
   opened?(graphId: string): Promise<void>;
   ownGraphs?(): Promise<ExistingGraph[]>;
-  content?(graphId: string): Promise<{ items: Array<{ id: string; title: string }>; edges: StarterLink[] }>;
+  content?(graphId: string): Promise<StarterContent>;
+  deleteGraph?(graphId: string): Promise<void>;
+}
+
+/** A write sent to the backend whose answer has not arrived yet. */
+export type StarterWrite =
+  | { id: string; sentAt: number; kind: 'graphs'; graphs: Array<{ name: string; type: string; parentGraphId: string | null }> }
+  | { id: string; sentAt: number; kind: 'items'; graphId: string; titles: string[] }
+  | { id: string; sentAt: number; kind: 'edges'; graphId: string; links: StarterLink[] };
+
+/** Records each write before it is sent and forgets it once answered, so a later page load knows what may still land. */
+export interface StarterJournal {
+  begin(write: StarterWrite): void;
+  end(id: string): void;
+}
+
+export interface StarterClock {
+  now(): number;
+  sleep(ms: number): Promise<void>;
+}
+
+const realClock: StarterClock = {
+  now: () => Date.now(),
+  sleep: ms => new Promise(resolve => setTimeout(resolve, ms)),
+};
+
+export const STARTER_POLL_MS = 1000;
+
+export interface StarterRunOptions {
+  /** Find what an interrupted run already wrote and add only what is missing. */
+  resume?: boolean;
+  journal?: StarterJournal;
+  /** Writes the interrupted run sent without seeing an answer. */
+  inflight?: StarterWrite[];
+  /** How long after it was sent such a write may still land; 0 for browser-local writes, which never land late. */
+  writeLimitMs?: number;
+  clock?: StarterClock;
 }
 
 export interface CreatedStarter {
@@ -297,17 +339,103 @@ export interface CreatedStarter {
   opensFirst: string;
 }
 
+const sameLink = (a: StarterLink, b: StarterLink) => a.sourceId === b.sourceId && a.targetId === b.targetId && a.type === b.type;
+
+/** Whether everything a write asked for can be seen now. */
+export function writeLanded(write: StarterWrite, own: ExistingGraph[], content?: StarterContent): boolean {
+  if (write.kind === 'graphs') {
+    return write.graphs.every(graph => own.some(g => g.name === graph.name && g.type === graph.type && (g.parentGraphId ?? null) === graph.parentGraphId));
+  }
+  if (!content) return false;
+  if (write.kind === 'items') return write.titles.every(title => content.items.some(item => item.title === title));
+  return write.links.every(link => content.edges.some(edge => sameLink(edge, link)));
+}
+
+/** Starter graphs that share a name, type and place: what a write that landed late leaves behind. */
+export function starterDuplicateGroups(plan: StarterWorkspace, own: ExistingGraph[]): ExistingGraph[][] {
+  const projectNames = new Set(plan.projects.map(project => project.name));
+  const topNames = new Set(plan.graphs.filter(graph => !graph.project).map(graph => graph.name));
+  const projectIds = new Set(own.filter(g => g.type === 'PROJECT' && !g.parentGraphId && projectNames.has(g.name)).map(g => g.id));
+  const isStarter = (g: ExistingGraph) => !g.parentGraphId
+    ? g.type === 'PROJECT' && (projectNames.has(g.name) || topNames.has(g.name))
+    : projectIds.has(g.parentGraphId) && plan.graphs.some(graph => graph.project && graph.name === g.name && graph.type === g.type);
+  const groups = new Map<string, ExistingGraph[]>();
+  for (const g of own.filter(isStarter)) {
+    const key = `${g.type}|${g.name}|${g.parentGraphId ?? ''}`;
+    groups.set(key, [...(groups.get(key) || []), g]);
+  }
+  return [...groups.values()].filter(group => group.length > 1);
+}
+
+/**
+ * Which duplicates to remove. In each group the graph with items or graphs
+ * inside it, else the oldest, is kept; only empty graphs with nothing inside
+ * are removed, and a graph whose item count is unknown is always kept.
+ */
+export function duplicateStarterGraphs(plan: StarterWorkspace, own: ExistingGraph[], itemCounts: Map<string, number>): string[] {
+  const used = (g: ExistingGraph) => own.some(other => other.parentGraphId === g.id) || (itemCounts.get(g.id) ?? 1) > 0;
+  return starterDuplicateGroups(plan, own).flatMap(group => [...group]
+    .sort((a, b) => Number(used(b)) - Number(used(a)) || (a.createdAt ?? '').localeCompare(b.createdAt ?? '') || a.id.localeCompare(b.id))
+    .slice(1)
+    .filter(g => !used(g))
+    .map(g => g.id));
+}
+
+async function awaitInflight(writes: StarterWrite[], api: StarterApi, limitMs: number, clock: StarterClock) {
+  let open = writes;
+  for (;;) {
+    open = open.filter(write => clock.now() < write.sentAt + limitMs);
+    if (!open.length) return;
+    const own = api.ownGraphs ? await api.ownGraphs() : [];
+    const contents = new Map<string, StarterContent>();
+    for (const write of open) {
+      if (write.kind !== 'graphs' && api.content && !contents.has(write.graphId)) contents.set(write.graphId, await api.content(write.graphId));
+    }
+    open = open.filter(write => !writeLanded(write, own, write.kind === 'graphs' ? undefined : contents.get(write.graphId)));
+    if (!open.length) return;
+    await clock.sleep(STARTER_POLL_MS);
+  }
+}
+
+async function removeDuplicates(plan: StarterWorkspace, api: StarterApi) {
+  if (!api.ownGraphs || !api.content || !api.deleteGraph) return;
+  for (let pass = 0; pass < 2; pass++) {
+    const own = await api.ownGraphs();
+    const groups = starterDuplicateGroups(plan, own);
+    if (!groups.length) return;
+    const counts = new Map<string, number>();
+    for (const g of groups.flat()) counts.set(g.id, (await api.content(g.id)).items.length);
+    const remove = duplicateStarterGraphs(plan, own, counts);
+    if (!remove.length) return;
+    const inProject = (id: string) => !!own.find(g => g.id === id)?.parentGraphId;
+    for (const id of [...remove.filter(inProject), ...remove.filter(id => !inProject(id))]) await api.deleteGraph(id);
+  }
+}
+
 /**
  * Projects first, then their graphs, then each graph's items, connections and
  * counts; the graph that opens first is complete before the rest. With
  * `resume`, whatever an interrupted run already wrote is found and kept, so a
- * reload during the first sign-in never leaves the example half-built.
+ * reload during the first sign-in never leaves the example half-built: the
+ * resume first waits until each write the interrupted run sent has landed or
+ * its time limit has passed, then adds only what is missing, then removes
+ * empty duplicates a later landing left behind.
  */
 export async function createStarterWorkspace(
   plan: StarterWorkspace,
   api: StarterApi,
-  { resume = false }: { resume?: boolean } = {}
+  { resume = false, journal, inflight = [], writeLimitMs = 0, clock = realClock }: StarterRunOptions = {}
 ): Promise<CreatedStarter> {
+  let writeNumber = 0;
+  const tracked = async <R>(write: StarterWrite, send: () => Promise<R>): Promise<R> => {
+    journal?.begin(write);
+    const result = await send();
+    journal?.end(write.id);
+    return result;
+  };
+  const writeId = () => `${clock.now().toString(36)}-${++writeNumber}-${Math.random().toString(36).slice(2, 8)}`;
+
+  if (resume) await awaitInflight(inflight, api, writeLimitMs, clock);
   const own = resume && api.ownGraphs ? await api.ownGraphs() : [];
   const ids: Record<string, string> = {};
   const ensureGraphs = async (entries: Array<{ key: string; input: StarterGraphInput }>) => {
@@ -317,7 +445,11 @@ export async function createStarterWorkspace(
       return !found;
     });
     if (!missing.length) return;
-    const created = await api.createGraphs(missing.map(entry => entry.input));
+    const inputs = missing.map(entry => entry.input);
+    const created = await tracked(
+      { id: writeId(), sentAt: clock.now(), kind: 'graphs', graphs: inputs.map(({ name, type, parentGraphId }) => ({ name, type, parentGraphId })) },
+      () => api.createGraphs(inputs)
+    );
     for (const { key, input } of missing) {
       const match = created.find(g => g.name === input.name);
       if (!match) throw new Error(`Failed to create the "${input.name}" graph`);
@@ -346,7 +478,10 @@ export async function createStarterWorkspace(
       return !found;
     });
     if (missing.length) {
-      const created = await api.createItems(graphId, missing);
+      const created = await tracked(
+        { id: writeId(), sentAt: clock.now(), kind: 'items', graphId, titles: missing.map(entry => entry.title) },
+        () => api.createItems(graphId, missing)
+      );
       if (created.length !== missing.length) {
         throw new Error(`Only ${created.length} of ${missing.length} example items were created in "${graph.name}".`);
       }
@@ -354,8 +489,10 @@ export async function createStarterWorkspace(
     }
     const links = graph.edges
       .map(edge => ({ sourceId: byKey.get(edge.source)!, targetId: byKey.get(edge.target)!, type: edge.type }))
-      .filter(link => !have.edges.some(e => e.sourceId === link.sourceId && e.targetId === link.targetId && e.type === link.type));
-    if (links.length) await api.createEdges(links);
+      .filter(link => !have.edges.some(e => sameLink(e, link)));
+    if (links.length) {
+      await tracked({ id: writeId(), sentAt: clock.now(), kind: 'edges', graphId, links }, () => api.createEdges(links));
+    }
     await api.setCounts(graphId, { nodeCount: graph.items.length, edgeCount: graph.edges.length });
   };
   const first = plan.graphs.find(graph => graph.key === plan.opensFirst);
@@ -364,5 +501,6 @@ export async function createStarterWorkspace(
     await api.opened?.(ids[first.key]);
   }
   await Promise.all(plan.graphs.filter(graph => graph !== first).map(fill));
+  if (resume) await removeDuplicates(plan, api);
   return { ids, opensFirst: plan.opensFirst };
 }

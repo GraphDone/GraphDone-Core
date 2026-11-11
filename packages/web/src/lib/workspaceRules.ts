@@ -2,7 +2,7 @@
  * Decisions about a user's graphs and projects, kept as pure functions so they
  * are tested without React or a backend (#277).
  */
-import { buildStarterWorkspace } from './starterWorkspace';
+import { buildStarterWorkspace, type StarterWrite } from './starterWorkspace';
 
 export interface GraphRef {
   id: string;
@@ -39,13 +39,22 @@ export function seenGraphCount(lists: { userGraphs?: GraphRef[]; sharedGraphs?: 
 export interface StarterMarker {
   hierarchy: boolean;
   startedAt: number;
-  sentAt: number;
+  /** Writes sent without an answer yet: a later load waits for them to land or time out. */
+  inflight: StarterWrite[];
 }
 
 export const STARTER_MARKER_TTL_MS = 10 * 60_000;
 
-/** The stored marker, or null when there is none, it is malformed, or it has expired. */
-export function parseStarterMarker(raw: string | null, now: number): StarterMarker | null {
+const isWrite = (value: unknown): value is StarterWrite => {
+  const write = value as Partial<Record<string, unknown>> | null;
+  if (!write || typeof write.id !== 'string' || typeof write.sentAt !== 'number') return false;
+  if (write.kind === 'graphs') return Array.isArray(write.graphs);
+  return (write.kind === 'items' || write.kind === 'edges') && typeof write.graphId === 'string'
+    && Array.isArray(write.kind === 'items' ? write.titles : write.links);
+};
+
+/** The stored marker, or null when there is none, it is malformed, or (given `now`) it has expired. */
+export function parseStarterMarker(raw: string | null, now?: number): StarterMarker | null {
   let value: unknown;
   try {
     value = JSON.parse(raw || 'null');
@@ -53,9 +62,9 @@ export function parseStarterMarker(raw: string | null, now: number): StarterMark
     return null;
   }
   const marker = value as Partial<StarterMarker> | null;
-  if (!marker || typeof marker.hierarchy !== 'boolean' || typeof marker.startedAt !== 'number' || typeof marker.sentAt !== 'number') return null;
-  if (now - marker.startedAt > STARTER_MARKER_TTL_MS || marker.startedAt > now + 60_000) return null;
-  return { hierarchy: marker.hierarchy, startedAt: marker.startedAt, sentAt: marker.sentAt };
+  if (!marker || typeof marker.hierarchy !== 'boolean' || typeof marker.startedAt !== 'number') return null;
+  if (now !== undefined && (now - marker.startedAt > STARTER_MARKER_TTL_MS || marker.startedAt > now + 60_000)) return null;
+  return { hierarchy: marker.hierarchy, startedAt: marker.startedAt, inflight: Array.isArray(marker.inflight) ? marker.inflight.filter(isWrite) : [] };
 }
 
 export type StarterStep = 'none' | 'create' | 'finish';
