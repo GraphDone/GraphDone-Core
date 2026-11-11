@@ -14,10 +14,10 @@ import { readableLabels } from '../../lib/journeys/readableLabels';
  *
  * The example project every new workspace gets supplies the hierarchy:
  *   Getting started: Welcome, Plan a launch, Fix bugs, Ideas
- *   Personal: Move house
+ *   Home: Move house
  */
 const SIBLINGS = ['Plan a launch', 'Fix bugs', 'Ideas'];
-const PROJECTS = ['Getting started', 'Personal'];
+const PROJECTS = ['Getting started', 'Home'];
 
 type Step = { step: number; level: number; scale: number; labels: string[] };
 

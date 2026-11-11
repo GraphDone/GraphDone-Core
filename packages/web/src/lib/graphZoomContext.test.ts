@@ -27,8 +27,8 @@ const starter: ZoomGraph[] = [
   g('launch', 'Plan a launch', 'gs', 12, '3'),
   g('bugs', 'Fix bugs', 'gs', 6, '4'),
   g('ideas', 'Ideas', 'gs', 5, '5'),
-  g('personal', 'Personal', null, 0, '6'),
-  g('move', 'Move house', 'personal', 6, '7'),
+  g('home', 'Home', null, 0, '6'),
+  g('move', 'Move house', 'home', 6, '7'),
   g('old', 'Old notes', null, 9, '0'),
 ];
 
@@ -43,7 +43,7 @@ describe('zoomContextOf', () => {
     expect(context.parent?.name).toBe('Getting started');
     expect(context.siblings.map(s => s.name)).toEqual(['Plan a launch', 'Fix bugs', 'Ideas']);
     // Current project first, then projects that hold graphs, then plain top-level graphs.
-    expect(context.projects.map(p => p.graph.name)).toEqual(['Getting started', 'Personal', 'Old notes']);
+    expect(context.projects.map(p => p.graph.name)).toEqual(['Getting started', 'Home', 'Old notes']);
     expect(context.projects[0]).toMatchObject({ current: true, items: 27 });
     expect(context.projects[0].children.map(c => c.name)).toEqual(['Welcome', 'Plan a launch', 'Fix bugs', 'Ideas']);
     expect(context.projects[1]).toMatchObject({ current: false, items: 6 });
@@ -53,7 +53,7 @@ describe('zoomContextOf', () => {
   it('gives a top-level graph its top-level neighbours and no project level', () => {
     const context = zoomContextOf(starter, 'old')!;
     expect(context.parent).toBeNull();
-    expect(context.siblings.map(s => s.name)).toEqual(['Getting started', 'Personal']);
+    expect(context.siblings.map(s => s.name)).toEqual(['Getting started', 'Home']);
     expect(context.projects).toEqual([]);
   });
 
