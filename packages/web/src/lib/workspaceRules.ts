@@ -11,7 +11,7 @@ export interface GraphRef {
 }
 
 export const projectDeleteMessage = (name: string, graphs: number) =>
-  `${name} holds ${graphs} graph${graphs === 1 ? '' : 's'}. Delete or move them first.`;
+  `${name} holds ${graphs} graph${graphs === 1 ? '' : 's'}. Delete them first.`;
 
 /** Why a project cannot be deleted yet, or null when nothing sits inside it. */
 export function projectDeleteBlock(graph: GraphRef, graphs: Array<Partial<GraphRef>>): string | null {

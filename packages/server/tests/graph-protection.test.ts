@@ -28,7 +28,7 @@ describe('deleting a graph that still holds graphs', () => {
   it('is refused on the server, so a tab with a stale list cannot leave graphs without their project', async () => {
     const db = fakeDriver([{ name: 'Home', inside: { toNumber: () => 2 } }]);
     await expect(deleteGraphs({ id: 'home' }, db.driver)).rejects.toMatchObject({
-      message: 'Home holds 2 graphs. Delete or move them first.',
+      message: 'Home holds 2 graphs. Delete them first.',
       extensions: { code: 'FAILED_PRECONDITION', graphsInside: 2 },
     });
     expect(db.deleted(), 'nothing is deleted').toBe(false);

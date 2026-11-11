@@ -84,7 +84,7 @@ export const graphProtectionResolvers = {
         const full = holding.records[0];
         if (full) {
           const inside = Number(full.get('inside')?.toNumber?.() ?? full.get('inside'));
-          throw new GraphQLError(`${full.get('name')} holds ${inside} graph${inside === 1 ? '' : 's'}. Delete or move them first.`, {
+          throw new GraphQLError(`${full.get('name')} holds ${inside} graph${inside === 1 ? '' : 's'}. Delete them first.`, {
             extensions: { code: 'FAILED_PRECONDITION', graphsInside: inside }
           });
         }

@@ -136,7 +136,7 @@ describe('offline GraphQL bulk selection', () => {
   it('refuses a project that still holds graphs before anyone types its name', async () => {
     addInside('project', ['Welcome', 'Plan a launch', 'Fix bugs', 'Ideas']);
     const { asked, client } = openDelete({ id: 'project', name: 'Getting started' });
-    expect((await screen.findByRole('alert')).textContent).toBe('Getting started holds 4 graphs. Delete or move them first.');
+    expect((await screen.findByRole('alert')).textContent).toBe('Getting started holds 4 graphs. Delete them first.');
     expect(screen.getByText('This project still holds graphs')).not.toBeNull();
     expect(screen.queryByRole('textbox')).toBeNull();
     expect(screen.queryByRole('button', { name: /Delete/ })).toBeNull();
@@ -149,7 +149,7 @@ describe('offline GraphQL bulk selection', () => {
     fixture.graphs = [{ id: 'project', name: 'Home', parentGraphId: null }];
     addInside('project', ['Added in another tab']);
     const { client } = openDelete({ id: 'project', name: 'Home' });
-    expect((await screen.findByRole('alert')).textContent).toBe('Home holds 1 graph. Delete or move them first.');
+    expect((await screen.findByRole('alert')).textContent).toBe('Home holds 1 graph. Delete them first.');
     expect(screen.queryByRole('button', { name: /Delete All/ })).toBeNull();
     client.stop();
   });
@@ -298,7 +298,7 @@ describe('offline graph hierarchy', () => {
 
   it('refuses to delete a project that still has graphs, so none is left without its parent', async () => {
     const child = await create({ name: 'Inside', type: 'SUBGRAPH', parentGraphId: 'other' });
-    await expect(run(DELETE_GRAPH, { id: 'other' })).rejects.toThrow('other holds 1 graph. Delete or move them first.');
+    await expect(run(DELETE_GRAPH, { id: 'other' })).rejects.toThrow('other holds 1 graph. Delete them first.');
     expect(fixture.account!.projects.other.local).not.toBeNull();
     await run(DELETE_GRAPH, { id: child.id });
     await run(DELETE_GRAPH, { id: 'other' });

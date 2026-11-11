@@ -6,8 +6,8 @@ describe('deleting a project', () => {
   const inside = (count: number) => Array.from({ length: count }, (_, i) => ({ id: `g${i}`, name: `Graph ${i}`, parentGraphId: 'p' }));
 
   it('is refused while graphs sit inside it, naming the project and how many', () => {
-    expect(projectDeleteBlock(project, [project, ...inside(4)])).toBe('Getting started holds 4 graphs. Delete or move them first.');
-    expect(projectDeleteBlock(project, [project, ...inside(1)])).toBe('Getting started holds 1 graph. Delete or move them first.');
+    expect(projectDeleteBlock(project, [project, ...inside(4)])).toBe('Getting started holds 4 graphs. Delete them first.');
+    expect(projectDeleteBlock(project, [project, ...inside(1)])).toBe('Getting started holds 1 graph. Delete them first.');
   });
 
   it('is allowed once nothing sits inside it', () => {
