@@ -1,16 +1,18 @@
 # `tests/e2e/journeys/` — basic user journeys
 
 Measures how reliably a person can do a basic thing, by every way the app offers,
-on desktop, iPad and iPhone. So far the journey is "connect two items". Each trial
-starts on the real landing page in a fresh browser, makes two items with the normal
-controls, connects them, and checks what is drawn, what was saved, and that it
-survives a reload. Repeats become a success rate per path and device, with a 95%
-Wilson lower bound, in the unified report.
+on desktop, iPad and iPhone. The journeys are "connect two items" and "edit a
+relationship". Each trial starts on the real landing page in a fresh browser, makes
+two items with the normal controls, connects them, and checks what is drawn, what
+was saved, and that it survives a reload. Repeats become a success rate per path and
+device, with a 95% Wilson lower bound, in the unified report.
 
 ```mermaid
 flowchart LR
   paths["lib/journeys/linkPaths.ts"] --> spec["link.spec.ts"]
   ws["lib/journeys/workspace.ts"] --> spec
+  ed["lib/journeys/relationshipEditor.ts"] --> rel["relationship-edit.spec.ts"]
+  rel --> proj
   spec --> proj["projects: journeys, journeys-ipad, journeys-iphone"]
   proj -->|"repeat-each N"| seq["sequence 'journeys'"]
   seq --> rep["rate + 95% lower bound per path"]
@@ -21,6 +23,7 @@ flowchart LR
 | Path | What it is |
 | --- | --- |
 | [`link.spec.ts`](link.spec.ts) | One `JOURNEY link <path>` test per way to connect (from [`tests/lib/journeys/`](../../lib/journeys/README.md)), plus a duplicate check: connecting an already-connected pair says "Already connected" and saves nothing new. Each trial records a `friction` annotation (zoom and pan steps) and `saved-after-ms`. |
+| [`relationship-edit.spec.ts`](relationship-edit.spec.ts) | `JOURNEY relationship-edit <path>` (#262): connect two items, open the editor as the device's person does (the label or wire on desktop and iPad, "Browse all relationships" on a phone), then `type` (every type in `RELATIONSHIP_OPTIONS`, then back), `flip` (change type, flip, flip back), `reload`, `delete`, and `second-tab` (self-hosted: another tab shows the change after its one-minute refetch). After each change it checks the editor (still "Edit relationship", the direction line, the pressed type), the saved data (one relationship for the pair, direction, type, weight), the canvas (one wire, arrow and label; the type's colour, label text and icon; the arrow at the target) and the relationship list entry, with no page or GraphQL errors and no "Failed" toast. |
 
 Six paths: + on a card, inspector Connect, Shift-click, Alt-drag, the card menu
 (right-click or long-press), quick edit "Details & connections" (Shift/Alt skip on touch).
@@ -44,7 +47,8 @@ TEST_URL=http://localhost:3127 node tests/run-unified.mjs --profile journeys
 JOURNEY_REPEAT=30 TEST_URL=http://localhost:3127 node tests/run-unified.mjs --sequence journeys
 ```
 
-`JOURNEY_REPEAT` sets `--repeat-each` (default 10), with 4 workers and no retries.
+`JOURNEY_REPEAT` sets `--repeat-each` (default 10), with 4 workers and no retries;
+`JOURNEY_GREP` limits the run to matching paths (for example `relationship-edit`).
 Report-only: not in CI or the `pr`/`full` profiles.
 
 Up: [`tests/e2e/`](../README.md)

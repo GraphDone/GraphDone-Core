@@ -75,13 +75,15 @@ export const SEQUENCES = {
   // recording .webm video + a labelled screenshot per step. Drives the real
   // production SPA — run with TEST_URL=https://graphdone-cloud.pages.dev.
   'live-journey': { adapter: 'playwright', title: 'Live site user journey (desktop + mobile)', args: ['--project=live-journey'], blocking: false },
-  // BASIC JOURNEYS: every way to do each basic thing (link so far), on desktop,
-  // tablet and phone, repeated so the report shows a success rate and its 95%
-  // lower bound per path. JOURNEY_BACKEND=hosted-guest with TEST_URL=<hosted
-  // site> runs the same journeys as a guest on the hosted build.
+  // BASIC JOURNEYS: every way to do each basic thing (link, relationship edit),
+  // on desktop, tablet and phone, repeated so the report shows a success rate
+  // and its 95% lower bound per path. JOURNEY_BACKEND=hosted-guest with
+  // TEST_URL=<hosted site> runs the same journeys as a guest on the hosted
+  // build; JOURNEY_GREP=<title pattern> measures only matching paths.
   'journeys': { adapter: 'playwright', title: 'Basic journeys — success rate per path and device', args: [
     '--project=journeys', '--project=journeys-ipad', '--project=journeys-iphone',
     `--repeat-each=${process.env.JOURNEY_REPEAT || 10}`, '--workers=4', '--retries=0',
+    ...(process.env.JOURNEY_GREP ? [`--grep=${process.env.JOURNEY_GREP}`] : []),
   ], blocking: false },
   // Cross-repo: ingest the newest GraphDone-Cloud live-audit findings.json (sibling
   // repo) into the unified report. Skips cleanly when absent.

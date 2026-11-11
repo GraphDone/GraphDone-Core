@@ -27,6 +27,8 @@ TEST_URL=https://graphdone.com JOURNEY_BACKEND=hosted-guest \
   node tests/run-unified.mjs --profile journeys
 ```
 
+- `JOURNEY_GREP` measures only matching paths, for example
+  `JOURNEY_GREP=relationship-edit` for the relationship editor journey.
 - `JOURNEY_REPEAT` sets trials per path and device (default 10). 10/10 proves
   at least ~72% with 95% confidence; about 380 clean runs are needed to show
   under 1% failure. Use 30 or more before claiming a fix or a release is

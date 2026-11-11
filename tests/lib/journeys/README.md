@@ -9,6 +9,7 @@ no retry-until-pass) and reads the saved truth from wherever the backend keeps i
 flowchart LR
   ws["workspace.ts: enter, create items"] --> spec["e2e/journeys/link.spec.ts"]
   lp["linkPaths.ts: LINK_PATHS"] --> spec
+  re["relationshipEditor.ts: open, read the editor, canvas and list"] --> rspec["e2e/journeys/relationship-edit.spec.ts"]
   spec --> saved["storedEdges: GraphQL or IndexedDB"]
   spec --> drawn["drawnEdges: the canvas"]
 ```
@@ -17,8 +18,9 @@ flowchart LR
 
 | Path | What it is |
 | --- | --- |
-| [`workspace.ts`](workspace.ts) | `enterWorkspace` (sign in and create a new graph, or "Continue as Guest" when `JOURNEY_BACKEND=hosted-guest`), `createItem` with the toolbar control, `storedEdges` (GraphQL for self-host, the `graphdone-offline` IndexedDB for a guest), `drawnEdges`, `cardBox`, `clickable`, and `SetupError` (messages start with `SETUP:` so reports keep setup failures apart). |
+| [`workspace.ts`](workspace.ts) | `enterWorkspace` (sign in and create a new graph — through the API on phones, which have no create-graph control — or "Continue as Guest" when `JOURNEY_BACKEND=hosted-guest`), `createItem` with the toolbar control, `storedEdges` with type and weight (GraphQL for self-host, the `graphdone-offline` IndexedDB for a guest), `drawnEdges`, `cardBox`, `clickable`, and `SetupError` (messages start with `SETUP:` so reports keep setup failures apart). |
 | [`linkPaths.ts`](linkPaths.ts) | `LINK_PATHS`: every way to connect two items — + then click, inspector Connect, Shift-click, Alt-drag, the card menu, quick edit "Details & connections". Each path returns its friction (zoom-in, zoom-out and pan steps). Helpers tap on touch and click on desktop, long-press, pinch or wheel to zoom, and pan items into view. |
+| [`relationshipEditor.ts`](relationshipEditor.ts) | The relationship editor as a person meets it: `openEditor` (label or wire on desktop and iPad, "Browse all relationships" on a phone), `expectEditor` (still "Edit relationship", direction line, pressed type), `expectListed` (the list entry, then back to the editor), `drawnRelationship` (wires, arrows, labels and hit areas for a pair; painted stroke and arrow colour; arrow end; label text; whether the label icon is the type's icon) and `watchProblems` (page errors, GraphQL errors, toasts across reloads). |
 
 ## Adding a path or a journey
 
