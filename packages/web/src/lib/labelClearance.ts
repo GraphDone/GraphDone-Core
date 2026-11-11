@@ -244,10 +244,10 @@ export function labelReport(
 }
 
 /** `point` moved `factor` times as far from `anchor` (only vertically for 'y'). */
-export function spreadPoint(point: Point, anchor: Point, factor: number, axes: 'xy' | 'y' = 'xy'): Point {
+export function spreadPoint(point: Point, anchor: Point, factor: number, axes: 'xy' | 'x' | 'y' = 'xy'): Point {
   return {
     x: axes === 'y' ? point.x : anchor.x + (point.x - anchor.x) * factor,
-    y: anchor.y + (point.y - anchor.y) * factor,
+    y: axes === 'x' ? point.y : anchor.y + (point.y - anchor.y) * factor,
   };
 }
 
@@ -290,8 +290,8 @@ export function spreadForLabels(
     anchor?: Point;
     maxFactor?: number;
     work?: { remaining: number };
-    /** 'y' spreads rows apart and keeps each card's x. */
-    axes?: 'xy' | 'y';
+    /** 'y' spreads rows apart and keeps each card's x ('x' the reverse). */
+    axes?: 'xy' | 'x' | 'y';
     /** Only these cards move; the others stay where they are. */
     moves?: (id: string) => boolean;
   }
@@ -469,7 +469,29 @@ export function organizeWithLabelRoom<
       spread: (ids, points) => {
         if (ids.length > SPREAD_MAX_CARDS) return 1;
         const sizes = new Map(ids.map(id => [id, options.dimensionsAt(byId.get(id)!, labelZoom)]));
-        return spreadForLabels(points, sizes, labelled, { zoom: labelZoom, anchor: points.get(ids[0]), work });
+        const anchor = points.get(ids[0])!;
+        const uniform = spreadForLabels(points, sizes, labelled, { zoom: labelZoom, anchor, work });
+        if (uniform <= 1) return 1;
+        // Spreading along the screen's long side alone can free the labels
+        // with less to frame (a hub's spokes on a phone go steeper, not wider).
+        const axis = options.viewport.height > options.viewport.width ? 'y' : 'x';
+        const along = spreadForLabels(points, sizes, labelled, { zoom: labelZoom, anchor, work, axes: axis, maxFactor: uniform * uniform });
+        // How closely the screen frames the component spread by (fx, fy).
+        const fit = (fx: number, fy: number) => {
+          let left = Infinity, right = -Infinity, top = Infinity, bottom = -Infinity;
+          for (const id of ids) {
+            const p = points.get(id)!, size = sizes.get(id)!;
+            const x = anchor.x + (p.x - anchor.x) * fx, y = anchor.y + (p.y - anchor.y) * fy;
+            left = Math.min(left, x - size.width / 2);
+            right = Math.max(right, x + size.width / 2);
+            top = Math.min(top, y - size.height / 2);
+            bottom = Math.max(bottom, y + size.height / 2);
+          }
+          return Math.min(options.viewport.width / (right - left), options.viewport.height / (bottom - top));
+        };
+        const alongFactors = axis === 'y' ? { x: 1, y: along } : { x: along, y: 1 };
+        // Kept when it frames closer and takes no more area than spreading evenly.
+        return along > 1 && along <= uniform * uniform && fit(alongFactors.x, alongFactors.y) > fit(uniform, uniform) ? alongFactors : uniform;
       },
     });
     const turned = turnToScreen(nodes, result.positions, labelled, options, labelZoom, work);
