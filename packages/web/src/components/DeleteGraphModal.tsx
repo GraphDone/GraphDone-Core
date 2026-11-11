@@ -5,6 +5,7 @@ import { AlertTriangle, CheckCircle, WORK_ITEM_TYPES } from '../constants/workIt
 import { useGraph } from '../contexts/GraphContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { GET_WORK_ITEMS, GET_EDGES, DELETE_WORK_ITEM, DELETE_EDGE } from '../lib/queries';
+import { GET_CHILD_GRAPHS } from '../graphql/graph';
 import { projectDeleteBlock } from '../lib/workspaceRules';
 import type { Graph } from '../types/graph';
 
@@ -16,9 +17,16 @@ interface DeleteGraphModalProps {
 }
 
 export function DeleteGraphModal({ isOpen, onClose, graph }: DeleteGraphModalProps) {
-  const { currentGraph, availableGraphs, deleteGraph } = useGraph();
+  const { currentGraph, deleteGraph } = useGraph();
   const targetGraph = graph ?? currentGraph;
-  const blocked = targetGraph ? projectDeleteBlock(targetGraph, availableGraphs) : null;
+  // Asked of the backend each time: another tab may have added a graph inside since this tab's list was read.
+  const { data: insideData, loading: loadingInside } = useQuery(GET_CHILD_GRAPHS, {
+    variables: targetGraph ? { id: targetGraph.id } : undefined,
+    skip: !isOpen || !targetGraph,
+    fetchPolicy: 'network-only',
+  });
+  const insideKnown = Array.isArray(insideData?.graphs);
+  const blocked = targetGraph && insideKnown ? projectDeleteBlock(targetGraph, insideData.graphs) : null;
   const { showSuccess, showError } = useNotifications();
   const [loading, setLoading] = useState(false);
   const [confirmText, setConfirmText] = useState('');
@@ -36,7 +44,7 @@ export function DeleteGraphModal({ isOpen, onClose, graph }: DeleteGraphModalPro
         }
       }
     } : undefined,
-    skip: !isOpen || !targetGraph || !!blocked,
+    skip: !isOpen || !targetGraph || !insideKnown || !!blocked,
     fetchPolicy: 'network-only',
     notifyOnNetworkStatusChange: true,
   });
@@ -52,14 +60,14 @@ export function DeleteGraphModal({ isOpen, onClose, graph }: DeleteGraphModalPro
         }
       }
     } : undefined,
-    skip: !isOpen || !targetGraph || !!blocked,
+    skip: !isOpen || !targetGraph || !insideKnown || !!blocked,
     fetchPolicy: 'network-only',
     notifyOnNetworkStatusChange: true,
   });
   const nodes: any[] = nodesData?.workItems || [];
   const nodeCount = nodes.length;
   const validEdges = Array.isArray(edgesData?.edges) && edgesData.edges.every((edge: any) => edge.source?.id && edge.target?.id);
-  const inspectionReady = !loadingNodes && !loadingEdges && !nodesError && !edgesError && Array.isArray(nodesData?.workItems) && validEdges;
+  const inspectionReady = insideKnown && !blocked && !loadingNodes && !loadingEdges && !nodesError && !edgesError && Array.isArray(nodesData?.workItems) && validEdges;
   const nodeConnections = useMemo(() => {
     const connections: {[key: string]: any[]} = {};
     if (validEdges) for (const edge of edgesData.edges) {
@@ -294,7 +302,7 @@ export function DeleteGraphModal({ isOpen, onClose, graph }: DeleteGraphModalPro
             )}
 
             {/* Loading state */}
-            {(loadingNodes || loadingEdges) && (
+            {(loadingInside || loadingNodes || loadingEdges) && (
               <div className="py-12 relative z-10">
                 <div className="flex items-center justify-center">
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500"></div>
@@ -302,7 +310,7 @@ export function DeleteGraphModal({ isOpen, onClose, graph }: DeleteGraphModalPro
                 <p className="text-center text-gray-400 mt-4 font-medium">Analyzing graph structure...</p>
               </div>
             )}
-            {!blocked && !loadingNodes && !loadingEdges && !inspectionReady && (
+            {!blocked && !loadingInside && !loadingNodes && !loadingEdges && !inspectionReady && (
               <p role="alert" className="py-6 relative z-10 text-red-200">
                 Deletion is unavailable because the current tasks and connections could not be verified. Close this dialog and try again after reconnecting.
               </p>

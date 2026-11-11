@@ -31,4 +31,11 @@ describe('graph hierarchy in the browser workspace',()=>{
   expect(()=>validateBackupSnapshot({...project('a'),project:{id:'a',name:'a',parent_id:{id:'p'}}})).toThrow(/invalid/);
   expect(()=>validateBackupProjects([project('p'),project('p'),project('g','p')])).toThrow(/Nothing was imported/);
  });
+ it('accepts a guest graph description and tags, and rejects malformed ones',()=>{
+  const described=(extra:Record<string,unknown>)=>({...project('a'),project:{...row('a'),...extra}});
+  expect(()=>validateBackupSnapshot(described({description:'Plans for the move',tags:'["home"]'}))).not.toThrow();
+  expect(()=>validateBackupSnapshot(described({description:{html:'bad'}}))).toThrow(/invalid/);
+  expect(()=>validateBackupSnapshot(described({tags:'not json'}))).toThrow(/invalid/);
+  expect(()=>validateBackupSnapshot(described({tags:JSON.stringify([{html:'bad'}])}))).toThrow(/invalid/);
+ });
 });

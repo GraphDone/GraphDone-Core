@@ -25,11 +25,11 @@ flowchart LR
 | Profile | npm script | What it runs |
 | --- | --- | --- |
 | `smoke` | `npm run test:unified:smoke` | Web unit tests, the smoke gate, passwordless sign-in focus. |
-| `pr` | `npm run test:pr` | `smoke` plus the graph, agent, inspector, level-of-detail, wire, large-graph, schematic, layout-recovery, organize-labels, routing, mobile, UI fit, performance-budget and zoom-out sequences. All blocking. |
+| `pr` | `npm run test:pr` | `smoke` plus the graph, agent, inspector, level-of-detail, wire, large-graph, schematic, layout-recovery, organize-labels, routing, mobile, UI fit, performance-budget, relationship-edit and zoom-out sequences. All blocking. |
 | `full` | `npm run test:unified` | `pr` plus the report-only diagnostics, showcase, matrix, VLM, scale sweep and cloud-audit sequences. |
 | `report` | none | Only the report-only capture sequences. |
 | `live` | none | The guest journey on the live hosted site (`live-journey`). |
-| `journeys` | none | Basic user journeys with success rates ([`e2e/journeys/`](../e2e/journeys/README.md)). |
+| `journeys` | none | Basic user journeys with success rates ([`e2e/journeys/`](../e2e/journeys/README.md)); `JOURNEY_REPEAT` sets the trials, `JOURNEY_GREP` picks the paths; the time limit is 6 minutes per repeat (`JOURNEY_TIMEOUT_MINUTES` overrides it). |
 
 `new-user`, `example-resume` and `prod-smoke` are in no profile: CI runs
 `new-user` and `example-resume` by name, and
@@ -40,6 +40,7 @@ flowchart LR
 ```bash
 TEST_URL=http://localhost:3127 node tests/run-unified.mjs --sequence mobile --out test-artifacts/runs/mobile-check
 node tests/run-unified.mjs --profile journeys
+JOURNEY_GREP=relationship-edit JOURNEY_REPEAT=20 TEST_URL=http://localhost:3127 node tests/run-unified.mjs --sequence journeys
 ```
 
 To add a test to a gate, add a sequence entry and list it in the right profile;

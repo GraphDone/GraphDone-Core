@@ -7,14 +7,15 @@ import { gql } from '../graphRequest';
  * saved truth, whichever backend serves it. Journeys never seed through an API:
  * they start where a real person starts and use the same controls.
  *
- *   JOURNEY_BACKEND=selfhost      sign in as the admin test user, new graph (default)
+ *   JOURNEY_BACKEND=selfhost      sign in as the admin test user, new graph (default;
+ *                                 phones, which cannot create a graph, get it from the API)
  *   JOURNEY_BACKEND=hosted-guest  "Continue as Guest" on the hosted build; work is
  *                                 saved in the browser's local workspace
  */
 export type Backend = 'selfhost' | 'hosted-guest';
 export const backend = (process.env.JOURNEY_BACKEND || 'selfhost') as Backend;
 
-export type StoredEdge = { id: string; source: string; target: string; type: string };
+export type StoredEdge = { id: string; source: string; target: string; type: string; weight: number };
 export type Item = { id: string; title: string };
 
 /** Failures before the journey's own action are setup failures; reports keep them apart. */
@@ -31,6 +32,19 @@ export async function enterWorkspace(page: Page): Promise<{ graphId?: string }> 
     return {};
   }
   await login(page, TEST_USERS.ADMIN);
+  if (!(await page.getByTestId('graph-selector').isVisible())) {
+    // Phones have no "Create New Graph" control (the phone header's project
+    // switcher only switches), so the trial's empty graph is made through the
+    // API, as that dialog would make it, and opened.
+    const me = (await gql(page, '{ me { id } }')).me.id;
+    const created = await gql(page, 'mutation($input:[GraphCreateInput!]!){createGraphs(input:$input){graphs{id}}}',
+      { input: [{ name: `Journey ${Date.now()}`, type: 'PROJECT', status: 'ACTIVE', createdBy: me }] });
+    const graphId: string = created.createGraphs.graphs[0].id;
+    await page.evaluate(id => localStorage.setItem('currentGraphId', id), graphId);
+    await page.goto('/');
+    await openGraphView(page);
+    return { graphId };
+  }
   await page.getByTestId('graph-selector').click();
   await page.getByRole('button', { name: 'Create New Graph', exact: true }).click();
   const create = page.getByRole('dialog', { name: 'Create new graph' });
@@ -93,12 +107,12 @@ export async function storedEdges(page: Page, graphId?: string): Promise<StoredE
       open.onsuccess = () => {
         const all = open.result.transaction('accounts').objectStore('accounts').getAll();
         all.onsuccess = () => resolve(all.result.flatMap((a: any) => Object.values(a.projects || {})
-          .flatMap((p: any) => (p.local?.edges || []).map((e: any) => ({ id: e.id, source: e.source_id, target: e.target_id, type: e.type })))));
+          .flatMap((p: any) => (p.local?.edges || []).map((e: any) => ({ id: e.id, source: e.source_id, target: e.target_id, type: e.type, weight: e.weight })))));
       };
     }));
   }
-  const data = await gql(page, 'query($id:ID!){edges(where:{source:{graph:{id:$id}}}){id type source{id} target{id}}}', { id: graphId });
-  return data.edges.map((e: any) => ({ id: e.id, source: e.source.id, target: e.target.id, type: e.type }));
+  const data = await gql(page, 'query($id:ID!){edges(where:{source:{graph:{id:$id}}}){id type weight source{id} target{id}}}', { id: graphId });
+  return data.edges.map((e: any) => ({ id: e.id, source: e.source.id, target: e.target.id, type: e.type, weight: e.weight }));
 }
 
 /** Connections the canvas actually draws, by endpoint id. */

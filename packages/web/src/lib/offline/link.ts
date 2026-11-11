@@ -15,9 +15,13 @@ function accountRows(a:Account):Map<string,Row> {
  for(const [id,p] of Object.entries(a.projects)){if(p.local)rows.set(id,p.local.project);else rows.delete(id);}
  return rows;
 }
+/** A guest graph's tags, kept as JSON text like an item's; anything unreadable reads as none. */
+function graphTags(row:Row):string[] {try{const tags=JSON.parse(row.tags||'[]');return Array.isArray(tags)?tags.filter(t=>typeof t==='string'):[];}catch{return [];}}
+/** A guest graph's description and tags, checked like an item's. Signed-in accounts sync only the name, so they keep neither. */
+const graphDetails=(input:any)=>nodeUpdate({description:input?.description,tags:input?.tags});
 function graph(row:Row,s?:Snapshot|null,rows?:Map<string,Row>):any {
  const path=rows?graphPath(row,rows):row.parent_id!=null?[row.parent_id]:[];
- return {__typename:'Graph',id:row.id,name:row.name,description:'',type:graphType(row),status:'ACTIVE',parentGraphId:path.length?path[path.length-1]:null,teamId:null,createdBy:row.owner_id,tags:[],defaultRole:'USER',depth:path.length,path,isShared:false,nodeCount:s?.nodes.length??row.node_count??0,edgeCount:s?.edges.length??row.edge_count??0,contributorCount:1,lastActivity:iso(row.created_at||now()),settings:JSON.stringify({theme:'dark',layout:'force',showPriorities:true,showDependencies:true,autoLayout:true,zoomLevel:1}),permissions:JSON.stringify({owner:row.owner_id,admins:[row.owner_id],editors:[],viewers:[],teamPermission:'VIEW'}),shareSettings:JSON.stringify({isPublic:false,allowTeamAccess:false,allowCopying:false,allowForking:false}),team:null,createdAt:iso(row.created_at||now()),updatedAt:iso(row.created_at||now()),workItems:[],subgraphs:[],parentGraph:null};
+ return {__typename:'Graph',id:row.id,name:row.name,description:row.description??'',type:graphType(row),status:'ACTIVE',parentGraphId:path.length?path[path.length-1]:null,teamId:null,createdBy:row.owner_id,tags:graphTags(row),defaultRole:'USER',depth:path.length,path,isShared:false,nodeCount:s?.nodes.length??row.node_count??0,edgeCount:s?.edges.length??row.edge_count??0,contributorCount:1,lastActivity:iso(row.created_at||now()),settings:JSON.stringify({theme:'dark',layout:'force',showPriorities:true,showDependencies:true,autoLayout:true,zoomLevel:1}),permissions:JSON.stringify({owner:row.owner_id,admins:[row.owner_id],editors:[],viewers:[],teamPermission:'VIEW'}),shareSettings:JSON.stringify({isPublic:false,allowTeamAccess:false,allowCopying:false,allowForking:false}),team:null,createdAt:iso(row.created_at||now()),updatedAt:iso(row.created_at||now()),workItems:[],subgraphs:[],parentGraph:null};
 }
 export function workItem(row:Row,s:Snapshot):any {
  const lite=(id:string)=>{const n=s.nodes.find(n=>n.id===id);return n?{__typename:'WorkItem',id:n.id,title:n.title,type:n.type,status:n.status}:null;};
@@ -112,7 +116,7 @@ export const offlineLink=new ApolloLink((operation,forward)=>{
         const type=i.type??'PROJECT',parent=i.parentGraphId??null;
         if(hierarchy&&!GRAPH_TYPES.includes(type))throw Error('Choose a project, workspace, sub-graph or template.');
         if(hierarchy&&parent!=null&&(typeof parent!=='string'||!rows.has(parent)))throw Error('The parent project does not exist.');
-        const id=crypto.randomUUID(),s:Snapshot={project:{id,name:i.name.slice(0,120),owner_id:owner,created_at:now(),sync_version:0,...(hierarchy?{type,parent_id:parent}:{})},nodes:[],edges:[],notes:[]};a.projects[id]={base:null,local:s,checkedAt:Date.now()};rows.set(id,s.project);return graph(s.project,s,rows);
+        const id=crypto.randomUUID(),s:Snapshot={project:{id,name:i.name.slice(0,120),owner_id:owner,created_at:now(),sync_version:0,...(hierarchy?{type,parent_id:parent,...graphDetails(i)}:{})},nodes:[],edges:[],notes:[]};a.projects[id]={base:null,local:s,checkedAt:Date.now()};rows.set(id,s.project);return graph(s.project,s,rows);
        });return {__typename:'GraphsMutationResponse',graphs:created};
       }
       const p=a.projects[pid],s=p?.local;if(!s)throw Error('Download this project before editing offline.');
@@ -133,6 +137,7 @@ export const offlineLink=new ApolloLink((operation,forward)=>{
       if(name==='updateGraphs'){
        const u=args.update,rows=accountRows(a);
        if(u.name!==undefined)s.project.name=String(u.name).trim().slice(0,120);if(!s.project.name)throw Error('A project name is required.');
+       if(localGuest())Object.assign(s.project,graphDetails(u));
        if(localGuest()&&u.type!==undefined){if(!GRAPH_TYPES.includes(u.type))throw Error('Choose a project, workspace, sub-graph or template.');s.project.type=u.type;}
        if(localGuest()&&'parentGraphId' in u) {
         const parent=u.parentGraphId??null;

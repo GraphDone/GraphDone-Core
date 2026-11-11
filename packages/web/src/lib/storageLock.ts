@@ -1,9 +1,18 @@
 /**
- * A lock shared by the tabs of one browser through localStorage, for pages
- * without Web Locks: `navigator.locks` exists only on HTTPS and localhost, so
- * a self-hosted server reached over plain HTTP has none. A tab writes its id
- * with an expiry, waits a moment, and holds the lock only if its id is still
- * there; while it works it renews the expiry, and a closed tab's lock expires.
+ * A best-effort lock shared by the tabs of one browser through localStorage,
+ * for pages without Web Locks: `navigator.locks` exists only on HTTPS and
+ * localhost, so a self-hosted server reached over plain HTTP has none. A tab
+ * writes its id with an expiry, waits a moment, and holds the lock only if its
+ * id is still there; while it works it renews the expiry, and a closed tab's
+ * lock expires.
+ *
+ * It is not a true mutual exclusion. localStorage has no compare-and-set, so
+ * two tabs whose writes and re-reads interleave badly can both go ahead, and a
+ * tab that is frozen (a background tab the browser suspends, a paused
+ * debugger) for longer than the expiry stops renewing while it still works, so
+ * another tab takes the lock. For the starter workspace the backstop is the
+ * resume's duplicate cleanup, which removes the empty duplicate graphs such an
+ * overlap can leave.
  */
 
 export interface LockStore {
