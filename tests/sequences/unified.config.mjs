@@ -17,6 +17,7 @@ export const SEQUENCES = {
   'prod-smoke': { adapter: 'playwright', title: 'Production stack smoke gate', args: ['tests/e2e/smoke/user-smoke.spec.ts', `--project=${PW}`, '--headed', '--workers=1', '--retries=0', '--trace=retain-on-failure'], blocking: true },
   'new-user': { adapter: 'playwright', title: 'Headed new-user acceptance', args: [
     'tests/e2e/quality/new-user-modes.spec.ts',
+    'tests/e2e/quality/example-resume.spec.ts',
     'tests/e2e/quality/button-content.spec.ts',
     'tests/e2e/graph/guest-dialog-layout.spec.ts',
     'tests/e2e/graph/responsive-real-workflows.spec.ts',

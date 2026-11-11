@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { STARTER_MARKER_TTL_MS, exampleAction, exampleLimitMessage, missingStarterGraphs, parseStarterMarker, projectDeleteBlock, seenGraphCount, starterHierarchy, starterStep, systemLocked, type OwnGraph } from './workspaceRules';
+import { STARTER_MARKER_TTL_MS, exampleAction, exampleLimitMessage, missingStarterGraphs, parseStarterMarker, projectDeleteBlock, seenGraphCount, starterHierarchy, starterMayOpen, starterStep, systemLocked, type OwnGraph } from './workspaceRules';
 
 describe('deleting a project', () => {
   const project = { id: 'p', name: 'Getting started', parentGraphId: null };
@@ -86,6 +86,31 @@ describe('the marker of a starter being written', () => {
     expect(parseStarterMarker(raw, start)!.inflight).toEqual([write, items]);
     expect(parseStarterMarker(JSON.stringify(marker))).toEqual(marker);
     expect(parseStarterMarker(JSON.stringify(marker), start + STARTER_MARKER_TTL_MS + 1)).toBeNull();
+  });
+});
+
+describe('when the example may open its first graph', () => {
+  const smoke = { id: 's', name: 'Smoke', type: 'PROJECT', parentGraphId: null };
+  const project = { id: 'p', name: 'Getting started', type: 'PROJECT', parentGraphId: null };
+  const welcome = { id: 'w', name: 'Welcome', type: 'SUBGRAPH', parentGraphId: 'p' };
+  const graphs = [smoke, project, welcome];
+
+  it('opens when nothing was picked: nothing open, or only an example project', () => {
+    expect(starterMayOpen({ picked: false, current: null, stored: null, graphs })).toBe(true);
+    expect(starterMayOpen({ picked: false, current: project, stored: 'p', graphs })).toBe(true);
+    expect(starterMayOpen({ picked: false, current: null, stored: 'deleted-or-someone-elses', graphs })).toBe(true);
+  });
+
+  it('never replaces a graph picked on this page, even an example project', () => {
+    expect(starterMayOpen({ picked: true, current: smoke, stored: 's', graphs })).toBe(false);
+    expect(starterMayOpen({ picked: true, current: project, stored: 'p', graphs })).toBe(false);
+    expect(starterMayOpen({ picked: true, current: null, stored: null, graphs })).toBe(false);
+  });
+
+  it('never replaces a graph picked before a reload or in another tab', () => {
+    expect(starterMayOpen({ picked: false, current: smoke, stored: 's', graphs })).toBe(false);
+    expect(starterMayOpen({ picked: false, current: null, stored: 's', graphs }), 'stored while this page had nothing open').toBe(false);
+    expect(starterMayOpen({ picked: false, current: welcome, stored: 'w', graphs }), 'already showing it').toBe(false);
   });
 });
 
