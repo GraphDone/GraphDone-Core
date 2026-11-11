@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
@@ -155,4 +156,67 @@ test('documented one-line install URLs serve the installer from main', () => {
   assert.ok(listed.status === 0 || listed.status === 1, listed.stderr);
   const wrong = listed.stdout.split('\n').filter(Boolean).filter((row) => !row.includes('/GraphDone-Core/main/scripts/install.sh'));
   assert.deepEqual(wrong, [], `Install URLs must point at /main/scripts/install.sh:\n${wrong.join('\n')}`);
+});
+
+// The pre-flight network check once made a single 5 s request; on a run with
+// no terminal one dropped request cancelled the whole install (CI saw it on
+// 2026-11-11). It now asks up to three times before calling the network down,
+// and asks the person at the terminal (never stdin, which is this script under
+// `curl | sh`) whether to go on. Run under sh, as `curl ... | sh` runs it.
+function networkCheck({ failures, tool = 'curl', tries, tty, stdin = '' }) {
+  const source = readFileSync(resolve(root, INSTALLER), 'utf8');
+  const fn = (name) => source.match(new RegExp(`^${name}\\(\\) \\{\\n[\\s\\S]*?\\n\\}`, 'm'))?.[0];
+  const names = ['ask_continue', 'network_reachable', 'network_unreachable', 'check_network'];
+  for (const name of names) assert.ok(fn(name), `install.sh defines ${name}`);
+  const dir = mkdtempSync(join(tmpdir(), 'gd-net-'));
+  try {
+    // Only the fake tool and sleep are on PATH, so the real curl or wget is never reached.
+    writeFileSync(join(dir, tool), `#!/bin/sh\nn=$(/bin/cat "${dir}/calls" 2>/dev/null || echo 0); n=$((n + 1)); echo $n > "${dir}/calls"\necho "$*" > "${dir}/args"\n[ "$n" -gt ${failures} ]\n`, { mode: 0o755 });
+    symlinkSync('/bin/sleep', join(dir, 'sleep'));
+    if (tty !== undefined) writeFileSync(join(dir, 'tty'), `${tty}\n`);
+    const script = [
+      'warn() { echo "WARN $*"; }', 'error() { echo "ERROR $*"; exit 1; }',
+      ...names.map(fn), 'check_network && echo CONTINUED',
+    ].join('\n');
+    const run = spawnSync('/bin/sh', ['-c', script], {
+      encoding: 'utf8',
+      input: stdin,
+      env: {
+        PATH: dir, GRAPHDONE_NETWORK_PAUSE: '0', GRAPHDONE_TTY: join(dir, 'tty'),
+        ...(tries !== undefined && { GRAPHDONE_NETWORK_TRIES: String(tries) }),
+      },
+    });
+    const read = (name) => (existsSync(join(dir, name)) ? readFileSync(join(dir, name), 'utf8') : '');
+    return { out: run.stdout + run.stderr, calls: Number(read('calls') || 0), args: read('args') };
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test('installer network check survives two dropped requests and gives up after three', () => {
+  const flaky = networkCheck({ failures: 2 });
+  assert.match(flaky.out, /CONTINUED/, flaky.out);
+  assert.doesNotMatch(flaky.out, /WARN/);
+  assert.equal(flaky.calls, 3);
+
+  const down = networkCheck({ failures: 99 });
+  assert.match(down.out, /ERROR Installation cancelled - network required/, down.out);
+  assert.equal(down.calls, 3);
+
+  assert.equal(networkCheck({ failures: 99, tries: 1 }).calls, 1, 'GRAPHDONE_NETWORK_TRIES=1 asks once');
+  assert.equal(networkCheck({ failures: 99, tries: 'abc' }).calls, 3, 'a non-number falls back to 3 instead of looping forever');
+});
+
+test('installer network check with only wget asks wget for one try each time', () => {
+  const flaky = networkCheck({ failures: 1, tool: 'wget' });
+  assert.match(flaky.out, /CONTINUED/, flaky.out);
+  assert.equal(flaky.calls, 2);
+  assert.match(flaky.args, /--tries=1/, 'wget would otherwise retry 20 times on its own');
+});
+
+test('installer asks the terminal, not stdin, whether to go on without GitHub', () => {
+  assert.match(networkCheck({ failures: 99, tty: 'y' }).out, /WARN Network connectivity test failed[\s\S]*CONTINUED/);
+  assert.match(networkCheck({ failures: 99, tty: 'n' }).out, /ERROR Installation cancelled/);
+  // Under `curl | sh` stdin is the script itself; a "y" there is not an answer.
+  assert.match(networkCheck({ failures: 99, stdin: 'y\n' }).out, /ERROR Installation cancelled/);
 });
