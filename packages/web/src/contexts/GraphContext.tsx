@@ -14,6 +14,7 @@ import { GET_WORK_ITEMS, GET_EDGES, DELETE_WORK_ITEM, CREATE_WORK_ITEM, CREATE_E
 import { buildStarterWorkspace, createStarterWorkspace, starterGraphCount, type StarterApi } from '../lib/starterWorkspace';
 import { offlineEnabled, localGuest } from '../lib/offline/engine';
 import { OFFLINE_PROJECT_LIMIT } from '../lib/offline/model';
+import { withStorageLock } from '../lib/storageLock';
 import { exampleLimitMessage, parseStarterMarker, projectDeleteBlock, seenGraphCount, starterHierarchy, starterStep, type StarterMarker } from '../lib/workspaceRules';
 
 const GraphContext = createContext<GraphContextType | undefined>(undefined);
@@ -248,7 +249,7 @@ export function GraphProvider({ children }: GraphProviderProps) {
       if (step === 'create') await writeStarter(userId, hierarchyHere(), false);
     };
     if (navigator.locks) await navigator.locks.request(`graphdone-starter:${userId}`, run);
-    else await run();
+    else await withStorageLock(`starter:${userId}`, run, { store: localStorage });
   };
 
   // Subscriptions for real-time updates (commented out until properly implemented)
