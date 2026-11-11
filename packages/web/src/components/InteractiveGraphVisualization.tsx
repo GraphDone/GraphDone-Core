@@ -64,6 +64,7 @@ import { appendNodeControlGlyph, nodeControlGlyphTransform } from '../lib/nodeCo
 import { graphItemLayout, itemTitleScale, measureGraphText, edgeLabelDimensions, GRAPH_FONT_FAMILY, ITEM_TITLE_SIZE, ITEM_TITLE_LINE, ITEM_HEADER_HEIGHT, EDGE_LABEL_SIZE, ITEM_WIRE_WIDTH } from '../lib/graphSymbolLayout';
 import { placeItemLabels } from '../lib/edgeLabelPlacement';
 import { separateCards } from '../lib/separateCards';
+import { PHONE_READABLE_SCALE } from '../lib/cardTitleZoom';
 import { clearFreeCards, framedZoom, hierarchyWithLabelRoom, labelGap, LABEL_MIN_ZOOM, LAYOUT_CHECKS, organizeWithLabelRoom, ORGANIZED_ZOOM_FLOOR, SMALL_GRAPH_ZOOM_FLOOR, WHOLE_FIT_MAX_CARDS, type LabelEdge, type LabelRoomOptions } from '../lib/labelClearance';
 import { LocalItemNeighborhood } from './LocalItemNeighborhood';
 import { frameOrganizedNeighborhood } from '../lib/organizationCamera';
@@ -107,9 +108,6 @@ const SIMPLIFY_SCALE = 0.45;
 // helps the paint-bound whole-graph pan/zoom. Edges return when you zoom past it.
 const DOT_SCALE = 0.2;
 
-// The smallest zoom a phone frames the graph at: small cards still show their
-// title (kept at 14 px on screen) and status stripe.
-const PHONE_READABLE_SCALE = 0.5;
 
 // The label size the automatic layouts leave room for: a drawn relationship's
 // measured label ("+N" included once the renderer has set it), else none.
@@ -4619,7 +4617,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // Room for every relationship label at the zoom the organized graph is framed at.
     // A small graph is framed whole while its titles and labels still read; a
     // large one keeps the organized floor.
-    const whole = simulation.nodes().length <= WHOLE_FIT_MAX_CARDS;
+    // A phone keeps the organized floor and frames the busiest part: a 390 px
+    // screen cannot hold two compact cards and a label side by side at a zoom
+    // where their titles still fit whole (compact label chips: #283).
+    const whole = simulation.nodes().length <= WHOLE_FIT_MAX_CARDS && !window.matchMedia(COMPACT_WORKSPACE_QUERY).matches;
     const floor = whole ? SMALL_GRAPH_ZOOM_FLOOR : ORGANIZED_ZOOM_FLOOR;
     const arranged = organizeWithLabelRoom(simulation.nodes() as WorkItem[], validatedEdges as any[], labelRoom(container.clientWidth, container.clientHeight, floor));
     for (const node of simulation.nodes() as any[]) {
@@ -4672,7 +4673,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       if (simNodes.length <= WHOLE_FIT_MAX_CARDS) {
         beforeHierarchyRef.current ??= { floor: organizationZoomFloorRef.current, whole: wholeGraphFitRef.current };
         wholeGraphFitRef.current = 'top';
-        organizationZoomFloorRef.current = Math.max(organizationZoomFloorRef.current, SMALL_GRAPH_ZOOM_FLOOR);
+        organizationZoomFloorRef.current = window.matchMedia(COMPACT_WORKSPACE_QUERY).matches ? PHONE_READABLE_SCALE : SMALL_GRAPH_ZOOM_FLOOR;
       }
       const { positions } = hierarchyWithLabelRoom(simNodes, validatedEdges as any[],
         labelRoom(container.clientWidth, container.clientHeight, organizationZoomFloorRef.current));

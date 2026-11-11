@@ -49,7 +49,11 @@ The search runs in the click handler, so its work is bounded: at most
 `WHOLE_FIT_MAX_CARDS` (60) cards, `LAYOUT_CHECKS` label checks and five
 layouts per click (about 100 ms on a desktop; a unit test guards it). Larger
 graphs keep the plain layouts and the 0.65 Organize floor (an early version
-searched up to 200 cards and froze the page for seconds). A graph's saved
+searched up to 200 cards and froze the page for seconds). A phone keeps the
+0.65 Organize floor and 0.5 in the hierarchical layout: two compact cards and
+a label side by side do not fit 390 px at a zoom where titles still fit whole
+(below about 0.45 a title breaks mid-word), so a whole graph there needs
+compact label chips. A graph's saved
 arrangement is never moved, so labels hidden there stay hidden until the person
 organizes. Labels under a control or the MiniMap are a camera matter, recorded
 by the audit but not counted.

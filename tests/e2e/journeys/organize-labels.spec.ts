@@ -7,7 +7,8 @@ import { deleteGraphDeep } from '../../lib/seedGraph';
 import { openGraphView } from '../../lib/journeys/workspace';
 import { auditEdgeLabels, labelProblems, layoutSpread, problemCount, type LabelProblems } from '../../lib/edgeLabelAudit';
 import { LAUNCH_CHECKLIST_SHAPE, WELCOME_SHAPE, type LabelShape } from '../../../packages/web/src/lib/labelClearanceShapes';
-import { CARD_TITLES_HIDE_BELOW } from '../../../packages/web/src/lib/cardTitleZoom';
+import { CARD_TITLES_HIDE_BELOW, PHONE_READABLE_SCALE } from '../../../packages/web/src/lib/cardTitleZoom';
+import { ORGANIZED_ZOOM_FLOOR } from '../../../packages/web/src/lib/labelClearance';
 
 /**
  * JOURNEY organize-labels: after "Organize around connections" and after the
@@ -17,12 +18,14 @@ import { CARD_TITLES_HIDE_BELOW } from '../../../packages/web/src/lib/cardTitleZ
  * centre and inside the visible gap of its own edge. Every edge whose two
  * cards are on screen, clear of the graph controls, must show its label.
  *
- * A graph of up to 60 items is framed whole down to the smallest zoom where
- * card titles and labels still show (CARD_TITLES_HIDE_BELOW): when the camera
- * rests above that zoom every card must be on screen. When the whole graph
- * needs a smaller zoom, the camera holds that zoom on the organized hub's
- * neighbourhood (or the hierarchy's top rows) and the check covers the edges
- * on screen (at least one).
+ * On a desktop or tablet a graph of up to 60 items is framed whole down to the
+ * smallest zoom where card titles and labels still show (CARD_TITLES_HIDE_BELOW).
+ * A phone keeps higher floors, where a narrow card's title still fits whole:
+ * the organized floor after Organize and PHONE_READABLE_SCALE in the
+ * hierarchical layout. When the camera rests above the floor every card must be
+ * on screen. When the whole graph needs a smaller zoom, the camera holds the
+ * floor on the organized hub's neighbourhood (or the hierarchy's top rows) and
+ * the check covers the edges on screen (at least one).
  *
  * The graphs are Welcome (what a new user gets first) and a twelve-item launch
  * checklist with fifteen relationships of mixed types, the graph a person
@@ -140,6 +143,9 @@ async function setLayout(page: Page, mode: 'hierarchical' | 'force') {
 type Stage = { graph: string; stage: string; via?: string; checked: boolean; edges: number; scale: number; cards: number; offScreen: number; underControlsCards: number; drawn: number; inView: number; underControls: number; shown: number; problems: LabelProblems; count: number; spread: Awaited<ReturnType<typeof layoutSpread>> };
 
 async function measure(page: Page, shape: LabelShape, stage: string, via?: string, checked = true): Promise<Stage> {
+  // The "Layout saved" note lasts a few seconds over the bottom of the graph;
+  // measure the view a person is left with.
+  if (checked) await expect(page.getByTestId('layout-save-status')).toHaveCount(0, { timeout: 15_000 });
   const audit = await auditEdgeLabels(page);
   const problems = labelProblems(audit);
   return {
@@ -173,20 +179,26 @@ async function organizeAndCheck(page: Page, owned: Owned, info: TestInfo, shape:
 }
 
 /** Why a checked stage fails; empty when every label there reads. */
-function failures(s: Stage, edgesInView = true): string[] {
+function failures(s: Stage, edgesInView: boolean, floor: number): string[] {
   const out: string[] = [];
   if (s.count > 0) out.push(`${s.count} label problems\n  ${Object.entries(s.problems).filter(([, list]) => list.length).map(([kind, list]) => `${kind}: ${list.slice(0, 6).join('; ')}`).join('\n  ')}`);
   if (s.scale < LABEL_MIN_ZOOM) out.push(`rests at zoom ${s.scale}, below the ${LABEL_MIN_ZOOM} where labels show`);
   if (s.drawn !== s.edges) out.push(`${s.drawn} of ${s.edges} relationships drawn`);
   if (edgesInView && s.inView === 0) out.push('no edge has both cards on screen');
-  if (s.scale > SMALL_GRAPH_ZOOM_FLOOR + 0.005 && s.offScreen > 0) out.push(`${s.offScreen} cards off screen although the camera could zoom out further`);
+  if (s.scale > floor + 0.005 && s.offScreen > 0) out.push(`${s.offScreen} cards off screen although the camera could zoom out further`);
   return out;
+}
+
+/** The zoom the camera may rest at after a stage when the whole graph needs less. */
+function floorFor(project: string, stage: string): number {
+  if (project !== 'journeys-iphone') return SMALL_GRAPH_ZOOM_FLOOR;
+  return stage === 'organized' ? ORGANIZED_ZOOM_FLOOR : PHONE_READABLE_SCALE;
 }
 
 async function report(info: TestInfo, stages: Stage[], edgesInView = true) {
   await evidence(info, 'label-stages.json', JSON.stringify(stages, null, 2), 'application/json');
   await evidence(info, 'label-summary.txt', summary(stages), 'text/plain');
-  const failing = stages.filter(s => s.checked).flatMap(s => failures(s, edgesInView).map(reason => `${s.graph} / ${s.stage}: ${reason}`));
+  const failing = stages.filter(s => s.checked).flatMap(s => failures(s, edgesInView, floorFor(info.project.name, s.stage)).map(reason => `${s.graph} / ${s.stage}: ${reason}`));
   expect(failing, `labels are not all readable:\n${summary(stages)}`).toEqual([]);
 }
 
