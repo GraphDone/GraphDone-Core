@@ -16,7 +16,8 @@ import { ORGANIZED_ZOOM_FLOOR } from '../../../packages/web/src/lib/labelClearan
  * relationship label a person can see must be there and readable: text of at
  * least 11 px, not under any card, not on another label, reachable at its
  * centre and inside the visible gap of its own edge. Every edge whose two
- * cards are on screen, clear of the graph controls, must show its label.
+ * cards are on screen, clear of the graph controls, must show its label. No
+ * card title on screen is split inside a word (a word too wide ends in "…").
  *
  * On a desktop or tablet a graph of up to 60 items is framed whole down to the
  * smallest zoom where card titles and labels still show (CARD_TITLES_HIDE_BELOW).
@@ -140,7 +141,7 @@ async function setLayout(page: Page, mode: 'hierarchical' | 'force') {
   return 'hook';
 }
 
-type Stage = { graph: string; stage: string; via?: string; checked: boolean; edges: number; scale: number; cards: number; offScreen: number; underControlsCards: number; drawn: number; inView: number; underControls: number; shown: number; problems: LabelProblems; count: number; spread: Awaited<ReturnType<typeof layoutSpread>> };
+type Stage = { graph: string; stage: string; via?: string; checked: boolean; edges: number; scale: number; cards: number; offScreen: number; underControlsCards: number; drawn: number; inView: number; underControls: number; shown: number; problems: LabelProblems; count: number; spread: Awaited<ReturnType<typeof layoutSpread>>; brokenTitles: string[] };
 
 async function measure(page: Page, shape: LabelShape, stage: string, via?: string, checked = true): Promise<Stage> {
   // The "Layout saved" note lasts a few seconds over the bottom of the graph;
@@ -151,12 +152,38 @@ async function measure(page: Page, shape: LabelShape, stage: string, via?: strin
   return {
     graph: shape.name, stage, via, checked, edges: shape.edges.length, scale: Math.round(audit.scale * 1000) / 1000, cards: audit.cards, offScreen: audit.offScreenCards, underControlsCards: audit.cardsUnderControls,
     drawn: audit.drawnEdges, inView: audit.inViewEdges, underControls: audit.underControls, shown: audit.shownLabels,
-    problems, count: problemCount(problems), spread: await layoutSpread(page),
+    problems, count: problemCount(problems), spread: await layoutSpread(page), brokenTitles: await brokenTitles(page),
   };
 }
 
+/**
+ * Card title lines on screen that split a word: every line must be whole words
+ * of the title, and only a line ending in "…" may end in the start of a word.
+ */
+function brokenTitles(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const out: string[] = [];
+    for (const group of document.querySelectorAll<SVGGElement>('.graph-container .node .node-title-group')) {
+      const box = group.getBoundingClientRect();
+      if (box.right <= 0 || box.bottom <= 0 || box.left >= innerWidth || box.top >= innerHeight) continue;
+      const title = group.querySelector('title')?.textContent ?? '';
+      const words = title.replace(/\s+/g, ' ').trim().split(' ');
+      for (const text of group.querySelectorAll<SVGTextElement>('.node-title-text')) {
+        if (getComputedStyle(text).opacity === '0') continue;
+        const line = text.textContent ?? '';
+        const clipped = line.endsWith('…');
+        const tokens = (clipped ? line.slice(0, -1) : line).split(' ').filter(Boolean);
+        const whole = tokens.every((token, index) =>
+          clipped && index === tokens.length - 1 ? words.some(word => word.startsWith(token)) : words.includes(token));
+        if (!whole && line !== 'Untitled') out.push(`"${line}" in "${title}"`);
+      }
+    }
+    return out;
+  });
+}
+
 const summary = (stages: Stage[]) => stages.map(s =>
-  `${s.graph} / ${s.stage}${s.via ? ` (${s.via})` : ''}${s.checked ? '' : ' [not checked]'}: zoom ${s.scale}, ${s.cards - s.offScreen}/${s.cards} cards on screen (${s.underControlsCards} partly under controls), ${s.shown}/${s.drawn} labels shown, ${s.inView} edges in view (${s.underControls} under controls) — hidden ${s.problems.hidden.length}, under a card ${s.problems.covered.length}, on another label ${s.problems.overlapping.length}, centre not reachable ${s.problems.unreachable.length}, outside the gap ${s.problems.outOfGap.length}, text too small ${s.problems.small.length}`
+  `${s.graph} / ${s.stage}${s.via ? ` (${s.via})` : ''}${s.checked ? '' : ' [not checked]'}: zoom ${s.scale}, ${s.cards - s.offScreen}/${s.cards} cards on screen (${s.underControlsCards} partly under controls), ${s.shown}/${s.drawn} labels shown, ${s.inView} edges in view (${s.underControls} under controls) — hidden ${s.problems.hidden.length}, under a card ${s.problems.covered.length}, on another label ${s.problems.overlapping.length}, centre not reachable ${s.problems.unreachable.length}, outside the gap ${s.problems.outOfGap.length}, text too small ${s.problems.small.length}, titles split mid-word ${s.brokenTitles.length}`
 ).join('\n');
 
 const slug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
@@ -184,6 +211,7 @@ function failures(s: Stage, edgesInView: boolean, floor: number): string[] {
   if (s.count > 0) out.push(`${s.count} label problems\n  ${Object.entries(s.problems).filter(([, list]) => list.length).map(([kind, list]) => `${kind}: ${list.slice(0, 6).join('; ')}`).join('\n  ')}`);
   if (s.scale < LABEL_MIN_ZOOM) out.push(`rests at zoom ${s.scale}, below the ${LABEL_MIN_ZOOM} where labels show`);
   if (s.drawn !== s.edges) out.push(`${s.drawn} of ${s.edges} relationships drawn`);
+  if (s.brokenTitles.length) out.push(`card titles split mid-word: ${s.brokenTitles.join('; ')}`);
   if (edgesInView && s.inView === 0) out.push('no edge has both cards on screen');
   if (s.scale > floor + 0.005 && s.offScreen > 0) out.push(`${s.offScreen} cards off screen although the camera could zoom out further`);
   return out;

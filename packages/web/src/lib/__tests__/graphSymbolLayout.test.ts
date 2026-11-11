@@ -31,6 +31,42 @@ describe('graph symbol content geometry', () => {
     }
   });
 
+  it('breaks titles only at spaces and ends a word too wide for a line in "…"', () => {
+    // Every line is whole words of the title; only a line ending in "…" may
+    // end in part of a word (its start), and no line starts inside a word.
+    const broken = (title: string, lines: string[]) => {
+      const words = title.split(' ');
+      return lines.filter(line => {
+        const clipped = line.endsWith('…');
+        const tokens = (clipped ? line.slice(0, -1) : line).split(' ').filter(Boolean);
+        return !tokens.every((token, index) =>
+          clipped && index === tokens.length - 1
+            ? words.some(word => word.startsWith(token))
+            : words.includes(token)
+        );
+      });
+    };
+    const titles = [
+      'System coordinator',
+      'Design mockups',
+      'Set up analytics',
+      'Email campaign',
+      'coordinator of the subsystems',
+      'Review the gateway settlement reconciliation and retry policy',
+      'PaymentGatewayRetryReconciliationHandler',
+    ];
+    for (const title of titles)
+      for (let width = 40; width <= 320; width += 10) {
+        const result = fitGraphText(title, width, ITEM_TITLE_SIZE, measure);
+        expect(broken(title, result.lines), `${title} at ${width}`).toEqual([]);
+        for (const line of result.lines)
+          if (line !== '…') expect(measure(line, ITEM_TITLE_SIZE)).toBeLessThanOrEqual(width);
+        if (result.truncated) expect(result.lines.some(line => line.endsWith('…'))).toBe(true);
+      }
+    // A word too wide for the line is cut where it is, never carried over.
+    expect(fitGraphText('System coordinator', 110, ITEM_TITLE_SIZE, measure).lines).toEqual(['System', 'coordinat…']);
+  });
+
   it('makes short cards compact and reserves title, description and metadata rows', () => {
     const short = graphItemLayout({ title: 'Review', type: 'TASK' }, measure);
     const long = graphItemLayout(

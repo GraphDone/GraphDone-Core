@@ -12,6 +12,15 @@ export type TextMeasure = (
   weight?: number
 ) => number;
 
+/** Scripts written without spaces between words: a line may break between any two characters there. */
+const UNSPACED_SCRIPT = /[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff]/;
+
+/**
+ * `text` in at most `maxLines` lines no wider than `width`, broken only at
+ * spaces. A word wider than a line is never split across lines: it is cut and
+ * ends in "…" (scripts written without spaces still break between
+ * characters). When more text follows the last line, that line ends in "…".
+ */
 export function fitGraphText(
   text: string,
   width: number,
@@ -19,41 +28,67 @@ export function fitGraphText(
   measure: TextMeasure,
   maxLines = 3
 ) {
-  let remaining = text.replace(/\s+/g, ' ').trim();
-  const lines: string[] = [];
-  while (remaining && lines.length < maxLines) {
-    if (measure(remaining, size, 600) <= width) {
-      lines.push(remaining);
-      remaining = '';
-      break;
-    }
-    const last = lines.length === maxLines - 1;
-    const chars = Array.from(remaining);
+  const fits = (line: string) => measure(line, size, 600) <= width;
+  /** How many of `chars` fit on a line followed by `suffix`. */
+  const longest = (chars: string[], suffix: string) => {
     let low = 0,
       high = chars.length;
     while (low < high) {
       const middle = Math.ceil((low + high) / 2);
-      if (
-        measure(
-          chars.slice(0, middle).join('') + (last ? '…' : ''),
-          size,
-          600
-        ) <= width
-      )
-        low = middle;
+      if (fits(chars.slice(0, middle).join('') + suffix)) low = middle;
       else high = middle - 1;
     }
-    if (!low) return { lines: [...lines, '…'], truncated: true };
-    let take = low;
-    const prefix = chars.slice(0, low).join('');
-    const space = prefix.lastIndexOf(' ');
-    if (!last && space > 0) take = Array.from(prefix.slice(0, space)).length;
-    lines.push(chars.slice(0, take).join('').trimEnd() + (last ? '…' : ''));
-    remaining = chars.slice(take).join('').trimStart();
+    return low;
+  };
+  const words = text.replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
+  const lines: string[] = [];
+  let next = 0,
+    truncated = false;
+  while (next < words.length && lines.length < maxLines) {
+    const last = lines.length === maxLines - 1;
+    let end = next;
+    while (end < words.length && fits(words.slice(next, end + 1).join(' ')))
+      end++;
+    if (end === words.length) {
+      lines.push(words.slice(next).join(' '));
+      next = end;
+      break;
+    }
+    if (last && end > next) {
+      // More follows: as many whole words as fit with the "…".
+      let keep = end - next;
+      while (keep > 0 && !fits(`${words.slice(next, next + keep).join(' ')}…`))
+        keep--;
+      if (keep > 0) {
+        lines.push(`${words.slice(next, next + keep).join(' ')}…`);
+        truncated = true;
+        break;
+      }
+    } else if (end > next) {
+      lines.push(words.slice(next, end).join(' '));
+      next = end;
+      continue;
+    }
+    // The next word alone is wider than the line (or the last line has room
+    // for none of the words and the "…").
+    const chars = Array.from(words[next]);
+    if (!last && UNSPACED_SCRIPT.test(words[next])) {
+      const take = longest(chars, '');
+      if (!take) return { lines: [...lines, '…'], truncated: true };
+      lines.push(chars.slice(0, take).join(''));
+      words[next] = chars.slice(take).join('');
+      continue;
+    }
+    const take = longest(chars, '…');
+    if (!take) return { lines: [...lines, '…'], truncated: true };
+    lines.push(chars.slice(0, take).join('') + '…');
+    truncated = true;
+    next++;
+    if (last) break;
   }
   return {
     lines: lines.length ? lines : ['Untitled'],
-    truncated: remaining.length > 0,
+    truncated: truncated || next < words.length,
   };
 }
 
