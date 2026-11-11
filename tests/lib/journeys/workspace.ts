@@ -44,7 +44,7 @@ export async function enterWorkspace(page: Page): Promise<{ graphId?: string }> 
 }
 
 /** Phones open on the List view; a person taps "Graph" in the bottom bar. */
-async function openGraphView(page: Page) {
+export async function openGraphView(page: Page) {
   const graph = page.locator('.graph-container');
   const nav = page.getByTestId('mobile-bottom-nav');
   await graph.or(nav).first().waitFor({ timeout: 20000 });
