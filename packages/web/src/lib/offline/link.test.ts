@@ -118,22 +118,47 @@ describe('offline GraphQL bulk selection', () => {
     client.stop();
   });
 
-  it('refuses a project that still holds graphs before anyone types its name', async () => {
-    fixture.graphs = [
-      { id: 'project', name: 'Getting started', parentGraphId: null },
-      ...['Welcome', 'Plan a launch', 'Fix bugs', 'Ideas'].map(name => ({ id: name, name, parentGraphId: 'project' })),
-    ];
+  const addInside = (parent: string, names: string[]) => {
+    for (const name of names) {
+      const s = snapshot(name, []);
+      s.project = { ...s.project, type: 'SUBGRAPH', parent_id: parent };
+      fixture.account!.projects[name] = { base: null, local: s, checkedAt: 0 };
+    }
+  };
+  const openDelete = (graph: { id: string; name: string }) => {
     const asked: string[] = [];
     const spy = new ApolloLink((operation, forward) => { asked.push(operation.operationName); return forward(operation); });
     const client = new ApolloClient({ link: spy.concat(offlineLink), cache: new InMemoryCache() });
-    const project = { id: 'project', name: 'Getting started' } as never;
-    render(createElement(ApolloProvider, { client, children: createElement(DeleteGraphModal, { isOpen: true, onClose: vi.fn(), graph: project }) }));
-    expect(screen.getByRole('alert').textContent).toBe('Getting started holds 4 graphs. Delete or move them first.');
+    render(createElement(ApolloProvider, { client, children: createElement(DeleteGraphModal, { isOpen: true, onClose: vi.fn(), graph: graph as never }) }));
+    return { asked, client };
+  };
+
+  it('refuses a project that still holds graphs before anyone types its name', async () => {
+    addInside('project', ['Welcome', 'Plan a launch', 'Fix bugs', 'Ideas']);
+    const { asked, client } = openDelete({ id: 'project', name: 'Getting started' });
+    expect((await screen.findByRole('alert')).textContent).toBe('Getting started holds 4 graphs. Delete them first.');
     expect(screen.getByText('This project still holds graphs')).not.toBeNull();
     expect(screen.queryByRole('textbox')).toBeNull();
     expect(screen.queryByRole('button', { name: /Delete/ })).toBeNull();
     await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)); });
-    expect(asked).toEqual([]);
+    expect(asked, 'only the graphs inside are asked for').toEqual(['GetChildGraphs']);
+    client.stop();
+  });
+
+  it('asks the backend for the graphs inside, so a stale list in this tab cannot allow the delete', async () => {
+    fixture.graphs = [{ id: 'project', name: 'Home', parentGraphId: null }];
+    addInside('project', ['Added in another tab']);
+    const { client } = openDelete({ id: 'project', name: 'Home' });
+    expect((await screen.findByRole('alert')).textContent).toBe('Home holds 1 graph. Delete them first.');
+    expect(screen.queryByRole('button', { name: /Delete All/ })).toBeNull();
+    client.stop();
+  });
+
+  it('goes on to the usual checks once the backend says nothing is inside, whatever this tab listed', async () => {
+    fixture.graphs = [{ id: 'project', name: 'Home', parentGraphId: null }, { id: 'gone', name: 'Moved away', parentGraphId: 'project' }];
+    const { client } = openDelete({ id: 'project', name: 'Home' });
+    expect(await screen.findByRole('button', { name: 'Delete All Unconnected Work Items (3)' })).not.toBeNull();
+    expect(screen.queryByText('This project still holds graphs')).toBeNull();
     client.stop();
   });
 
@@ -250,6 +275,25 @@ describe('offline graph hierarchy', () => {
     expect(Object.keys(fixture.account!.projects)).toEqual(['project', 'other']);
   });
 
+  it('keeps a guest graph\'s description and tags, and updates them', async () => {
+    const made = await create({ name: 'Notes', type: 'PROJECT', description: 'Plans for the move', tags: ['home', 'move'] });
+    expect(made).toMatchObject({ description: 'Plans for the move', tags: ['home', 'move'] });
+    expect(byName(await graphs(), 'Notes')).toMatchObject({ description: 'Plans for the move', tags: ['home', 'move'] });
+    await run(UPDATE_GRAPH, { id: made.id, input: { description: 'Moved in', tags: ['done'] } });
+    expect(byName(await graphs(), 'Notes')).toMatchObject({ description: 'Moved in', tags: ['done'] });
+    await run(UPDATE_GRAPH, { id: made.id, input: { name: 'Renamed' } });
+    expect(byName(await graphs(), 'Renamed'), 'a rename keeps them').toMatchObject({ description: 'Moved in', tags: ['done'] });
+    await expect(create({ name: 'Too many', tags: Array.from({ length: 51 }, (_, i) => `t${i}`) })).rejects.toThrow(/up to 50 tags/);
+    await expect(create({ name: 'Too long', description: 'x'.repeat(4001) })).rejects.toThrow(/4000 characters/);
+  });
+
+  it('keeps no description or tags for a signed-in account, whose sync carries only the name', async () => {
+    fixture.guest = false;
+    const made = await create({ name: 'Synced', description: 'Lost on sync', tags: ['x'] });
+    expect(made).toMatchObject({ description: '', tags: [] });
+    expect(fixture.account!.projects[made.id].local!.project).not.toHaveProperty('description');
+  });
+
   it('keeps a signed-in account flat, because its sync has no parent column yet', async () => {
     fixture.guest = false;
     const created = await create({ name: 'Flat', type: 'SUBGRAPH', parentGraphId: 'project' });
@@ -273,7 +317,7 @@ describe('offline graph hierarchy', () => {
 
   it('refuses to delete a project that still has graphs, so none is left without its parent', async () => {
     const child = await create({ name: 'Inside', type: 'SUBGRAPH', parentGraphId: 'other' });
-    await expect(run(DELETE_GRAPH, { id: 'other' })).rejects.toThrow('other holds 1 graph. Delete or move them first.');
+    await expect(run(DELETE_GRAPH, { id: 'other' })).rejects.toThrow('other holds 1 graph. Delete them first.');
     expect(fixture.account!.projects.other.local).not.toBeNull();
     await run(DELETE_GRAPH, { id: child.id });
     await run(DELETE_GRAPH, { id: 'other' });
