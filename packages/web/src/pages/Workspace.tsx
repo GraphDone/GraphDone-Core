@@ -235,7 +235,7 @@ export function Workspace() {
       {breadcrumb.length > 1 && (
         <div
           data-testid="graph-breadcrumb"
-          className="bg-gray-800/30 backdrop-blur-sm border-b border-gray-700/20 px-4 sm:px-6 lg:px-8 py-2 flex items-center gap-1 text-sm overflow-x-auto"
+          className="bg-gray-800/30 backdrop-blur-sm border-b border-gray-700/20 px-4 sm:px-6 lg:px-8 py-2 flex items-center gap-1 text-sm overflow-x-auto short:hidden"
         >
           <button
             onClick={() => ascendTo(breadcrumb[breadcrumb.length - 2].id)}
