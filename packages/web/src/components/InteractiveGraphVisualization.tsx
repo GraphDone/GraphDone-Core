@@ -66,12 +66,11 @@ import { graphItemLayout, itemTitleScale, measureGraphText, edgeLabelDimensions,
 import { placeItemLabels, labelsMissed } from '../lib/edgeLabelPlacement';
 import { separateCards } from '../lib/separateCards';
 import { organizeTopology } from '../lib/topologyOrganization';
-import { PHONE_READABLE_SCALE } from '../lib/cardTitleZoom';
-import { clearFreeCards, framedZoom, hierarchyWithLabelRoom, labelGap, LABEL_MIN_ZOOM, LAYOUT_CHECKS, organizeWithLabelRoom, ORGANIZED_ZOOM_FLOOR, SMALL_GRAPH_ZOOM_FLOOR, WHOLE_FIT_MAX_CARDS, type LabelEdge, type LabelRoomOptions } from '../lib/labelClearance';
+import { clearFreeCards, framedZoom, labelGap, LABEL_MIN_ZOOM, LAYOUT_CHECKS, organizeWithLabelRoom, ORGANIZED_ZOOM_FLOOR, SMALL_GRAPH_ZOOM_FLOOR, WHOLE_FIT_MAX_CARDS, type LabelEdge, type LabelRoomOptions } from '../lib/labelClearance';
 import { LocalItemNeighborhood } from './LocalItemNeighborhood';
 import { frameOrganizedNeighborhood } from '../lib/organizationCamera';
 import { DEFAULT_PHYSICS, collisionRadius, linkDistance, linkMaxDistance, linkStrength } from '../lib/physicsConfig';
-import { isHierarchicalLayout, parseLayoutMode, LAYOUT_MODE_STORAGE_KEY, type LayoutMode } from '../lib/layoutAlgorithms';
+import { computeCompactLayout, isHierarchicalLayout, parseLayoutMode, LAYOUT_MODE_STORAGE_KEY, type LayoutMode } from '../lib/layoutAlgorithms';
 import { edgeBorderEndpoints, minEdgeLength, clampToMinNeighbors } from '../lib/edgeGeometry';
 import { directionStrategy, arrowVisibility, perpendicularOffset } from '../lib/edgeLOD';
 import { assignParallelEdgeIndices } from '../lib/parallelEdges';
@@ -112,6 +111,9 @@ const SIMPLIFY_SCALE = 0.45;
 // helps the paint-bound whole-graph pan/zoom. Edges return when you zoom past it.
 const DOT_SCALE = 0.2;
 
+// The smallest zoom a phone frames the graph at: small cards still show their
+// title (kept at 14 px on screen) and status stripe.
+const PHONE_READABLE_SCALE = 0.5;
 
 // The label size the automatic layouts leave room for: a drawn relationship's
 // measured label ("+N" included once the renderer has set it), else none.
@@ -4301,20 +4303,15 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const altDragSourceRef = useRef<any>(null); // Alt-drag: item being dragged from
   const organizationZoomFloorRef = useRef(0);
   const organizationFocusRef = useRef<string>();
-  // Organize or the hierarchical layout on a graph of at most
-  // WHOLE_FIT_MAX_CARDS: frame the whole graph down to the zoom where card
-  // titles and relationship labels still show (no phone floor). When even
-  // that is too small, Organize stays centred if the graph nearly fits and
-  // frames the busiest card's neighbourhood otherwise; the hierarchical
-  // layout shows its top rows (prerequisites first).
-  const wholeGraphFitRef = useRef<false | 'centre' | 'top'>(false);
-  // The framing the hierarchical layout replaced, restored when it is turned off.
-  const beforeHierarchyRef = useRef<{ floor: number; whole: false | 'centre' | 'top' } | null>(null);
+  // Organize on a graph of at most WHOLE_FIT_MAX_CARDS: frame the whole graph
+  // down to the zoom where card titles and relationship labels still show (no
+  // phone floor). When even that is too small, stay centred if the graph
+  // nearly fits and frame the busiest card's neighbourhood otherwise.
+  const wholeGraphFitRef = useRef(false);
   useEffect(() => {
     organizationZoomFloorRef.current = 0;
     organizationFocusRef.current = undefined;
     wholeGraphFitRef.current = false;
-    beforeHierarchyRef.current = null;
   }, [layoutScope]);
 
   // Fit view to show all nodes. Returns true if a fit transform was applied,
@@ -4358,7 +4355,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       && PHONE_READABLE_SCALE > Math.max(scale, minimumScale);
     if (phoneFloor) minimumScale = PHONE_READABLE_SCALE;
     // A small graph that nearly fits stays centred whole rather than on its hub.
-    const nearlyWhole = !!wholeGraphFitRef.current && scale >= 0.8 * minimumScale;
+    const nearlyWhole = wholeGraphFitRef.current && scale >= 0.8 * minimumScale;
     if (minimumScale > scale) {
       // A freshly organized graph keeps a readable floor instead of shrinking
       // every card to fit: stay centred on the same cards at that scale.
@@ -4367,15 +4364,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       scale = minimumScale;
       translateX = fit.region.x + fit.region.width / 2 - centerX * scale;
       translateY = fit.region.y + fit.region.height / 2 - centerY * scale;
-      if (wholeGraphFitRef.current === 'top') {
-        const top = Math.min(...cards.map(node => node.y - getNodeDimensionsAt(node, scale).height / 2));
-        translateY = fit.region.y + 16 - top * scale;
-      }
     }
     const focus = (organizationFocusRef.current && cards.find(node => node.id === organizationFocusRef.current))
       || (phoneFloor ? [...cards].sort((a, b) => ((b as WorkItem).priority ?? 0) - ((a as WorkItem).priority ?? 0))[0] : undefined);
-    // A hierarchy too tall for the screen keeps its top rows in view instead.
-    if (minimumScale > 0 && focus && wholeGraphFitRef.current !== 'top' && !nearlyWhole) {
+    if (minimumScale > 0 && focus && !nearlyWhole) {
       const at = frameOrganizedNeighborhood(
         cards.map(node => ({ id: node.id, x: node.x, y: node.y, ...getNodeDimensionsAt(node, scale) })),
         focus.id,
@@ -4657,8 +4649,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     forgetLabelSpots(validatedEdges as any[]);
     (window as any).__graphOrganization = {components:arranged.components,work:arranged.work};
     organizationZoomFloorRef.current = floor;
-    wholeGraphFitRef.current = whole && 'centre';
-    beforeHierarchyRef.current = null;
+    wholeGraphFitRef.current = whole;
     organizationFocusRef.current = arranged.components[0]?.focus;
     cameraManuallyPositionedRef.current = true;
     if (currentGraphIdRef.current) fittedGraphsRef.current.add(currentGraphIdRef.current);
@@ -4672,8 +4663,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     });
   }, [validatedEdges, fitViewToNodes, persistAllPositions, labelRoom]);
 
-  // Hierarchical mode packs actual card sizes into compact dependency rows,
-  // with room for every relationship label at the zoom they are framed at.
+  // Hierarchical mode packs actual card sizes into compact dependency rows.
   // Pin both axes so repulsion cannot spread a finished row across the viewport.
   // Switching back restores both original pins, including saved-position pins.
   const layoutModeRef = useRef<LayoutMode>(
@@ -4688,13 +4678,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     if (!sim || !container) return;
     const simNodes = sim.nodes() as any[];
     if (isHierarchicalLayout(mode)) {
-      if (simNodes.length <= WHOLE_FIT_MAX_CARDS) {
-        beforeHierarchyRef.current ??= { floor: organizationZoomFloorRef.current, whole: wholeGraphFitRef.current };
-        wholeGraphFitRef.current = 'top';
-        organizationZoomFloorRef.current = window.matchMedia(COMPACT_WORKSPACE_QUERY).matches ? PHONE_READABLE_SCALE : SMALL_GRAPH_ZOOM_FLOOR;
-      }
-      const { positions } = hierarchyWithLabelRoom(simNodes, validatedEdges as any[],
-        labelRoom(container.clientWidth, container.clientHeight, organizationZoomFloorRef.current));
+      const positions = computeCompactLayout(
+        simNodes, validatedEdges as any[],
+        { width: container.clientWidth, height: container.clientHeight }, getNodeDimensions,
+      );
       simNodes.forEach((node: any) => {
         const point = positions.get(node.id);
         if (!point) return;
@@ -4705,11 +4692,6 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         node.vx = node.vy = 0;
       });
     } else {
-      if (beforeHierarchyRef.current) {
-        organizationZoomFloorRef.current = beforeHierarchyRef.current.floor;
-        wholeGraphFitRef.current = beforeHierarchyRef.current.whole;
-        beforeHierarchyRef.current = null;
-      }
       simNodes.forEach((node: any) => {
         if (!node.__layerPinned) return;
         node.fy = node.__preLayerFy ?? null;
@@ -4719,10 +4701,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         delete node.__preLayerFy;
       });
     }
-    forgetLabelSpots(validatedEdges as any[]);
     sim.alpha(DEFAULT_PHYSICS.alpha.loadEnergy).restart();
     if (isHierarchicalLayout(mode)) requestAnimationFrame(() => fitViewToNodes());
-  }, [validatedEdges, labelRoom, fitViewToNodes]);
+  }, [validatedEdges, getNodeDimensions, fitViewToNodes]);
   // Stable handle so the window hook + load effect don't churn when the edge
   // poll re-creates applyLayoutMode (which would reheat the sim every poll).
   const applyLayoutModeRef = useRef(applyLayoutMode);
@@ -5103,7 +5084,6 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     (window as any).triggerZoomToFit = () => {
       organizationZoomFloorRef.current = 0;
       wholeGraphFitRef.current = false;
-      beforeHierarchyRef.current = null;
       return fitViewRef.current();
     };
     return () => {

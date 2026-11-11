@@ -35,8 +35,7 @@ concerns the room between connected cards.
   obstacles, and the floor), and lay out again when that zoom needs more room.
 - Reserved gaps are not enough where wires cross labels: check the result by
   placing labels exactly as the renderer does (`placeGraphLabels`) and spread
-  the group by the smallest factor that frees them (`spreadForLabels`), rows
-  apart first in the hierarchical layout.
+  the group by the smallest factor that frees them (`spreadForLabels`).
 - Check the layout the renderer will get, under any ids: real ids are random
   and break ties in the organizer and the label order. Keep only spreads that
   were checked, check the finished layout as a whole (`checkedWhole`), and
@@ -60,14 +59,12 @@ The search runs in the click handler, so its work is bounded: at most
 layouts per click (about 100 ms on a desktop; a unit test guards it). Larger
 graphs keep the plain layouts and the 0.65 Organize floor (an early version
 searched up to 200 cards and froze the page for seconds). A phone keeps the
-0.65 Organize floor and 0.5 in the hierarchical layout: two compact cards and
-a label side by side do not fit 390 px at a zoom where titles still fit whole
-(below about 0.45 a long word is cut short), so a whole graph there needs
-compact label chips. Above 60 cards the hierarchical rows are the old ones,
-wrapped at the screen's reading width (pinned by golden numbers in
-`layoutAlgorithms.test.ts`); up to 60, a row that edges leave does not wrap
-(wrapped cards would sit on those edges), so a hub with many dependents is
-wide. A graph of unplaced items opens organized as before. A graph's saved
+0.65 Organize floor: two compact cards and a label side by side do not fit
+390 px at a zoom where titles still fit whole (below about 0.45 a long word is
+cut short), so a whole graph there needs compact label chips. The
+hierarchical layout and the first open of a graph of unplaced items stay as
+they were: label room in hierarchical rows that still wrap like dev's (a hub
+with many dependents) is #283. A graph's saved
 arrangement is never moved, so labels hidden there stay hidden until the person
 organizes. Labels under a control or the MiniMap are a camera matter, recorded
 by the audit but not counted.

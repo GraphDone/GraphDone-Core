@@ -13,7 +13,6 @@ import {
 } from './relationshipPriority';
 import {
   clearFreeCards,
-  hierarchyWithLabelRoom,
   labelGap,
   labelReport,
   framedZoom,
@@ -29,9 +28,7 @@ import {
   type LabelEdge,
 } from './labelClearance';
 import { organizeTopology } from './topologyOrganization';
-import { computeCompactLayout } from './layoutAlgorithms';
 import { LABEL_SHAPES, type LabelShape } from './labelClearanceShapes';
-import { PHONE_READABLE_SCALE } from './cardTitleZoom';
 
 // measureGraphText's own estimate when there is no canvas: wider than the
 // browser's text, so layouts that pass here have room to spare on screen.
@@ -188,13 +185,6 @@ describe('the whole small graph on screen', () => {
     const ys = [...organizeWithLabelRoom(g.items, g.edges, options).positions.values()].map(p => p.y);
     expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(Math.max(...ys) - Math.min(...ys));
   });
-
-  it.each(smallCases)('%s on %s: hierarchical, framed at a zoom that draws every label', (_name, screen, shape) => {
-    const g = graph(shape);
-    const result = hierarchyWithLabelRoom(g.items, g.edges, { ...g, viewport: SCREENS[screen], floor: SMALL_GRAPH_ZOOM_FLOOR });
-    expect(result.zoom).toBeGreaterThanOrEqual(LABEL_MIN_ZOOM);
-    expect(problems(g, result.positions, result.zoom)).toEqual(NONE);
-  });
 });
 
 /** A generated graph: `n` tasks, `m` relationships mostly between near neighbours. */
@@ -235,56 +225,24 @@ describe('bounded work', () => {
     expect(problems(g, result.positions, result.zoom)).toEqual(NONE);
   });
 
-  // Organize and the hierarchical toggle run in the click handler: a whole
-  // layout of WHOLE_FIT_MAX_CARDS cards takes about 100 ms on a desktop. The
-  // bound has room for a slow test runner, not for the seconds it once took.
-  it.each(['organize', 'hierarchical'] as const)('%s of 60 cards and 90 relationships finishes within a second', kind => {
+  // Organize runs in the click handler: a whole layout of WHOLE_FIT_MAX_CARDS
+  // cards takes about 100 ms on a desktop. The bound has room for a slow test
+  // runner, not for the seconds it once took.
+  it('Organize of 60 cards and 90 relationships finishes within a second', () => {
     const g = graph(generated(WHOLE_FIT_MAX_CARDS, 90));
     const options = { ...g, viewport: SCREENS.desktop, floor: SMALL_GRAPH_ZOOM_FLOOR };
-    const run = () => (kind === 'organize' ? organizeWithLabelRoom : hierarchyWithLabelRoom)(g.items, g.edges, options);
+    const run = () => organizeWithLabelRoom(g.items, g.edges, options);
     run();
     const start = performance.now();
     run();
     expect(performance.now() - start).toBeLessThan(1000);
   });
 
-  // The plain rows are pinned to their old output in layoutAlgorithms.test.
-  it.each([SMALL_GRAPH_ZOOM_FLOOR, ORGANIZED_ZOOM_FLOOR])('above WHOLE_FIT_MAX_CARDS (floor %s) the layouts are the plain ones', floor => {
+  it.each([SMALL_GRAPH_ZOOM_FLOOR, ORGANIZED_ZOOM_FLOOR])('above WHOLE_FIT_MAX_CARDS (floor %s) Organize is the plain organizer', floor => {
     const g = graph(generated(WHOLE_FIT_MAX_CARDS + 1, 90));
     const options = { ...g, viewport: SCREENS.desktop, floor };
     const dims = (item: (typeof g.items)[number]) => g.dimensionsAt(item, 1);
     expect(organizeWithLabelRoom(g.items, g.edges, options).positions).toEqual(organizeTopology(g.items, g.edges, dims, SCREENS.desktop).positions);
-    const hierarchy = hierarchyWithLabelRoom(g.items, g.edges, options);
-    expect(hierarchy.positions).toEqual(computeCompactLayout(g.items, g.edges, SCREENS.desktop, dims));
-    expect(hierarchy.labelZoom).toBe(1);
-  });
-});
-
-describe('hierarchyWithLabelRoom', () => {
-  it.each(cases)('%s on %s: every label reads at the zoom it is framed at and at 100%%', (_name, screen, shape) => {
-    const g = graph(shape);
-    const result = hierarchyWithLabelRoom(g.items, g.edges, { ...g, viewport: SCREENS[screen], floor: ORGANIZED_ZOOM_FLOOR });
-    expect(problems(g, result.positions, Math.max(LABEL_MIN_ZOOM, result.zoom))).toEqual(NONE);
-    expect(problems(g, result.positions, 1)).toEqual(NONE);
-    expect(cardsTouching(g, result.positions)).toEqual([]);
-  });
-
-  // The Launch checklist mixes dependency and other links around one hub; its
-  // rows put the hub below everything and run tall (hub placement is a
-  // follow-up), so it is left out of this bound.
-  it.each(cases.filter(([name]) => name !== 'Launch checklist'))('%s on %s: takes at most 1.5 times the area "Organize" takes', (_name, screen, shape) => {
-    const g = graph(shape);
-    const result = hierarchyWithLabelRoom(g.items, g.edges, { ...g, viewport: SCREENS[screen], floor: ORGANIZED_ZOOM_FLOOR });
-    const organized = organizeWithLabelRoom(g.items, g.edges, { ...g, viewport: SCREENS[screen] });
-    expect(area(g, result.positions) / area(g, organized.positions)).toBeLessThan(1.5);
-  });
-
-  it('keeps prerequisites above the work that depends on them', () => {
-    const g = graph(LABEL_SHAPES.find(shape => shape.name === 'Plan a launch')!);
-    const { positions } = hierarchyWithLabelRoom(g.items, g.edges, { ...g, viewport: SCREENS.desktop });
-    const dependencies = g.edges.filter(edge => edge.type === 'DEPENDS_ON');
-    expect(dependencies.length).toBeGreaterThan(0);
-    for (const edge of dependencies) expect(positions.get(edge.target)!.y).toBeLessThan(positions.get(edge.source)!.y);
   });
 });
 
@@ -400,7 +358,7 @@ describe('clearFreeCards', () => {
 // Item ids break ties in the organizer and in the label order, and real ids are
 // random, so the room for labels must not depend on them. These seeds gave
 // orders where a label stayed hidden: the component spread was taken at an
-// unchecked 1.1 slack, and the hierarchical rows were never checked as a whole.
+// unchecked 1.1 slack, and the finished layout was never checked as a whole.
 describe('label room whatever the item ids', () => {
   const renamed = (shape: LabelShape, seed: number): LabelShape => {
     let state = seed;
@@ -414,15 +372,13 @@ describe('label room whatever the item ids', () => {
   };
   const orders = LABEL_SHAPES.filter(shape => ['Launch checklist', 'Two connected hubs'].includes(shape.name))
     .flatMap(shape => [3, 10, 29, 36, 78].map(seed => [shape.name, seed, shape] as const));
-  it.each(orders)('%s with ids from seed %i: every label shows after Organize and in the hierarchical layout', (_name, seed, shape) => {
+  it.each(orders)('%s with ids from seed %i: every label shows after Organize', (_name, seed, shape) => {
     const g = graph(renamed(shape, seed));
     for (const screen of Object.keys(SCREENS) as Screen[]) {
       const phone = screen === 'iPhone';
       const options = { ...g, viewport: SCREENS[screen] };
       const organized = organizeWithLabelRoom(g.items, g.edges, { ...options, floor: phone ? ORGANIZED_ZOOM_FLOOR : SMALL_GRAPH_ZOOM_FLOOR });
       expect(problems(g, organized.positions, organized.zoom), `organized on ${screen}`).toEqual(NONE);
-      const rows = hierarchyWithLabelRoom(g.items, g.edges, { ...options, floor: phone ? PHONE_READABLE_SCALE : SMALL_GRAPH_ZOOM_FLOOR });
-      expect(problems(g, rows.positions, rows.zoom), `hierarchical on ${screen}`).toEqual(NONE);
     }
   });
 });

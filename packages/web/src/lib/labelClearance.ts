@@ -14,9 +14,8 @@
  * - `labelGap` is how long an edge's visible line must be for its label.
  * - `spreadForLabels` finds the smallest spread of a group of cards that lets
  *   all of their labels show: the fallback when reserving gaps is not enough.
- * - `organizeWithLabelRoom`, `hierarchyWithLabelRoom` and `clearFreeCards` run
- *   the organizer, the hierarchical rows and a settled force layout with that
- *   room, at the zoom the camera will show them.
+ * - `organizeWithLabelRoom` and `clearFreeCards` run the organizer and a
+ *   settled force layout with that room, at the zoom the camera will show them.
  */
 import type { Dims, ObstacleBox } from './edgeLabelLayout';
 import { borderReach, edgeBorderEndpoints } from './edgeGeometry';
@@ -36,7 +35,6 @@ import {
   type OrganizationEdge,
   type OrganizationNode,
 } from './topologyOrganization';
-import { computeCompactLayout, computeLabelRoomLayout } from './layoutAlgorithms';
 import { CARD_TITLES_HIDE_BELOW } from './cardTitleZoom';
 
 type Point = { x: number; y: number };
@@ -49,11 +47,10 @@ export const LABEL_MIN_ZOOM = CARD_TITLES_HIDE_BELOW;
 /** "Organize around connections" never frames a large graph below this zoom. */
 export const ORGANIZED_ZOOM_FLOOR = 0.65;
 /**
- * Up to this many cards, Organize and the hierarchical layout frame the whole
- * graph, down to SMALL_GRAPH_ZOOM_FLOOR (the smallest zoom where card titles
- * and labels still show), with room for each label at that zoom. Below it the
- * camera holds that zoom on the organized hub's neighbourhood or the top rows
- * of the hierarchy. Larger graphs keep
+ * Up to this many cards, Organize frames the whole graph, down to
+ * SMALL_GRAPH_ZOOM_FLOOR (the smallest zoom where card titles and labels still
+ * show), with room for each label at that zoom. Below it the camera holds that
+ * zoom on the organized hub's neighbourhood. Larger graphs keep
  * ORGANIZED_ZOOM_FLOOR and open on a neighbourhood or the overview.
  */
 export const WHOLE_FIT_MAX_CARDS = 60;
@@ -243,18 +240,15 @@ export function labelReport(
   return { hidden: labels.hidden, onCards, onLabels, outOfGap };
 }
 
-/** `point` moved `factor` times as far from `anchor` (only vertically for 'y'). */
-export function spreadPoint(point: Point, anchor: Point, factor: number, axes: 'xy' | 'y' = 'xy'): Point {
-  return {
-    x: axes === 'y' ? point.x : anchor.x + (point.x - anchor.x) * factor,
-    y: anchor.y + (point.y - anchor.y) * factor,
-  };
+/** `point` moved `factor` times as far from `anchor`. */
+export function spreadPoint(point: Point, anchor: Point, factor: number): Point {
+  return { x: anchor.x + (point.x - anchor.x) * factor, y: anchor.y + (point.y - anchor.y) * factor };
 }
 
 /** Work limit for the spread searches of one layout, in obstacle checks. */
 export const SPREAD_CHECKS = 4_000_000;
 /**
- * Work limit for one whole Organize or hierarchical layout of a small graph
+ * Work limit for one whole Organize layout of a small graph
  * (every zoom tried, every spread search and the turn check), in obstacle
  * checks: about 100 ms. It runs in the click handler.
  */
@@ -290,8 +284,6 @@ export function spreadForLabels(
     anchor?: Point;
     maxFactor?: number;
     work?: { remaining: number };
-    /** 'y' spreads rows apart and keeps each card's x. */
-    axes?: 'xy' | 'y';
     /** Only these cards move; the others stay where they are. */
     moves?: (id: string) => boolean;
   }
@@ -307,7 +299,7 @@ export function spreadForLabels(
     if (work.remaining <= 0) return null;
     const cards: LabelCard[] = [...points].map(([id, p]) => ({
       id,
-      ...(options.moves?.(id) === false ? p : spreadPoint(p, anchor, factor, options.axes)),
+      ...(options.moves?.(id) === false ? p : spreadPoint(p, anchor, factor)),
       ...sizes.get(id)!,
     }));
     const before = work.remaining;
@@ -544,54 +536,6 @@ function turnToScreen<T extends OrganizationNode>(
   const hiddenBefore = hidden(before);
   const hiddenAfter = hiddenBefore === null ? null : hidden(after);
   return hiddenBefore !== null && hiddenAfter !== null && hiddenAfter <= hiddenBefore ? turned : null;
-}
-
-/**
- * The hierarchical rows with room for every label: rows sit far enough apart
- * for the labels of the edges between them, cards in a row for edges inside
- * it, and when wires still cross labels the rows spread further apart.
- */
-export function hierarchyWithLabelRoom<
-  T extends OrganizationNode,
-  E extends OrganizationEdge & { id: string },
->(nodes: readonly T[], edges: readonly E[], options: LabelRoomOptions<T, E>) {
-  if (nodes.length > WHOLE_FIT_MAX_CARDS) {
-    const positions = computeCompactLayout(
-      nodes as unknown as (T & { id: string })[],
-      edges as never,
-      options.viewport,
-      node => options.dimensionsAt(node, 1)
-    );
-    return { positions, zoom: framedZoom(nodes, positions, options, Math.max(options.floor ?? 0, 0)), labelZoom: 1 };
-  }
-  const labelled = drawnEdges(edges, options);
-  const byEdge = new Map(labelled.map(edge => [edge.id, edge]));
-  const work = { remaining: LAYOUT_CHECKS };
-  return withFramedRoom(nodes, options as LabelRoomOptions<T, never>, labelZoom => {
-    const gapFor = (edge: E) => {
-      const drawn = byEdge.get(edge.id);
-      return drawn ? labelGap(drawn.label, labelZoom) : 0;
-    };
-    let positions = computeLabelRoomLayout(
-      nodes as unknown as (T & { id: string })[],
-      edges as never,
-      options.viewport,
-      node => options.dimensionsAt(node, 1),
-      { edgeGap: gapFor as never }
-    );
-    if (!labelled.length) return { positions };
-    const sizes = new Map(nodes.map(node => [node.id, options.dimensionsAt(node, labelZoom)]));
-    const ys = [...positions.values()].map(p => p.y);
-    const anchor = { x: options.viewport.width / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 };
-    // Rows apart first (keeps the columns); both ways only when that is not enough.
-    const rows = spreadForLabels(positions, sizes, labelled, { zoom: labelZoom, anchor, maxFactor: 3, axes: 'y', work });
-    positions = new Map([...positions].map(([id, p]) => [id, spreadPoint(p, anchor, rows, 'y')]));
-    if (rows >= 3) {
-      const both = spreadForLabels(positions, sizes, labelled, { zoom: labelZoom, anchor, maxFactor: 2, work });
-      positions = new Map([...positions].map(([id, p]) => [id, spreadPoint(p, anchor, both)]));
-    }
-    return { positions: checkedWhole(nodes, positions, labelled, options, labelZoom, work) };
-  });
 }
 
 /** Gap two cards keep when `clearFreeCards` moves one past the other. */
