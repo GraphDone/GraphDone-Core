@@ -7,16 +7,20 @@ import {
   GET_GRAPHS_BY_USER,
   CREATE_GRAPH,
   CREATE_STARTER_GRAPHS,
+  CREATE_STARTER_ITEMS,
+  CREATE_STARTER_EDGES,
+  STARTER_CONTENT,
+  STARTER_OWN_GRAPHS,
   UPDATE_GRAPH,
   DELETE_GRAPH,
   GET_CHILD_GRAPHS
 } from '../graphql/graph';
-import { GET_WORK_ITEMS, GET_EDGES, DELETE_WORK_ITEM, CREATE_WORK_ITEM, CREATE_EDGE } from '../lib/queries';
-import { buildStarterWorkspace, createStarterWorkspace, starterGraphCount, type StarterApi, type StarterJournal } from '../lib/starterWorkspace';
+import { GET_WORK_ITEMS, DELETE_WORK_ITEM, CREATE_WORK_ITEM, CREATE_EDGE } from '../lib/queries';
+import { awaitExampleIdle, buildStarterWorkspace, createStarterWorkspace, isExamplePending, starterGraphCount, type StarterApi, type StarterJournal } from '../lib/starterWorkspace';
 import { offlineEnabled, localGuest } from '../lib/offline/engine';
 import { OFFLINE_PROJECT_LIMIT } from '../lib/offline/model';
 import { withStorageLock } from '../lib/storageLock';
-import { exampleLimitMessage, graphTree, parseStarterMarker, projectDeleteBlock, seenGraphCount, starterHierarchy, starterStep, type StarterMarker } from '../lib/workspaceRules';
+import { exampleLimitMessage, graphTree, parseStarterMarker, projectDeleteBlock, seenGraphCount, starterHierarchy, starterMayOpen, starterStep, type StarterMarker } from '../lib/workspaceRules';
 
 const GraphContext = createContext<GraphContextType | undefined>(undefined);
 
@@ -26,6 +30,8 @@ const hierarchyHere = () => starterHierarchy({ offline: offlineEnabled, guest: l
 // A server write sent just before a reload can still land afterwards; a resume
 // waits up to this long after it was sent. Browser-local writes never land late.
 const STARTER_WRITE_LIMIT_MS = 30000;
+// The example waits for the user's own view to load before each write, for at most this long in all.
+const STARTER_YIELD_LIMIT_MS = 20000;
 const starterPendingKey = (userId: string) => `graphdone:starter-pending:${userId}`;
 const readStarterPending = (userId: string): StarterMarker | null => {
   const raw = localStorage.getItem(starterPendingKey(userId));
@@ -45,9 +51,6 @@ const starterJournal = (userId: string, marker: StarterMarker): StarterJournal =
     end: id => update(inflight => inflight.filter(write => write.id !== id))
   };
 };
-const STARTER_PROJECTS = new Set(buildStarterWorkspace({ hierarchy: true }).projects.map(project => project.name));
-const isEmptyStarterProject = (graph: Graph) =>
-  graph.type === 'PROJECT' && !graph.parentGraphId && STARTER_PROJECTS.has(graph.name);
 
 function parseGraph(g: any): Graph {
   return {
@@ -92,6 +95,7 @@ export function GraphProvider({ children }: GraphProviderProps) {
   currentUserIdRef.current = currentUser?.id;
   const currentGraphRef = useRef<Graph | null>(currentGraph);
   currentGraphRef.current = currentGraph;
+  const pickedGraphRef = useRef(false);
 
 
   // GraphQL operations - Load graphs for current user only
@@ -108,6 +112,32 @@ export function GraphProvider({ children }: GraphProviderProps) {
   const [deleteWorkItemMutation] = useMutation(DELETE_WORK_ITEM);
   const [createWorkItemMutation] = useMutation(CREATE_WORK_ITEM);
   const [createEdgeMutation] = useMutation(CREATE_EDGE);
+  const starterContent = async (graphId: string) => {
+    const { data } = await apolloClient.query({
+      query: STARTER_CONTENT,
+      variables: { items: { graph: { id: graphId } }, edges: { source: { graph: { id: graphId } } } },
+      fetchPolicy: 'no-cache'
+    });
+    return {
+      items: (data?.workItems || []).map((item: { id: string; title: string }) => ({ id: item.id, title: item.title })),
+      edges: (data?.edges || []).map((edge: { type: string; source?: { id: string }; target?: { id: string } }) => ({
+        sourceId: edge.source?.id || '',
+        targetId: edge.target?.id || '',
+        type: edge.type
+      }))
+    };
+  };
+
+  const viewLoading = () => [...apolloClient.getObservableQueries('active').values()].some(query => query.getCurrentResult().loading);
+  const yieldToView = () => {
+    let left = STARTER_YIELD_LIMIT_MS;
+    return async () => {
+      while (left > 0 && viewLoading()) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        left -= 100;
+      }
+    };
+  };
 
   const starterApi = (userId: string, teamId: string): StarterApi => ({
     createGraphs: async inputs => {
@@ -152,7 +182,9 @@ export function GraphProvider({ children }: GraphProviderProps) {
       return data?.createGraphs?.graphs || [];
     },
     createItems: async (graphId, items) => {
-      const { data } = await createWorkItemMutation({
+      const { data } = await apolloClient.mutate({
+        mutation: CREATE_STARTER_ITEMS,
+        fetchPolicy: 'no-cache',
         variables: {
           input: items.map(item => ({
             title: item.title,
@@ -176,7 +208,9 @@ export function GraphProvider({ children }: GraphProviderProps) {
       return (data?.createWorkItems?.workItems || []).map((workItem: { id: string }) => workItem.id);
     },
     createEdges: async edges => {
-      await createEdgeMutation({
+      await apolloClient.mutate({
+        mutation: CREATE_STARTER_EDGES,
+        fetchPolicy: 'no-cache',
         variables: {
           input: edges.map(edge => ({
             type: edge.type,
@@ -186,28 +220,19 @@ export function GraphProvider({ children }: GraphProviderProps) {
         }
       });
     },
-    setCounts: async (graphId, { nodeCount, edgeCount }) => {
+    setCounts: async (graphId, { nodeCount, edgeCount, tags }) => {
       await updateGraphMutation({
-        variables: { id: graphId, input: { nodeCount, edgeCount, lastActivity: new Date().toISOString() } }
+        variables: { id: graphId, input: { nodeCount, edgeCount, lastActivity: new Date().toISOString(), ...(tags && { tags }) } }
       });
     },
     ownGraphs: async () => {
-      const { data } = await refetchGraphs();
-      return data?.userGraphs || [];
+      const { data } = await apolloClient.query({ query: STARTER_OWN_GRAPHS, variables: { userId }, fetchPolicy: 'no-cache' });
+      return data?.graphs || [];
     },
-    content: async graphId => {
-      const [items, edges] = await Promise.all([
-        apolloClient.query({ query: GET_WORK_ITEMS, variables: { where: { graph: { id: graphId } } }, fetchPolicy: 'network-only' }),
-        apolloClient.query({ query: GET_EDGES, variables: { where: { source: { graph: { id: graphId } } } }, fetchPolicy: 'network-only' })
-      ]);
-      return {
-        items: (items.data?.workItems || []).map((item: { id: string; title: string }) => ({ id: item.id, title: item.title })),
-        edges: (edges.data?.edges || []).map((edge: { type: string; source?: { id: string }; target?: { id: string } }) => ({
-          sourceId: edge.source?.id || '',
-          targetId: edge.target?.id || '',
-          type: edge.type
-        }))
-      };
+    content: starterContent,
+    idle: yieldToView(),
+    filled: async graphId => {
+      if (currentGraphRef.current?.id === graphId) await apolloClient.refetchQueries({ include: ['GetWorkItems', 'GetEdges'] });
     }
   });
 
@@ -217,7 +242,7 @@ export function GraphProvider({ children }: GraphProviderProps) {
     const marker = interrupted ?? { hierarchy: hierarchyHere(), startedAt: Date.now(), inflight: [] };
     saveStarterMarker(userId, marker);
     const plan = buildStarterWorkspace({ hierarchy: marker.hierarchy });
-    await createStarterWorkspace(plan, {
+    const created = await createStarterWorkspace(plan, {
       ...api,
       deleteGraph: async graphId => {
         await deleteGraphMutation({ variables: { id: graphId } });
@@ -226,34 +251,42 @@ export function GraphProvider({ children }: GraphProviderProps) {
         const { data } = await refetchGraphs();
         const current = currentGraphRef.current;
         const found = (data?.userGraphs || []).find((g: { id: string }) => g.id === graphId);
-        if (found && (!resume || !current || isEmptyStarterProject(current))) {
+        const graphs = [...(data?.userGraphs || []), ...(data?.sharedGraphs || []), ...(data?.systemGraphs || [])];
+        if (found && starterMayOpen({ picked: pickedGraphRef.current, current, stored: localStorage.getItem('currentGraphId'), graphs })) {
           localStorage.setItem('currentGraphId', graphId);
           setCurrentGraph(parseGraph(found));
+        } else if (current?.id === graphId) {
+          await apolloClient.refetchQueries({ include: ['GetWorkItems', 'GetEdges'] });
         }
-        await apolloClient.refetchQueries({ include: ['GetWorkItems', 'GetEdges'] });
       }
     }, {
       resume,
       journal: starterJournal(userId, marker),
       inflight: marker.inflight,
-      writeLimitMs: offlineEnabled ? 0 : STARTER_WRITE_LIMIT_MS
+      writeLimitMs: offlineEnabled ? 0 : STARTER_WRITE_LIMIT_MS,
+      pending: !offlineEnabled
     });
     localStorage.removeItem(starterPendingKey(userId));
     console.log('✅ Starter workspace ready:', plan.projects.length, 'projects,', plan.graphs.length, 'graphs');
-    // Refetch every open item/connection list (List view, header counts)
-    // that already asked while a graph was still empty (#262).
     await refetchGraphs();
-    await apolloClient.refetchQueries({ include: ['GetWorkItems', 'GetEdges'] });
+    // An item/connection list for an example graph may have asked while it was still empty (#262).
+    if (Object.values(created.ids).includes(currentGraphRef.current?.id ?? '')) {
+      await apolloClient.refetchQueries({ include: ['GetWorkItems', 'GetEdges'] });
+    }
   };
 
   const startStarter = async (userId: string) => {
     const run = async () => {
       if (currentUserIdRef.current !== userId) return;
       const { data } = await refetchGraphs();
-      const pending = readStarterPending(userId);
-      const step = starterStep({ graphsSeen: seenGraphCount(data), pending: !!pending });
-      if (step === 'finish' && pending) await writeStarter(userId, pending);
+      const local = readStarterPending(userId);
+      const unfinished = !offlineEnabled && (data?.userGraphs || []).some(isExamplePending);
+      const step = starterStep({ graphsSeen: seenGraphCount(data), pending: !!local || unfinished });
       if (step === 'create') await writeStarter(userId, null);
+      if (step !== 'finish') return;
+      // Started in another browser, which may still be writing it: finish it only once nothing changes.
+      if (!local && !(await awaitExampleIdle(starterApi(userId, currentTeam?.id || 'team-1'), STARTER_WRITE_LIMIT_MS))) return;
+      await writeStarter(userId, local ?? { hierarchy: true, startedAt: Date.now(), inflight: [] });
     };
     if (navigator.locks) await navigator.locks.request(`graphdone-starter:${userId}`, run);
     else await withStorageLock(`starter:${userId}`, run, { store: localStorage });
@@ -369,8 +402,9 @@ export function GraphProvider({ children }: GraphProviderProps) {
         }
       }
 
-      // A reload interrupted the starter: finish it once per page load.
-      if (readStarterPending(currentUser.id) && !isCreatingWelcomeGraphRef.current) {
+      // A reload, or a browser closed mid-write, interrupted the starter: finish it once per page load.
+      const unfinished = !offlineEnabled && userGraphs.some(isExamplePending);
+      if ((readStarterPending(currentUser.id) || unfinished) && !isCreatingWelcomeGraphRef.current) {
         isCreatingWelcomeGraphRef.current = true;
         startStarter(currentUser.id).catch(error => {
           console.error('❌ Failed to finish the starter workspace:', error);
@@ -445,6 +479,7 @@ export function GraphProvider({ children }: GraphProviderProps) {
     try {
       const graph = availableGraphs.find(g => g.id === graphId);
       if (graph) {
+        pickedGraphRef.current = true;
         setCurrentGraph(graph);
         localStorage.setItem('currentGraphId', graphId);
       }
@@ -511,6 +546,7 @@ export function GraphProvider({ children }: GraphProviderProps) {
         
         // Manually refetch to ensure UI is in sync
         await refetchGraphs();
+        pickedGraphRef.current = true;
         setCurrentGraph(newGraph);
         localStorage.setItem('currentGraphId', newGraph.id);
         return newGraph;

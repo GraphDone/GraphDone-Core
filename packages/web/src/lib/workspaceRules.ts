@@ -136,6 +136,35 @@ export interface OwnGraph {
 }
 
 const STARTER = buildStarterWorkspace({ hierarchy: true });
+const STARTER_PROJECT_NAMES = new Set(STARTER.projects.map(project => project.name));
+
+interface OpenGraph {
+  id: string;
+  name: string;
+  type?: string | null;
+  parentGraphId?: string | null;
+}
+
+/** One of the example's projects: what a page shows on its own before Welcome exists. */
+export const isStarterProject = (graph: OpenGraph) =>
+  graph.type === 'PROJECT' && !graph.parentGraphId && STARTER_PROJECT_NAMES.has(graph.name);
+
+/**
+ * Whether the example may open its first graph. It never replaces a graph the
+ * user picked: one picked on this page, or one picked earlier (before a
+ * reload, or in another tab) that still exists. Nothing open, or one of the
+ * example's projects, counts as no choice.
+ */
+export function starterMayOpen({ picked, current, stored, graphs }: {
+  picked: boolean;
+  current: OpenGraph | null;
+  stored: string | null;
+  graphs: OpenGraph[];
+}): boolean {
+  if (picked) return false;
+  const choice = current ?? graphs.find(graph => graph.id === stored) ?? null;
+  return !choice || isStarterProject(choice);
+}
 
 /**
  * What is still missing from the user's starter workspace, by name. Once a

@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  EXAMPLE_PENDING_TAG,
   STARTER_POSITION_BOX,
+  awaitExampleIdle,
   buildStarterWorkspace,
+  isExamplePending,
   createStarterWorkspace,
   starterGraphCount,
   uniqueName,
@@ -169,6 +172,16 @@ function fakeBackend() {
   const id = (prefix: string) => `${prefix}-${++next}-${Math.random().toString(36).slice(2, 8)}`;
   const log: string[] = [];
   const graphs = new Map<string, StarterGraphInput & { createdAt: string }>();
+  const created: Array<{ name: string; tags: string[] }> = [];
+  const sizes: number[] = [];
+  let busy = 0;
+  let mostAtOnce = 0;
+  const write = async <R>(size: number, run: () => Promise<R>): Promise<R> => {
+    sizes.push(size);
+    mostAtOnce = Math.max(mostAtOnce, ++busy);
+    await Promise.resolve();
+    try { return await run(); } finally { busy--; }
+  };
   const items = new Map<string, { graphId: string; title: string }>();
   const edges: StarterLink[] = [];
   const counts = new Map<string, { nodeCount: number; edgeCount: number }>();
@@ -182,6 +195,7 @@ function fakeBackend() {
       log.push(`graphs ${inputs.map(input => input.name).join(', ')}`);
       return [...inputs].reverse().map(input => {
         const graphId = id('graph');
+        created.push({ name: input.name, tags: [...input.tags] });
         graphs.set(graphId, { ...input, createdAt: String(next).padStart(6, '0') });
         return { id: graphId, name: input.name };
       });
@@ -194,9 +208,10 @@ function fakeBackend() {
       log.push(`edges ${name(items.get(list[0].sourceId)!.graphId)}`);
       edges.push(...list);
     },
-    async setCounts(graphId: string, value: { nodeCount: number; edgeCount: number }) {
+    async setCounts(graphId: string, { tags, ...value }: { nodeCount: number; edgeCount: number; tags?: string[] }) {
       log.push(`counts ${name(graphId)}`);
       counts.set(graphId, value);
+      if (tags) graphs.get(graphId)!.tags = tags;
     },
   };
   // A write held back by the network lands at the backend's next call once it is due.
@@ -208,17 +223,20 @@ function fakeBackend() {
     }
   };
   const api: StarterApi = {
-    async createGraphs(inputs) { await land(); return raw.createGraphs(inputs); },
-    async createItems(graphId, list) { await land(); return raw.createItems(graphId, list); },
-    async createEdges(list) { await land(); return raw.createEdges(list); },
-    async setCounts(graphId, value) { await land(); return raw.setCounts(graphId, value); },
+    async createGraphs(inputs) { await land(); return write(inputs.length, () => raw.createGraphs(inputs)); },
+    async createItems(graphId, list) { await land(); return write(list.length, () => raw.createItems(graphId, list)); },
+    async createEdges(list) { await land(); return write(list.length, () => raw.createEdges(list)); },
+    async setCounts(graphId, value) { await land(); return write(1, () => raw.setCounts(graphId, value)); },
     async opened(graphId) {
       log.push(`opened ${name(graphId)}`);
       opened.push(graphId);
     },
+    async filled(graphId) {
+      log.push(`filled ${name(graphId)}`);
+    },
     async ownGraphs() {
       await land();
-      return [...graphs].map(([graphId, input]) => ({ id: graphId, name: input.name, type: input.type, parentGraphId: input.parentGraphId, createdAt: input.createdAt }));
+      return [...graphs].map(([graphId, input]) => ({ id: graphId, name: input.name, type: input.type, parentGraphId: input.parentGraphId, createdAt: input.createdAt, tags: [...input.tags] }));
     },
     async content(graphId) {
       await land();
@@ -234,7 +252,7 @@ function fakeBackend() {
       graphs.delete(graphId);
     },
   };
-  return { api, raw, log, graphs, items, edges, counts, opened, deleted, landings, clock };
+  return { api, raw, log, graphs, items, edges, counts, opened, deleted, landings, clock, created, sizes, mostAtOnce: () => mostAtOnce };
 }
 
 function journalOf() {
@@ -259,6 +277,10 @@ function reloadAfter(backend: Backend, stopAfter: number, due: () => boolean): S
 
 const itemTotal = (plan: ReturnType<typeof full>) => plan.graphs.reduce((sum, graph) => sum + graph.items.length, 0);
 const edgeTotal = (plan: ReturnType<typeof full>) => plan.graphs.reduce((sum, graph) => sum + graph.edges.length, 0);
+/** Every write a whole run sends: each graph, item and connection, each graph's counts, and in pending mode each project's tags. */
+const writeTotal = (plan: ReturnType<typeof full>, pending = false) =>
+  starterGraphCount(plan) + itemTotal(plan) + edgeTotal(plan) + plan.graphs.length + (pending ? plan.projects.length : 0);
+const titlesIn = (backend: Backend, graphId: string) => [...backend.items.values()].filter(entry => entry.graphId === graphId).map(entry => entry.title);
 
 describe('creating the starter workspace', () => {
   it('creates projects, then their graphs with parent, depth and path, then items and connections', async () => {
@@ -266,11 +288,13 @@ describe('creating the starter workspace', () => {
     const plan = full();
     const created = await createStarterWorkspace(plan, backend.api);
 
-    expect(backend.log.slice(0, 6)).toEqual([
-      'graphs Getting started, Home',
-      'graphs Welcome, Plan a launch, Fix bugs, Ideas, Move house',
-      'items Welcome', 'edges Welcome', 'counts Welcome', 'opened Welcome',
+    const welcome = plan.graphs.find(graph => graph.key === 'welcome')!;
+    const filled = backend.log.indexOf('filled Welcome');
+    expect(backend.log.slice(0, filled + 1), 'Welcome and its project come first and open at once, then Welcome is filled').toEqual([
+      'graphs Getting started', 'graphs Welcome', 'opened Welcome',
+      ...welcome.items.map(() => 'items Welcome'), ...welcome.edges.map(() => 'edges Welcome'), 'counts Welcome', 'filled Welcome',
     ]);
+    expect(backend.log.slice(filled + 1, filled + 6)).toEqual(['graphs Home', 'graphs Plan a launch', 'graphs Fix bugs', 'graphs Ideas', 'graphs Move house']);
     expect(backend.opened).toEqual([created.ids.welcome]);
 
     for (const project of plan.projects) {
@@ -301,15 +325,43 @@ describe('creating the starter workspace', () => {
     expect(backend.opened).toEqual([created.ids.welcome]);
   });
 
-  it('stops when the backend creates fewer items than asked', async () => {
+  it('stops when the backend does not create an item', async () => {
     const backend = fakeBackend();
-    backend.api.createItems = async () => ['only-one'];
-    await expect(createStarterWorkspace(full(), backend.api)).rejects.toThrow(/Only 1 of 4 example items/);
+    backend.api.createItems = async () => [];
+    await expect(createStarterWorkspace(full(), backend.api)).rejects.toThrow(/example item "Welcome to GraphDone" was not created in "Welcome"/);
+  });
+
+  it('waits for the user\'s view before each write, and writes nothing while it is loading', async () => {
+    const plan = full();
+    const backend = fakeBackend();
+    const seen: number[] = [];
+    await createStarterWorkspace(plan, { ...backend.api, idle: async () => { seen.push(backend.sizes.length); } });
+    expect(seen, 'one wait right before every write').toEqual(Array.from({ length: writeTotal(plan) }, (_, i) => i));
+
+    const held = fakeBackend();
+    let release!: () => void;
+    const loading = new Promise<void>(resolve => { release = resolve; });
+    let waits = 0;
+    const run = createStarterWorkspace(plan, { ...held.api, idle: async () => { if (++waits === 5) await loading; } });
+    for (let i = 0; i < 50; i++) await Promise.resolve();
+    expect(held.sizes, 'nothing is written while the view loads').toHaveLength(4);
+    release();
+    await run;
+    expect(held.sizes).toHaveLength(writeTotal(plan));
+  });
+
+  it('sends one write at a time, each with one graph, item or connection, so every write has the same small shape', async () => {
+    const backend = fakeBackend();
+    const plan = full();
+    await createStarterWorkspace(plan, backend.api);
+    expect(backend.mostAtOnce()).toBe(1);
+    expect(new Set(backend.sizes)).toEqual(new Set([1]));
+    expect(backend.sizes).toHaveLength(writeTotal(plan));
   });
 
   it('finishes an interrupted run on resume without creating anything twice', async () => {
     const plan = full();
-    for (let stopAfter = 0; stopAfter <= 16; stopAfter++) {
+    for (let stopAfter = 0; stopAfter <= writeTotal(plan); stopAfter++) {
       const backend = fakeBackend();
       const real = { ...backend.api };
       let calls = 0;
@@ -335,7 +387,7 @@ describe('creating the starter workspace', () => {
 
   it('waits for a write that lands after the resume first looks, so nothing is written twice', async () => {
     const plan = full();
-    for (let stopAfter = 0; stopAfter <= 16; stopAfter++) {
+    for (let stopAfter = 0; stopAfter <= writeTotal(plan); stopAfter++) {
       const backend = fakeBackend();
       const { open, journal } = journalOf();
       const landsAt = 20_000;
@@ -362,12 +414,12 @@ describe('creating the starter workspace', () => {
     const plan = full();
     const backend = fakeBackend();
     const { open, journal } = journalOf();
-    const resumeWroteProjects = () => backend.log.includes('graphs Getting started, Home');
+    const resumeWroteProjects = () => backend.log.includes('graphs Getting started');
     await createStarterWorkspace(plan, reloadAfter(backend, 0, resumeWroteProjects), { journal, clock: backend.clock }).catch(() => undefined);
     const created = await createStarterWorkspace(plan, backend.api, { resume: true, inflight: [...open.values()], writeLimitMs: 30_000, clock: backend.clock });
 
     expect(backend.clock.now(), 'waited out the time limit first').toBeGreaterThanOrEqual(30_000);
-    expect(backend.deleted, 'the two late, empty projects').toHaveLength(2);
+    expect(backend.deleted, 'the late, empty project').toHaveLength(1);
     expect(backend.graphs.size).toBe(7);
     for (const project of plan.projects) expect(backend.graphs.has(created.ids[project.key])).toBe(true);
     for (const graph of plan.graphs) expect(backend.graphs.get(created.ids[graph.key])!.parentGraphId).toBe(created.ids[graph.project!]);
@@ -384,6 +436,113 @@ describe('creating the starter workspace', () => {
     expect(backend.clock.now()).toBe(0);
     expect(backend.graphs.size).toBe(7);
     expect(backend.items.size).toBe(itemTotal(plan));
+  });
+});
+
+describe('keeping the unfinished example on the backend', () => {
+  const pendingTags = (backend: Backend) => [...backend.graphs.values()].filter(graph => graph.tags.includes(EXAMPLE_PENDING_TAG)).map(graph => graph.name);
+
+  it('creates every part with the pending tag and drops it once that part is finished', async () => {
+    const backend = fakeBackend();
+    const plan = full();
+    await createStarterWorkspace(plan, backend.api, { pending: true });
+    expect(backend.created.map(graph => graph.name).sort()).toEqual([...plan.projects, ...plan.graphs].map(graph => graph.name).sort());
+    for (const graph of backend.created) expect(graph.tags, graph.name).toContain(EXAMPLE_PENDING_TAG);
+    expect(pendingTags(backend)).toEqual([]);
+    for (const graph of [...plan.projects, ...plan.graphs]) {
+      expect([...backend.graphs.values()].find(g => g.name === graph.name)!.tags).toEqual(graph.tags);
+    }
+    // A graph loses the tag in the write that sets its counts, after its items and connections.
+    const welcome = backend.log.indexOf('counts Welcome');
+    expect(backend.log.lastIndexOf('items Welcome')).toBeLessThan(welcome);
+    expect(backend.log.lastIndexOf('edges Welcome')).toBeLessThan(welcome);
+    expect(backend.log.indexOf('counts Getting started'), 'a project loses it once its graphs exist').toBeGreaterThan(backend.log.indexOf('graphs Move house'));
+  });
+
+  it('a fresh session finishes what a closed one left, with nothing written twice', async () => {
+    const plan = full();
+    for (const landsLate of [true, false]) {
+      for (let stopAfter = 0; stopAfter < writeTotal(plan, true); stopAfter++) {
+        const backend = fakeBackend();
+        // The closed browser's last write lands 5 s later, or never.
+        await createStarterWorkspace(plan, reloadAfter(backend, stopAfter, () => landsLate && backend.clock.now() >= 5_000), { pending: true, clock: backend.clock }).catch(() => undefined);
+        const at = `stopping at write ${stopAfter}${landsLate ? ', last write landing late' : ''}`;
+        // Each later sign-in has no journal of the closed browser: with no graphs it starts the example, and with
+        // an unfinished one it waits until nothing changes, then finishes it, as GraphContext does.
+        for (let signIn = 0; signIn < 3; signIn++) {
+          const own = await backend.api.ownGraphs!();
+          if (!own.length) await createStarterWorkspace(plan, backend.api, { pending: true, clock: backend.clock });
+          else if (own.some(isExamplePending) && await awaitExampleIdle(backend.api, 30_000, backend.clock)) {
+            await createStarterWorkspace(plan, backend.api, { resume: true, pending: true, clock: backend.clock });
+          }
+          await backend.clock.sleep(60_000);
+        }
+        if (landsLate) expect(backend.landings, `the held write has landed (${at})`).toHaveLength(0);
+        expect(pendingTags(backend), `nothing left pending (${at})`).toEqual([]);
+        expect([...backend.graphs.values()].map(graph => graph.name).sort(), `each graph once (${at})`).toEqual([...plan.projects, ...plan.graphs].map(graph => graph.name).sort());
+        for (const graph of plan.graphs) {
+          const graphId = [...backend.graphs].find(([, g]) => g.name === graph.name)![0];
+          expect(titlesIn(backend, graphId).sort(), `${graph.name} items once each (${at})`).toEqual(graph.items.map(entry => entry.title).sort());
+          expect(backend.counts.get(graphId), `${graph.name} counts (${at})`).toEqual({ nodeCount: graph.items.length, edgeCount: graph.edges.length });
+        }
+        expect(backend.edges, `connections once each (${at})`).toHaveLength(edgeTotal(plan));
+      }
+    }
+  });
+
+  it('adds nothing to a finished part, so what the user deleted from it stays deleted', async () => {
+    const backend = fakeBackend();
+    const plan = full();
+    const created = await createStarterWorkspace(plan, backend.api, { pending: true });
+    const dropItem = (itemId: string) => {
+      backend.items.delete(itemId);
+      for (let i = backend.edges.length - 1; i >= 0; i--) if ([backend.edges[i].sourceId, backend.edges[i].targetId].includes(itemId)) backend.edges.splice(i, 1);
+    };
+    dropItem([...backend.items].find(([, entry]) => entry.graphId === created.ids.welcome)![0]);
+    for (const [itemId, entry] of [...backend.items]) if (entry.graphId === created.ids.ideas) dropItem(itemId);
+    backend.graphs.delete(created.ids.ideas);
+    // Fix bugs is still unfinished: its items and connections were never written.
+    for (const [itemId, entry] of [...backend.items]) if (entry.graphId === created.ids['fix-bugs']) dropItem(itemId);
+    backend.graphs.get(created.ids['fix-bugs'])!.tags = ['example', EXAMPLE_PENDING_TAG];
+    const edgesBefore = backend.edges.length;
+
+    await createStarterWorkspace(plan, backend.api, { resume: true, pending: true });
+
+    expect(titlesIn(backend, created.ids.welcome)).toHaveLength(graphNamed('Welcome').items.length - 1);
+    expect([...backend.graphs.values()].some(graph => graph.name === 'Ideas'), 'a deleted graph is not brought back').toBe(false);
+    expect(titlesIn(backend, created.ids['fix-bugs']).sort()).toEqual(graphNamed('Fix bugs').items.map(entry => entry.title).sort());
+    expect(backend.edges.length - edgesBefore, 'only Fix bugs gets its connections').toBe(graphNamed('Fix bugs').edges.length);
+    expect(pendingTags(backend)).toEqual([]);
+  });
+
+  it('waits while another session is still writing, and steps back if it finishes', async () => {
+    const backend = fakeBackend();
+    const plan = full();
+    await createStarterWorkspace(plan, reloadAfter(backend, 9, () => false), { pending: true, clock: backend.clock }).catch(() => undefined);
+    const welcomeId = [...backend.graphs].find(([, graph]) => graph.name === 'Welcome')![0];
+    // The other session adds an item every 10 s for a minute.
+    let added = 0;
+    const api: StarterApi = {
+      ...backend.api,
+      async ownGraphs() {
+        while (added < 6 && backend.clock.now() >= (added + 1) * 10_000) await backend.raw.createItems(welcomeId, [{ ...graphNamed('Welcome').items[0], title: `Other ${added++}` }]);
+        return backend.api.ownGraphs!();
+      },
+    };
+    expect(await awaitExampleIdle(api, 30_000, backend.clock)).toBe(true);
+    expect(backend.clock.now(), 'idle only 30 s after the last change').toBeGreaterThanOrEqual(90_000);
+
+    const finished = fakeBackend();
+    await createStarterWorkspace(plan, reloadAfter(finished, 9, () => false), { pending: true, clock: finished.clock }).catch(() => undefined);
+    const other: StarterApi = {
+      ...finished.api,
+      async ownGraphs() {
+        if (finished.clock.now() >= 10_000) for (const graph of finished.graphs.values()) graph.tags = graph.tags.filter(tag => tag !== EXAMPLE_PENDING_TAG);
+        return finished.api.ownGraphs!();
+      },
+    };
+    expect(await awaitExampleIdle(other, 30_000, finished.clock), 'the other session finished it').toBe(false);
+    expect(finished.clock.now()).toBeLessThan(30_000);
   });
 });
 
