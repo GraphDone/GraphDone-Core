@@ -121,9 +121,11 @@ export async function closeEditor(page: Page, step: string) {
   await expect(editor, `${step}: closing must close the editor`).toHaveCount(0);
 }
 
-/** The camera's zoom, from the graph group's transform. */
+/** The camera's zoom: d3 keeps it on the svg; the graph group's transform says the same once it has moved. */
 const zoomOf = (page: Page) => page.evaluate(() => {
-  const m = /scale\(\s*([\d.e-]+)/.exec(document.querySelector('.graph-container svg g.main-graph-group')?.getAttribute('transform') || '');
+  const svg = document.querySelector('.graph-container svg') as (SVGSVGElement & { __zoom?: { k: number } }) | null;
+  if (svg?.__zoom) return svg.__zoom.k;
+  const m = /scale\(\s*([\d.e-]+)/.exec(svg?.querySelector('g.main-graph-group')?.getAttribute('transform') || '');
   return m ? Number(m[1]) : 1;
 });
 
@@ -194,9 +196,9 @@ export async function showPair(page: Page, aId: string, bId: string, type: strin
         await page.mouse.move(to.x, to.y, { steps: 10 });
         await page.mouse.up();
       }
-    } else if (k < 0.75 && at.nearTip) {
+    } else if ((k < 0.75 || attempt < 2) && at.nearTip) {
       // Zoom in around the arrow, so it stays on screen.
-      const factor = Math.min(3, 0.9 / k);
+      const factor = Math.min(3, Math.max(1.3, 0.9 / k));
       if (touch) {
         const cdp = await page.context().newCDPSession(page);
         await cdp.send('Input.synthesizePinchGesture', { x: at.nearTip.x, y: at.nearTip.y, scaleFactor: factor, gestureSourceType: 'touch' });

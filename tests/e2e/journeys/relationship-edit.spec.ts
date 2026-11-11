@@ -88,8 +88,11 @@ async function settle<T>(page: Page, read: () => Promise<T>, wanted: unknown, ti
 
 /** With the editor closed: a person sees the wire in the type's colour and the arrow at the target (zooming in first if needed). */
 async function expectSeen(page: Page, t: Trial, want: Want, step: string, timeout = 10000) {
-  await showPair(page, t.a.id, t.b.id, want.type);
-  const seen = await settle(page, () => drawnRelationship(page, t.a.id, t.b.id, want.type, { seen: true }), seenAs(want), timeout);
+  // Bring the arrow into view on every reading: a refetch can redraw it elsewhere.
+  const seen = await settle(page, async () => {
+    await showPair(page, t.a.id, t.b.id, want.type);
+    return drawnRelationship(page, t.a.id, t.b.id, want.type, { seen: true });
+  }, seenAs(want), timeout);
   expect(seen, `${step}: a person must see one ${typeInfo(want.type).label} wire ${want.source.title} → ${want.target.title} in ${typeInfo(want.type).color}, with its label, icon and arrow`).toEqual(seenAs(want));
 }
 
@@ -121,8 +124,8 @@ async function expectStep(page: Page, t: Trial, want: Want, step: string): Promi
   let closed: unknown = 'not checked: the editor was not open to close';
   if (open.editor.editWindows === 1) {
     await closeEditor(page, step);
-    await showPair(page, t.a.id, t.b.id, want.type);
     closed = await settle(page, async () => {
+      await showPair(page, t.a.id, t.b.id, want.type);
       const { editWindows } = await editorShows(page);
       return { editWindows, canvas: await drawnRelationship(page, t.a.id, t.b.id, want.type, { seen: true }) };
     }, wantClosed, 10000);
