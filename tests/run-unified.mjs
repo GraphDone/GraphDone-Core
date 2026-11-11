@@ -41,7 +41,7 @@ async function runOne(id) {
   const def = SEQUENCES[id];
   process.stdout.write(`\n▶ ${id} — ${def.title}\n`);
   if (def.adapter === 'vitest') return runVitestSequence({ id, title: def.title, cwd: def.cwd, blocking: def.blocking !== false });
-  if (def.adapter === 'playwright') return runPlaywrightSequence({ id, title: def.title, args: def.args, target, blocking: def.blocking !== false });
+  if (def.adapter === 'playwright') return runPlaywrightSequence({ id, title: def.title, args: def.args, target, timeoutMs: def.timeoutMs, blocking: def.blocking !== false });
   if (def.adapter === 'cloud-audit') {
     const cloudDir = def.cloudRepoDir || resolve(process.cwd(), '..', 'GraphDone-Cloud');
     const findingsPath = options.cloudFindings || findLatestCloudFindings(cloudDir);

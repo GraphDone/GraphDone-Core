@@ -175,7 +175,8 @@ jobs:
               nested-lod ci-nested-lod xvfb
               router-navigation ci-router-navigation xvfb
               mobile ci-mobile
-          - name: wires, agents, inspector, effects, perf
+          - name: wires, agents, inspector, effects, perf, guest relationship edit
+            guest: true
             sequences: |
               smoke ci-smoke
               item-wires ci-item-wires xvfb
@@ -183,13 +184,14 @@ jobs:
               inspector-readability ci-inspector-readability xvfb
               living-graph-effects - -
               perf-budgets ci-perf
-          - name: toolchain, schematic, LOD, layout
+          - name: toolchain, schematic, LOD, layout, relationship edit
             toolchain: true
             sequences: |
               smoke ci-smoke
               semantic-lod ci-semantic-lod xvfb
               layout-recovery ci-layout-recovery xvfb
               example-resume ci-example-resume
+              relationship-edit ci-relationship-edit
     services:
       neo4j:
         image: neo4j:5.26.12
@@ -260,6 +262,22 @@ jobs:
             exit 1
           fi
           echo "All sequences in this shard passed."
+      # graphdone.com's guests keep their work in the browser: the same journey,
+      # once per path and device, on the hosted build with its API on a port
+      # where nothing listens, so every read and write goes to the browser workspace.
+      # It is served as a static host serves it, without vite.config.ts (whose dev
+      # proxy `vite preview` would reuse, reaching the dev stack's API).
+      - name: Relationship edit as a hosted guest
+        if: matrix.guest && !cancelled()
+        env:
+          CI: true
+          JOURNEY_BACKEND: hosted-guest
+          TEST_URL: http://127.0.0.1:4190
+        run: |
+          (cd packages/web && VITE_OFFLINE_SYNC=true VITE_HOSTED_USAGE=true VITE_API_URL=http://127.0.0.1:4199 VITE_GRAPHQL_URL=http://127.0.0.1:4199/api/graphql npx vite build --outDir /tmp/graphdone-guest)
+          node -e "import('vite').then(v => v.preview({ configFile: false, root: 'packages/web', build: { outDir: '/tmp/graphdone-guest' }, preview: { host: '127.0.0.1', port: 4190, strictPort: true } }))" > /tmp/guest-preview.log 2>&1 &
+          timeout 60 bash -c 'until curl -sf http://127.0.0.1:4190 >/dev/null; do sleep 1; done'
+          node tests/run-unified.mjs --sequence relationship-edit --out test-artifacts/ci-relationship-edit-guest
       - name: Dump dev log on failure
         if: failure()
         run: tail -100 /tmp/dev.log || true

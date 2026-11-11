@@ -93,6 +93,26 @@ export const GET_EDGES = gql`
   }
 `;
 
+// The saved relationship a flip copies: read fresh, so the reversed one keeps
+// its current type, weight and metadata. Not named GetEdges, so refreshing the
+// edge lists by name never re-runs it.
+export const GET_RELATIONSHIP = gql`
+  query GetRelationship($where: EdgeWhere) {
+    edges(where: $where) {
+      id
+      type
+      weight
+      metadata
+      source {
+        id
+      }
+      target {
+        id
+      }
+    }
+  }
+`;
+
 export const GET_WORK_ITEM_BY_ID = gql`
   query GetWorkItemById($id: ID!) {
     workItem(id: $id) {
@@ -414,6 +434,7 @@ export const DELETE_EDGE = gql`
   mutation DeleteEdges($where: EdgeWhere!) {
     deleteEdges(where: $where) {
       nodesDeleted
+      relationshipsDeleted
     }
   }
 `;

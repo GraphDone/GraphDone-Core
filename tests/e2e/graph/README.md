@@ -29,7 +29,7 @@ flowchart LR
 | `new-user` | `guest-dialog-layout`, `responsive-real-workflows`, `overview-board-actions`, `recorded-ai-work`, `admin-dialog-responsive`, `quick-edit-write-order` | Dialogs fit small screens; API progress shows up in the workspace; the last quick edit wins. |
 | `mobile` (by tag) | `fit-focus.spec.ts` | Zoom to fit settles and focus returns to quick edit (`@mobile`). |
 | CI step only | `living-graph-effects.spec.ts` | Breathing, glow, energy flow, hover highlight and reduced motion actually render. |
-| default project only | `node-quick-edit.spec.ts`, `node-inspector-copyid.spec.ts`, `relationship-flip.spec.ts`, `local-cloud-progress.spec.ts` | Quick editor fields and notes, copy-id chip, edge flip. The last one skips unless `GRAPHDONE_LOCAL_CLOUD=1`. |
+| default project only | `node-quick-edit.spec.ts`, `node-inspector-copyid.spec.ts`, `local-cloud-progress.spec.ts` | Quick editor fields and notes, copy-id chip. The last one skips unless `GRAPHDONE_LOCAL_CLOUD=1`. Editing a relationship (type, flip, delete) is the [relationship-edit journey](../journeys/README.md). |
 
 ## How to run
 

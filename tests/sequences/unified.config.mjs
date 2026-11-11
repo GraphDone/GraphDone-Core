@@ -9,6 +9,7 @@
  *   report — only the capture-heavy report sequences (video / galleries / metrics)
  */
 const PW = 'GraphDone-Core/dev-neo4j/chromium';
+const JOURNEY_REPEAT = Number(process.env.JOURNEY_REPEAT || 10);
 
 export const SEQUENCES = {
   // Blocking signal
@@ -78,14 +79,28 @@ export const SEQUENCES = {
   // recording .webm video + a labelled screenshot per step. Drives the real
   // production SPA — run with TEST_URL=https://graphdone-cloud.pages.dev.
   'live-journey': { adapter: 'playwright', title: 'Live site user journey (desktop + mobile)', args: ['--project=live-journey'], blocking: false },
-  // BASIC JOURNEYS: every way to do each basic thing (link so far), on desktop,
-  // tablet and phone, repeated so the report shows a success rate and its 95%
-  // lower bound per path. JOURNEY_BACKEND=hosted-guest with TEST_URL=<hosted
-  // site> runs the same journeys as a guest on the hosted build.
+  // BASIC JOURNEYS: every way to do each basic thing (link, relationship edit),
+  // on desktop, tablet and phone, repeated so the report shows a success rate
+  // and its 95% lower bound per path. JOURNEY_BACKEND=hosted-guest with
+  // TEST_URL=<hosted site> runs the same journeys as a guest on the hosted
+  // build; JOURNEY_GREP=<title pattern> measures only matching paths. The
+  // time limit grows with the repeats (JOURNEY_TIMEOUT_MINUTES overrides it):
+  // a fixed 15 minutes stopped a 20-repeat run before Playwright wrote any result.
   'journeys': { adapter: 'playwright', title: 'Basic journeys — success rate per path and device', args: [
     '--project=journeys', '--project=journeys-ipad', '--project=journeys-iphone',
-    `--repeat-each=${process.env.JOURNEY_REPEAT || 10}`, '--workers=4', '--retries=0',
-  ], blocking: false },
+    `--repeat-each=${JOURNEY_REPEAT}`, '--workers=4', '--retries=0',
+    ...(process.env.JOURNEY_GREP ? [`--grep=${process.env.JOURNEY_GREP}`] : []),
+  ], timeoutMs: Number(process.env.JOURNEY_TIMEOUT_MINUTES || JOURNEY_REPEAT * 6) * 60_000, blocking: false },
+  // RELATIONSHIP EDIT (#262): change a relationship's type through every type,
+  // flip it, reload, delete it, and see a second tab catch up, once per path on
+  // desktop, iPad and iPhone. The repeated measurement is the journeys sequence.
+  // A guest's workspace lives in one browser, so with JOURNEY_BACKEND=hosted-guest
+  // the second-tab path is left out rather than skipped (a blocking run allows no skips).
+  'relationship-edit': { adapter: 'playwright', title: 'Relationship edit — type, flip, reload, delete on every device', args: [
+    'tests/e2e/journeys/relationship-edit.spec.ts', '--project=journeys', '--project=journeys-ipad', '--project=journeys-iphone',
+    '--workers=2', '--retries=0', '--trace=retain-on-failure',
+    ...(process.env.JOURNEY_BACKEND === 'hosted-guest' ? ['--grep-invert=relationship-edit second-tab'] : []),
+  ], blocking: true },
   // ZOOM OUT (#277): from the Welcome graph to the projects, every step must show
   // readable text and the levels go items → graph → neighbouring graphs →
   // projects, on desktop, iPad and iPhone. Needs the example project new
@@ -101,8 +116,8 @@ export const SEQUENCES = {
 
 export const PROFILES = {
   smoke: ['unit-web', 'smoke', 'e2e-auth'],
-  pr: ['unit-web', 'smoke', 'e2e-auth', 'e2e-graph', 'agent-connection', 'inspector-readability', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'devices', 'perf-budgets', 'zoom-out'],
-  full: ['unit-web', 'smoke', 'e2e-auth', 'e2e-graph', 'agent-connection', 'inspector-readability', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'devices', 'perf-budgets', 'zoom-out', 'diagnostics', 'showcase', 'matrix', 'vlm', 'perf-scale', 'cloud-audit'],
+  pr: ['unit-web', 'smoke', 'e2e-auth', 'e2e-graph', 'agent-connection', 'inspector-readability', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'devices', 'perf-budgets', 'relationship-edit', 'zoom-out'],
+  full: ['unit-web', 'smoke', 'e2e-auth', 'e2e-graph', 'agent-connection', 'inspector-readability', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'devices', 'perf-budgets', 'relationship-edit', 'zoom-out', 'diagnostics', 'showcase', 'matrix', 'vlm', 'perf-scale', 'cloud-audit'],
   report: ['diagnostics', 'showcase', 'matrix', 'vlm', 'perf-scale', 'cloud-audit'],
   live: ['live-journey'],
   journeys: ['journeys'],
