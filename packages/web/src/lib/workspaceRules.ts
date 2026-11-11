@@ -42,10 +42,23 @@ export function starterStep({ graphsSeen, pending }: { graphsSeen: number; pendi
   return graphsSeen === 0 ? 'create' : 'none';
 }
 
-/** The browser-local workspace holds `limit` graphs; null when the example fits. */
-export function exampleLimitMessage({ offline, existing, adds, limit }: { offline: boolean; existing: number; adds: number; limit: number }): string | null {
+/**
+ * The hosted build holds `limit` graphs per browser workspace or account;
+ * null when the example fits. Without a hierarchy the example is one Welcome graph.
+ */
+export function exampleLimitMessage({ offline, hierarchy, existing, adds, limit }: { offline: boolean; hierarchy: boolean; existing: number; adds: number; limit: number }): string | null {
   if (!offline || existing + adds <= limit) return null;
-  return `This browser workspace holds up to ${limit} projects and graphs, and the example project adds ${adds}. Delete ${existing + adds - limit} first.`;
+  const over = existing + adds - limit;
+  return hierarchy
+    ? `This browser workspace holds up to ${limit} projects and graphs, and the example project adds ${adds}. Delete ${over} first.`
+    : `This account holds up to ${limit} graphs. Delete ${over} to add a Welcome graph.`;
+}
+
+/** How the selector names the action: the example project, or one Welcome graph without a hierarchy. */
+export function exampleAction(hierarchy: boolean) {
+  return hierarchy
+    ? { label: 'Add example project', busy: 'Adding example project…', failed: 'The example project could not be added.', added: (opened: string) => `Added the example project. "${opened}" is open.` }
+    : { label: 'Add a Welcome graph', busy: 'Adding a Welcome graph…', failed: 'The Welcome graph could not be added.', added: (opened: string) => `Added a Welcome graph. "${opened}" is open.` };
 }
 
 export interface OwnGraph {

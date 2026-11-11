@@ -7,6 +7,7 @@ import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
 import { GET_WORK_ITEMS, GET_EDGES } from '../lib/queries';
 import { offlineEnabled, localGuest } from '../lib/offline/engine';
+import { exampleAction, starterHierarchy } from '../lib/workspaceRules';
 
 interface GraphSelectorProps {
   onCreateGraph?: () => void;
@@ -27,6 +28,7 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
   const [expandedGraphs, setExpandedGraphs] = useState<Set<string>>(new Set());
   const [example, setExample] = useState({ busy: false, message: '', error: '' });
   const canAddExample = currentUser?.role === 'USER' || currentUser?.role === 'ADMIN' || (offlineEnabled && localGuest());
+  const exampleWords = exampleAction(starterHierarchy({ offline: offlineEnabled, guest: localGuest() }));
   const exampleNoteRef = useRef<HTMLParagraphElement>(null);
   useEffect(() => {
     exampleNoteRef.current?.scrollIntoView?.({ block: 'nearest' });
@@ -35,9 +37,9 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
     setExample({ busy: true, message: '', error: '' });
     try {
       const opened = await addExampleProject();
-      setExample({ busy: false, message: `Added the example project. "${opened.name}" is open.`, error: '' });
+      setExample({ busy: false, message: exampleWords.added(opened.name), error: '' });
     } catch (error) {
-      setExample({ busy: false, message: '', error: error instanceof Error ? error.message : 'The example project could not be added.' });
+      setExample({ busy: false, message: '', error: error instanceof Error ? error.message : exampleWords.failed });
     }
   };
   const openPath = currentGraph?.path?.join('/') ?? '';
@@ -517,7 +519,7 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
                     className="w-full min-h-[44px] flex items-center space-x-2.5 p-2.5 rounded-xl text-left text-sm text-gray-200 hover:bg-gray-700/60 hover:text-white border border-transparent hover:border-gray-600/40 transition-all duration-200 disabled:opacity-60"
                   >
                     <Sparkles className="h-4 w-4 flex-shrink-0 text-emerald-300" aria-hidden="true" />
-                    <span className="flex-1">{example.busy ? 'Adding example project…' : 'Add example project'}</span>
+                    <span className="flex-1">{example.busy ? exampleWords.busy : exampleWords.label}</span>
                   </button>
                   {example.message && <p ref={exampleNoteRef} role="status" className="px-2.5 pt-1 text-xs text-emerald-200 break-words">{example.message}</p>}
                   {example.error && <p ref={exampleNoteRef} role="alert" className="px-2.5 pt-1 text-xs text-red-200 break-words">{example.error}</p>}

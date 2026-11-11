@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { exampleLimitMessage, missingStarterGraphs, projectDeleteBlock, seenGraphCount, starterHierarchy, starterStep, type OwnGraph } from './workspaceRules';
+import { exampleAction, exampleLimitMessage, missingStarterGraphs, projectDeleteBlock, seenGraphCount, starterHierarchy, starterStep, type OwnGraph } from './workspaceRules';
 
 describe('deleting a project', () => {
   const project = { id: 'p', name: 'Getting started', parentGraphId: null };
@@ -44,7 +44,7 @@ describe('which starter a user gets', () => {
 });
 
 describe('the 100-graph check before adding the example', () => {
-  const check = (existing: number, offline = true) => exampleLimitMessage({ offline, existing, adds: 7, limit: 100 });
+  const check = (existing: number, offline = true) => exampleLimitMessage({ offline, hierarchy: true, existing, adds: 7, limit: 100 });
 
   it('lets the example in while it fits', () => {
     expect(check(0)).toBeNull();
@@ -58,6 +58,21 @@ describe('the 100-graph check before adding the example', () => {
 
   it('has no limit on a self-hosted server', () => {
     expect(check(500, false)).toBeNull();
+  });
+
+  it('speaks of one Welcome graph for a signed-in hosted account', () => {
+    const flat = (existing: number) => exampleLimitMessage({ offline: true, hierarchy: false, existing, adds: 1, limit: 100 });
+    expect(flat(99)).toBeNull();
+    expect(flat(100)).toBe('This account holds up to 100 graphs. Delete 1 to add a Welcome graph.');
+  });
+});
+
+describe('naming the add-example action', () => {
+  it('offers the example project where projects are kept, and a Welcome graph where they are not', () => {
+    const projects = exampleAction(true);
+    expect([projects.label, projects.busy, projects.failed, projects.added('Welcome')]).toEqual(['Add example project', 'Adding example project…', 'The example project could not be added.', 'Added the example project. "Welcome" is open.']);
+    const flat = exampleAction(false);
+    expect([flat.label, flat.busy, flat.failed, flat.added('Welcome (2)')]).toEqual(['Add a Welcome graph', 'Adding a Welcome graph…', 'The Welcome graph could not be added.', 'Added a Welcome graph. "Welcome (2)" is open.']);
   });
 });
 

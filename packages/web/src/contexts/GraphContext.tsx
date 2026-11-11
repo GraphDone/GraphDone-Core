@@ -670,7 +670,7 @@ export function GraphProvider({ children }: GraphProviderProps) {
       hierarchy: hierarchyHere(),
       takenNames: availableGraphs.map(g => g.name)
     });
-    const full = exampleLimitMessage({ offline: offlineEnabled, existing: availableGraphs.length, adds: starterGraphCount(plan), limit: OFFLINE_PROJECT_LIMIT });
+    const full = exampleLimitMessage({ offline: offlineEnabled, hierarchy: plan.projects.length > 0, existing: availableGraphs.length, adds: starterGraphCount(plan), limit: OFFLINE_PROJECT_LIMIT });
     if (full) throw new Error(full);
     isAddingExampleRef.current = true;
     setIsCreating(true);
