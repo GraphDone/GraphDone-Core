@@ -32,20 +32,7 @@ export async function enterWorkspace(page: Page): Promise<{ graphId?: string }> 
     return {};
   }
   await login(page, TEST_USERS.ADMIN);
-  if (!(await page.getByTestId('graph-selector').isVisible())) {
-    // Phones have no "Create New Graph" control (the phone header's project
-    // switcher only switches), so the trial's empty graph is made through the
-    // API, as that dialog would make it, and opened.
-    const me = (await gql(page, '{ me { id } }')).me.id;
-    const created = await gql(page, 'mutation($input:[GraphCreateInput!]!){createGraphs(input:$input){graphs{id}}}',
-      { input: [{ name: `Journey ${Date.now()}`, type: 'PROJECT', status: 'ACTIVE', createdBy: me }] });
-    const graphId: string = created.createGraphs.graphs[0].id;
-    await page.evaluate(id => localStorage.setItem('currentGraphId', id), graphId);
-    await page.goto('/');
-    await openGraphView(page);
-    return { graphId };
-  }
-  await page.getByTestId('graph-selector').click();
+  await page.locator('[data-testid="graph-selector"]:visible, [data-testid="graph-selector-mobile"]:visible').first().click();
   await page.getByRole('button', { name: 'Create New Graph', exact: true }).click();
   const create = page.getByRole('dialog', { name: 'Create new graph' });
   await create.getByRole('button', { name: 'Continue', exact: true }).click();

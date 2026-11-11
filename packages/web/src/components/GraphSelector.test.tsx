@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { GraphSelector } from './GraphSelector';
+import { onGraphRequests, requestGraph } from '../lib/graphRequests';
 
 const graph = (id: string, name: string, extra: Record<string, unknown> = {}) => ({
   id, name, type: 'SUBGRAPH', createdBy: 'me', parentGraphId: null, depth: 0, path: [id], nodeCount: 1, edgeCount: 0, isShared: false, ...extra,
@@ -70,5 +71,32 @@ describe('the graph selector edit and delete buttons', () => {
     expect(screen.getByText("🔒 System graph — can't be deleted")).toBeTruthy();
     fireEvent.click(shared.trash);
     expect(onDeleteGraph).not.toHaveBeenCalled();
+  });
+});
+
+describe('the phone top bar graph selector', () => {
+  it('asks the workspace to create, rename and delete a graph, by name', () => {
+    const answer = { create: vi.fn(), edit: vi.fn(), delete: vi.fn() };
+    const stop = onGraphRequests(answer);
+    render(
+      <GraphSelector
+        testId="graph-selector-mobile"
+        onCreateGraph={() => requestGraph('create')}
+        onEditGraph={graph => requestGraph('edit', graph)}
+        onDeleteGraph={graph => requestGraph('delete', graph)}
+      />
+    );
+    const list = () => {
+      fireEvent.click(screen.getByTestId('graph-selector-mobile'));
+      return within(screen.getByTestId('graph-selector-dropdown'));
+    };
+    fireEvent.click(list().getByRole('button', { name: 'Edit Ideas' }));
+    fireEvent.click(list().getByRole('button', { name: 'Delete Ideas' }));
+    fireEvent.click(list().getByTitle('Create New Graph'));
+    stop();
+
+    expect(answer.edit).toHaveBeenCalledWith(expect.objectContaining({ id: 'i', name: 'Ideas' }));
+    expect(answer.delete).toHaveBeenCalledWith(expect.objectContaining({ id: 'i', name: 'Ideas' }));
+    expect(answer.create).toHaveBeenCalledTimes(1);
   });
 });

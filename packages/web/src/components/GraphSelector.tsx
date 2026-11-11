@@ -155,8 +155,10 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
   const graphActions = (row: any) => {
     const graph = availableGraphs.find(g => g.id === row.id) ?? row;
     const isSystemGraph = systemLocked(graph, currentUser?.id);
-    const action = (run: (graph: any) => void, locked: string, hover: string, icon: ReactNode) => (
+    const action = (label: string, run: (graph: any) => void, locked: string, hover: string, icon: ReactNode) => (
       <button
+        aria-label={`${label} ${graph.name}`}
+        aria-disabled={isSystemGraph || undefined}
         onClick={(e) => {
           e.stopPropagation();
           if (!isSystemGraph) {
@@ -171,15 +173,15 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
           }
         }}
         onMouseLeave={() => setHoveredTooltip(null)}
-        className={`p-1.5 rounded-lg transition-all duration-200 ${isSystemGraph ? 'text-gray-600 cursor-not-allowed' : `text-gray-400 ${hover} hover:scale-110`}`}
+        className={`p-1.5 [@media(hover:none)]:p-2.5 rounded-lg transition-all duration-200 ${isSystemGraph ? 'text-gray-600 cursor-not-allowed' : `text-gray-400 ${hover} hover:scale-110`}`}
       >
         {icon}
       </button>
     );
     return (
-      <div className="shrink-0 flex items-center space-x-1 opacity-0 group-hover/item:opacity-100 transition-opacity ml-2">
-        {onEditGraph && action(onEditGraph, '🔒 System graph — can\'t be edited', 'hover:text-blue-400 hover:bg-blue-500/20', <Edit3 className="h-3.5 w-3.5" />)}
-        {onDeleteGraph && action(onDeleteGraph, '🔒 System graph — can\'t be deleted', 'hover:text-red-400 hover:bg-red-500/20', <Trash2 className="h-3.5 w-3.5" />)}
+      <div className="shrink-0 flex items-center space-x-1 opacity-0 group-hover/item:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity ml-2">
+        {onEditGraph && action('Edit', onEditGraph, '🔒 System graph — can\'t be edited', 'hover:text-blue-400 hover:bg-blue-500/20', <Edit3 className="h-3.5 w-3.5" />)}
+        {onDeleteGraph && action('Delete', onDeleteGraph, '🔒 System graph — can\'t be deleted', 'hover:text-red-400 hover:bg-red-500/20', <Trash2 className="h-3.5 w-3.5" />)}
       </div>
     );
   };
