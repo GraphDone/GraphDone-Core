@@ -275,6 +275,25 @@ describe('offline graph hierarchy', () => {
     expect(Object.keys(fixture.account!.projects)).toEqual(['project', 'other']);
   });
 
+  it('keeps a guest graph\'s description and tags, and updates them', async () => {
+    const made = await create({ name: 'Notes', type: 'PROJECT', description: 'Plans for the move', tags: ['home', 'move'] });
+    expect(made).toMatchObject({ description: 'Plans for the move', tags: ['home', 'move'] });
+    expect(byName(await graphs(), 'Notes')).toMatchObject({ description: 'Plans for the move', tags: ['home', 'move'] });
+    await run(UPDATE_GRAPH, { id: made.id, input: { description: 'Moved in', tags: ['done'] } });
+    expect(byName(await graphs(), 'Notes')).toMatchObject({ description: 'Moved in', tags: ['done'] });
+    await run(UPDATE_GRAPH, { id: made.id, input: { name: 'Renamed' } });
+    expect(byName(await graphs(), 'Renamed'), 'a rename keeps them').toMatchObject({ description: 'Moved in', tags: ['done'] });
+    await expect(create({ name: 'Too many', tags: Array.from({ length: 51 }, (_, i) => `t${i}`) })).rejects.toThrow(/up to 50 tags/);
+    await expect(create({ name: 'Too long', description: 'x'.repeat(4001) })).rejects.toThrow(/4000 characters/);
+  });
+
+  it('keeps no description or tags for a signed-in account, whose sync carries only the name', async () => {
+    fixture.guest = false;
+    const made = await create({ name: 'Synced', description: 'Lost on sync', tags: ['x'] });
+    expect(made).toMatchObject({ description: '', tags: [] });
+    expect(fixture.account!.projects[made.id].local!.project).not.toHaveProperty('description');
+  });
+
   it('keeps a signed-in account flat, because its sync has no parent column yet', async () => {
     fixture.guest = false;
     const created = await create({ name: 'Flat', type: 'SUBGRAPH', parentGraphId: 'project' });

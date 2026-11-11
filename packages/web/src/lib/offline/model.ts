@@ -96,6 +96,8 @@ export function validateBackupSnapshot(s:any):asserts s is Snapshot {
  if(!s?.project||!Array.isArray(s.nodes)||!Array.isArray(s.edges)||!Array.isArray(s.notes))fail();
  text(s.project.name,120);if(!s.project.name.trim()||s.nodes.length>300||s.edges.length>600||s.notes.length>2000)fail();
  if(s.project.type!=null&&!GRAPH_TYPES.includes(s.project.type))fail();
+ text(s.project.description,4000,true);
+ if(s.project.tags!=null){text(s.project.tags,6000);try{const tags=JSON.parse(s.project.tags);if(!Array.isArray(tags)||tags.length>50||tags.some((t:any)=>typeof t!=='string'||t.length>100))fail();}catch{fail();}}
  if(s.project.parent_id!=null){text(s.project.parent_id,128);if(s.project.parent_id===s.project.id)fail();}
  const ids=new Set<string>();
  for(const n of s.nodes){text(n.id,128);if(ids.has(n.id))fail();ids.add(n.id);text(n.title,200);if(!n.title.trim())fail();text(n.description,4000,true);text(n.type,60);text(n.status,60);num(n.priority);if(n.priority<0||n.priority>1)fail();num(n.position_x);num(n.position_y);text(n.metadata,10000);text(n.tags,6000);
