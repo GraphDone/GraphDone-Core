@@ -7,8 +7,8 @@ import { gql } from '../graphRequest';
  * saved truth, whichever backend serves it. Journeys never seed through an API:
  * they start where a real person starts and use the same controls.
  *
- *   JOURNEY_BACKEND=selfhost      sign in as the admin test user, new graph (default;
- *                                 phones, which cannot create a graph, get it from the API)
+ *   JOURNEY_BACKEND=selfhost      sign in as the admin test user and create a new graph
+ *                                 with the visible graph selector (default; on every device)
  *   JOURNEY_BACKEND=hosted-guest  "Continue as Guest" on the hosted build; work is
  *                                 saved in the browser's local workspace
  */

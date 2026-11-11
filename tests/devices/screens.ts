@@ -213,6 +213,24 @@ export const UI_FIT_SCREENS: UiFitScreen[] = [
     },
   },
   {
+    id: 'graph-edit',
+    async open(page) {
+      await openGraphList(page);
+      await page.getByTestId('graph-selector-dropdown').locator('button[aria-label^="Edit "]:not([aria-disabled])').first().click();
+      await expect(page.getByRole('dialog', { name: 'Edit graph' })).toBeVisible();
+      await settle(page, 800);
+    },
+  },
+  {
+    id: 'graph-delete',
+    async open(page) {
+      await openGraphList(page);
+      await page.getByTestId('graph-selector-dropdown').locator('button[aria-label^="Delete "]:not([aria-disabled])').first().click();
+      await expect(page.getByRole('dialog', { name: 'Delete graph' })).toBeVisible();
+      await settle(page, 800);
+    },
+  },
+  {
     id: 'create-item',
     async open(page) {
       await openView(page, 'cards');
