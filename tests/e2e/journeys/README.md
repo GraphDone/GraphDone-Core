@@ -49,6 +49,9 @@ JOURNEY_REPEAT=30 TEST_URL=http://localhost:3127 node tests/run-unified.mjs --se
 
 `JOURNEY_REPEAT` sets `--repeat-each` (default 10), with 4 workers and no retries;
 `JOURNEY_GREP` limits the run to matching paths (for example `relationship-edit`).
+The run may take 6 minutes per repeat before the harness stops it
+(`JOURNEY_TIMEOUT_MINUTES` overrides that); Playwright writes no results for a
+run that is stopped.
 The `journeys` sequence is report-only: not in CI or the `pr`/`full` profiles. The
 `relationship-edit` sequence runs that journey once per path and device and is
 blocking (CI shard "toolchain, schematic, LOD, layout, relationship edit").

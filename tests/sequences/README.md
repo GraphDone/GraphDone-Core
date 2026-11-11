@@ -29,7 +29,7 @@ flowchart LR
 | `full` | `npm run test:unified` | `pr` plus the report-only diagnostics, showcase, matrix, VLM, scale sweep and cloud-audit sequences. |
 | `report` | none | Only the report-only capture sequences. |
 | `live` | none | The guest journey on the live hosted site (`live-journey`). |
-| `journeys` | none | Basic user journeys with success rates ([`e2e/journeys/`](../e2e/journeys/README.md)); `JOURNEY_REPEAT` sets the trials, `JOURNEY_GREP` picks the paths. |
+| `journeys` | none | Basic user journeys with success rates ([`e2e/journeys/`](../e2e/journeys/README.md)); `JOURNEY_REPEAT` sets the trials, `JOURNEY_GREP` picks the paths; the time limit is 6 minutes per repeat (`JOURNEY_TIMEOUT_MINUTES` overrides it). |
 
 `new-user` and `prod-smoke` are in no profile: CI runs `new-user` by name, and
 `scripts/test-production-stack.mjs` runs `prod-smoke`.

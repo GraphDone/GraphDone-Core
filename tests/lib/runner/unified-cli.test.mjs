@@ -354,3 +354,16 @@ test('every Smoke Gate shard warms up with THE GATE, and the summary job keeps t
   assert.deepEqual(ci.jobs['smoke-gate'].needs, ['smoke-gate-shard']);
   assert.ok(ci.jobs['ci-success'].needs.includes('smoke-gate'));
 });
+
+test('the journeys measurement gets time in proportion to its repeats', () => {
+  const limit = env => JSON.parse(execFileSync(process.execPath, ['--input-type=module', '-e',
+    "const { SEQUENCES } = await import(process.argv[1]); console.log(JSON.stringify([SEQUENCES.journeys.timeoutMs, SEQUENCES.journeys.args.find(a => a.startsWith('--repeat-each'))]))",
+    join(root, 'tests/sequences/unified.config.mjs')], { env: { PATH: process.env.PATH, ...env }, encoding: 'utf8' }));
+  // Six minutes per repeat: a fixed 15 minutes stopped 20 repeats before any result was written.
+  assert.deepEqual(limit({}), [60 * 60_000, '--repeat-each=10']);
+  assert.deepEqual(limit({ JOURNEY_REPEAT: '20' }), [120 * 60_000, '--repeat-each=20']);
+  assert.deepEqual(limit({ JOURNEY_REPEAT: '20', JOURNEY_TIMEOUT_MINUTES: '30' }), [30 * 60_000, '--repeat-each=20']);
+  // Run-once gates keep the adapter's default limit.
+  assert.equal(SEQUENCES['relationship-edit'].timeoutMs, undefined);
+  assert.match(readFileSync(join(root, 'tests/run-unified.mjs'), 'utf8'), /runPlaywrightSequence\(\{[^}]*timeoutMs: def\.timeoutMs/);
+});

@@ -9,6 +9,7 @@
  *   report — only the capture-heavy report sequences (video / galleries / metrics)
  */
 const PW = 'GraphDone-Core/dev-neo4j/chromium';
+const JOURNEY_REPEAT = Number(process.env.JOURNEY_REPEAT || 10);
 
 export const SEQUENCES = {
   // Blocking signal
@@ -79,12 +80,14 @@ export const SEQUENCES = {
   // on desktop, tablet and phone, repeated so the report shows a success rate
   // and its 95% lower bound per path. JOURNEY_BACKEND=hosted-guest with
   // TEST_URL=<hosted site> runs the same journeys as a guest on the hosted
-  // build; JOURNEY_GREP=<title pattern> measures only matching paths.
+  // build; JOURNEY_GREP=<title pattern> measures only matching paths. The
+  // time limit grows with the repeats (JOURNEY_TIMEOUT_MINUTES overrides it):
+  // a fixed 15 minutes stopped a 20-repeat run before Playwright wrote any result.
   'journeys': { adapter: 'playwright', title: 'Basic journeys — success rate per path and device', args: [
     '--project=journeys', '--project=journeys-ipad', '--project=journeys-iphone',
-    `--repeat-each=${process.env.JOURNEY_REPEAT || 10}`, '--workers=4', '--retries=0',
+    `--repeat-each=${JOURNEY_REPEAT}`, '--workers=4', '--retries=0',
     ...(process.env.JOURNEY_GREP ? [`--grep=${process.env.JOURNEY_GREP}`] : []),
-  ], blocking: false },
+  ], timeoutMs: Number(process.env.JOURNEY_TIMEOUT_MINUTES || JOURNEY_REPEAT * 6) * 60_000, blocking: false },
   // RELATIONSHIP EDIT (#262): change a relationship's type through every type,
   // flip it, reload, delete it, and see a second tab catch up, once per path on
   // desktop, iPad and iPhone. The repeated measurement is the journeys sequence.
