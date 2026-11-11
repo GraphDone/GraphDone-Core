@@ -1,11 +1,12 @@
 import { ProjectTransfer } from './ProjectTransfer';
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, Plus, Folder, FolderOpen, FileText, Share2, Eye, Edit3, Crown, Trash2, FolderPlus, ChevronRight, Users, Bot, Settings, Zap, User, Lock } from 'lucide-react';
+import { ChevronDown, Plus, Folder, FolderOpen, FileText, Share2, Eye, Edit3, Crown, Trash2, FolderPlus, ChevronRight, Users, Bot, Settings, Zap, User, Lock, Sparkles } from 'lucide-react';
 import { useQuery } from '@apollo/client';
 import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
 import { GET_WORK_ITEMS, GET_EDGES } from '../lib/queries';
+import { offlineEnabled, localGuest } from '../lib/offline/engine';
 
 interface GraphSelectorProps {
   onCreateGraph?: () => void;
@@ -18,12 +19,28 @@ interface GraphSelectorProps {
 }
 
 export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testId = 'graph-selector' }: GraphSelectorProps) {
-  const { currentGraph, graphHierarchy, selectGraph } = useGraph();
+  const { currentGraph, graphHierarchy, selectGraph, addExampleProject } = useGraph();
   const { currentTeam, currentUser } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['team', 'personal', 'system']));
   // Which parent graphs are expanded to show their sub-graphs (the hierarchy).
   const [expandedGraphs, setExpandedGraphs] = useState<Set<string>>(new Set());
+  const [example, setExample] = useState({ busy: false, message: '', error: '' });
+  const canAddExample = currentUser?.role === 'USER' || currentUser?.role === 'ADMIN' || (offlineEnabled && localGuest());
+  const addExample = async () => {
+    setExample({ busy: true, message: '', error: '' });
+    try {
+      const opened = await addExampleProject();
+      setExample({ busy: false, message: `Added the example project. "${opened.name}" is open.`, error: '' });
+    } catch (error) {
+      setExample({ busy: false, message: '', error: error instanceof Error ? error.message : 'The example project could not be added.' });
+    }
+  };
+  const openPath = currentGraph?.path?.join('/') ?? '';
+  useEffect(() => {
+    if (!openPath) return;
+    setExpandedGraphs(prev => openPath.split('/').every(id => prev.has(id)) ? prev : new Set([...prev, ...openPath.split('/')]));
+  }, [openPath]);
   const toggleGraphExpand = (id: string) => {
     setExpandedGraphs((prev) => {
       const next = new Set(prev);
@@ -133,6 +150,7 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
   const toggleDropdown = () => {
     if (!isOpen) {
       updateButtonPosition();
+      setExample(prev => prev.busy ? prev : { busy: false, message: '', error: '' });
     }
     setIsOpen(!isOpen);
   };
@@ -479,6 +497,22 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
                   </div>
                 );
               })}
+
+              {canAddExample && (
+                <div className="mt-2 border-t border-gray-600/40 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => void addExample()}
+                    disabled={example.busy}
+                    className="w-full min-h-[44px] flex items-center space-x-2.5 p-2.5 rounded-xl text-left text-sm text-gray-200 hover:bg-gray-700/60 hover:text-white border border-transparent hover:border-gray-600/40 transition-all duration-200 disabled:opacity-60"
+                  >
+                    <Sparkles className="h-4 w-4 flex-shrink-0 text-emerald-300" aria-hidden="true" />
+                    <span className="flex-1">{example.busy ? 'Adding example project…' : 'Add example project'}</span>
+                  </button>
+                  {example.message && <p role="status" className="px-2.5 pt-1 text-xs text-emerald-200 break-words">{example.message}</p>}
+                  {example.error && <p role="alert" className="px-2.5 pt-1 text-xs text-red-200 break-words">{example.error}</p>}
+                </div>
+              )}
 
               {graphHierarchy.length === 0 && (
                 <div className="p-8 text-center text-gray-500">

@@ -22,7 +22,7 @@ flowchart TD
 | Path | What it is |
 | --- | --- |
 | [`AuthContext.tsx`](AuthContext.tsx) | `AuthProvider` / `useAuth`: restores the saved session from [`../lib/authStorage.ts`](../lib/authStorage.ts), confirms it with the `me` query, and exposes `currentUser`, `currentTeam`, `login`, `logout`, `isAuthenticated`. |
-| [`GraphContext.tsx`](GraphContext.tsx) | `GraphProvider` / `useGraph`: the list of graphs the user can see, the current graph (remembered in `localStorage`), create/update/delete/duplicate/move, and sub-graph navigation (`descendInto`, `ascendTo`, breadcrumbs). Uses [`../graphql/graph.ts`](../graphql/graph.ts). |
+| [`GraphContext.tsx`](GraphContext.tsx) | `GraphProvider` / `useGraph`: the list of graphs the user can see, the current graph (remembered in `localStorage`), create/update/delete/duplicate/move, and sub-graph navigation (`descendInto`, `ascendTo`, breadcrumbs). A user who can see no graphs gets the example workspace from [`../lib/starterWorkspace.ts`](../lib/starterWorkspace.ts), with Welcome open; `addExampleProject` adds it again on request. A project that still has graphs cannot be deleted. Uses [`../graphql/graph.ts`](../graphql/graph.ts). |
 | [`ViewModeContext.tsx`](ViewModeContext.tsx) | `ViewModeProvider` / `useViewMode`: graph, dashboard, table, cards, kanban, gantt, calendar or activity; saved as `graphdone:viewMode`. |
 | [`NotificationContext.tsx`](NotificationContext.tsx) | `NotificationProvider` / `useNotifications`: `showSuccess` / `showError` toasts. |
 
