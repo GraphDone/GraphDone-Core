@@ -83,6 +83,14 @@ export const SEQUENCES = {
     '--project=journeys', '--project=journeys-ipad', '--project=journeys-iphone',
     `--repeat-each=${process.env.JOURNEY_REPEAT || 10}`, '--workers=4', '--retries=0',
   ], blocking: false },
+  // ORGANIZE LABELS: after "Organize around connections", in the hierarchical
+  // layout and once the force layout settles, every relationship label is
+  // readable (not under a card or another label, inside its edge's gap), on
+  // desktop, iPad and iPhone, for the example graphs and hard shapes.
+  'organize-labels': { adapter: 'playwright', title: 'Organize — every relationship label readable', args: [
+    'tests/e2e/journeys/organize-labels.spec.ts', '--project=journeys', '--project=journeys-ipad', '--project=journeys-iphone',
+    '--workers=1', '--retries=0', '--trace=retain-on-failure',
+  ], blocking: true },
   // Cross-repo: ingest the newest GraphDone-Cloud live-audit findings.json (sibling
   // repo) into the unified report. Skips cleanly when absent.
   'cloud-audit': { adapter: 'cloud-audit', title: 'Cloud live audit (ingested)', blocking: false },
@@ -90,8 +98,8 @@ export const SEQUENCES = {
 
 export const PROFILES = {
   smoke: ['unit-web', 'smoke', 'e2e-auth'],
-  pr: ['unit-web', 'smoke', 'e2e-auth', 'e2e-graph', 'agent-connection', 'inspector-readability', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'devices', 'perf-budgets'],
-  full: ['unit-web', 'smoke', 'e2e-auth', 'e2e-graph', 'agent-connection', 'inspector-readability', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'devices', 'perf-budgets', 'diagnostics', 'showcase', 'matrix', 'vlm', 'perf-scale', 'cloud-audit'],
+  pr: ['unit-web', 'smoke', 'e2e-auth', 'e2e-graph', 'agent-connection', 'inspector-readability', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'organize-labels', 'router-navigation', 'mobile', 'devices', 'perf-budgets'],
+  full: ['unit-web', 'smoke', 'e2e-auth', 'e2e-graph', 'agent-connection', 'inspector-readability', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'organize-labels', 'router-navigation', 'mobile', 'devices', 'perf-budgets', 'diagnostics', 'showcase', 'matrix', 'vlm', 'perf-scale', 'cloud-audit'],
   report: ['diagnostics', 'showcase', 'matrix', 'vlm', 'perf-scale', 'cloud-audit'],
   live: ['live-journey'],
   journeys: ['journeys'],
