@@ -21,8 +21,10 @@ import type { Page } from '@playwright/test';
  *   line between the two cards' borders;
  * - `textPx`: the label text's font size on screen, in CSS pixels.
  *
- * `offScreenCards` counts the cards not wholly inside the graph area or
- * under a control: with none, the whole graph is on screen.
+ * `offScreenCards` counts the cards not wholly inside the graph area: with
+ * none, the whole graph is on screen. `cardsUnderControls` counts cards a
+ * control covers part of (a control such as the layout-save notice can
+ * appear after the camera framed the graph); recorded, not a failure.
  *
  * Boxes that only touch (within half a pixel) do not count as overlapping.
  */
@@ -54,6 +56,7 @@ export interface LabelAudit {
   underControls: number;
   shownLabels: number;
   offScreenCards: number;
+  cardsUnderControls: number;
   labels: AuditedLabel[];
 }
 
@@ -81,7 +84,7 @@ export async function auditEdgeLabels(page: Page): Promise<LabelAudit> {
     const area = document.querySelector('.graph-container');
     const svg = area?.querySelector('svg');
     const group = svg?.querySelector('g.main-graph-group');
-    if (!area || !svg) return { scale: 0, cards: 0, drawnEdges: 0, inViewEdges: 0, underControls: 0, shownLabels: 0, offScreenCards: 0, labels: [] };
+    if (!area || !svg) return { scale: 0, cards: 0, drawnEdges: 0, inViewEdges: 0, underControls: 0, shownLabels: 0, offScreenCards: 0, cardsUnderControls: 0, labels: [] };
     const scale = Number(/scale\(([^)]+)\)/.exec(group?.getAttribute('transform') ?? '')?.[1] ?? 1);
     const bounds = area.getBoundingClientRect();
     const painted = (el: Element | null) => {
@@ -185,7 +188,8 @@ export async function auditEdgeLabels(page: Page): Promise<LabelAudit> {
       });
     }
     for (const label of labels) delete label.line;
-    const offScreenCards = [...cards.values()].filter(card => !inside(card) || controls.some(control => intersects(control, card))).length;
+    const offScreenCards = [...cards.values()].filter(card => !inside(card)).length;
+    const cardsUnderControls = [...cards.values()].filter(card => inside(card) && controls.some(control => intersects(control, card))).length;
     return {
       scale,
       cards: cards.size,
@@ -194,6 +198,7 @@ export async function auditEdgeLabels(page: Page): Promise<LabelAudit> {
       underControls: labels.filter(l => l.underControls).length,
       shownLabels: shown.length,
       offScreenCards,
+      cardsUnderControls,
       labels,
     };
   });
