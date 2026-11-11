@@ -118,3 +118,40 @@ export function relationshipLine(edge: Pick<WorkItemEdge, 'source' | 'target'>, 
   };
   return `${title(edge.source)} → ${title(edge.target)}`;
 }
+
+/** A screen rectangle, as getBoundingClientRect gives it. */
+export interface ScreenBox { left: number; top: number; right: number; bottom: number }
+
+/**
+ * Where the editor window opens. On a phone it spans the width. Elsewhere it
+ * opens beside the relationship's two items (`avoid`), on the side with more
+ * room, when that side fits it, so the wire and both cards stay in view;
+ * otherwise beside the pressed point, on its side with more room. It always
+ * stays on screen, below `top`.
+ */
+export function editorPlacement(input: {
+  click: { x: number; y: number };
+  avoid?: ScreenBox;
+  width: number;
+  height: number;
+  viewport: { width: number; height: number };
+  top: number;
+  margin: number;
+  narrow: boolean;
+}): { x: number; y: number } {
+  const { click, avoid, width, height, viewport, top, margin, narrow } = input;
+  const gap = 16;
+  const clampX = (x: number) => Math.max(margin, Math.min(x, viewport.width - width - margin));
+  const clampY = (y: number) => Math.max(top, Math.min(y, viewport.height - height - margin));
+  if (narrow) return { x: (viewport.width - width) / 2, y: clampY(click.y - height / 2) };
+  if (avoid) {
+    const roomRight = viewport.width - margin - (avoid.right + gap);
+    const roomLeft = avoid.left - gap - margin;
+    if (Math.max(roomLeft, roomRight) >= width) {
+      const x = roomRight >= roomLeft ? avoid.right + gap : avoid.left - gap - width;
+      return { x: clampX(x), y: clampY((avoid.top + avoid.bottom) / 2 - height / 2) };
+    }
+  }
+  const x = click.x < viewport.width / 2 ? click.x + 120 : click.x - 120 - width;
+  return { x: clampX(x), y: clampY(click.y - height / 2) };
+}

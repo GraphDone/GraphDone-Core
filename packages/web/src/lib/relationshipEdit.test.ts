@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { editorEdge, endpointId, flipRelationship, relationshipLine, reversedEdgeInput, savedRelationship, type SavedRelationship } from './relationshipEdit';
+import { editorEdge, editorPlacement, endpointId, flipRelationship, relationshipLine, reversedEdgeInput, savedRelationship, type SavedRelationship } from './relationshipEdit';
 
 const original: SavedRelationship = { id: 'e1', type: 'BLOCKS', weight: 0.8, sourceId: 'a', targetId: 'b', metadata: null };
 
@@ -131,5 +131,36 @@ describe('editorEdge and relationshipLine', () => {
     expect(edge).toEqual({ id: 'e1', source: 'b', target: 'a', type: 'BLOCKS', strength: 0.8 });
     expect(relationshipLine(edge, [{ id: 'a', title: 'Plan' }, { id: 'b', title: 'Do' }])).toBe('Do → Plan');
     expect(relationshipLine({ source: { id: 'a' } as any, target: 'zzz' }, [{ id: 'a', title: 'Plan' }])).toBe('Plan → Unknown');
+  });
+});
+
+describe('editorPlacement', () => {
+  const base = { width: 450, height: 600, viewport: { width: 1440, height: 900 }, top: 24, margin: 24, narrow: false };
+  const overlaps = (x: number, y: number, box: { left: number; top: number; right: number; bottom: number }) =>
+    x < box.right && x + base.width > box.left && y < box.bottom && y + base.height > box.top;
+
+  it('opens beside both items, on the side with more room, never over them', () => {
+    // The pair sits right of centre (as in a guest's welcome graph): the window goes left of both cards.
+    const avoid = { left: 690, top: 260, right: 990, bottom: 840 };
+    const at = editorPlacement({ ...base, click: { x: 760, y: 600 }, avoid });
+    expect(at).toEqual({ x: 690 - 16 - 450, y: 24 + (550 - 300 - 24) });
+    expect(overlaps(at.x, at.y, avoid)).toBe(false);
+    // ...and right of them when they sit on the left.
+    const left = { left: 100, top: 300, right: 500, bottom: 500 };
+    const right = editorPlacement({ ...base, click: { x: 300, y: 400 }, avoid: left });
+    expect(right.x).toBe(516);
+    expect(overlaps(right.x, right.y, left)).toBe(false);
+  });
+
+  it('falls back to beside the pressed point when neither side of the items has room', () => {
+    const wide = { left: 300, top: 200, right: 1100, bottom: 700 };
+    expect(editorPlacement({ ...base, click: { x: 900, y: 450 }, avoid: wide }).x).toBe(900 - 120 - 450);
+    expect(editorPlacement({ ...base, click: { x: 400, y: 450 } }).x).toBe(520);
+  });
+
+  it('stays on screen and spans a phone', () => {
+    expect(editorPlacement({ ...base, click: { x: 1400, y: 890 } })).toEqual({ x: 1400 - 120 - 450, y: 900 - 600 - 24 });
+    expect(editorPlacement({ ...base, click: { x: 1300, y: 10 } }).y).toBe(24);
+    expect(editorPlacement({ ...base, width: 374, viewport: { width: 390, height: 844 }, margin: 8, narrow: true, click: { x: 50, y: 400 }, avoid: { left: 0, top: 0, right: 390, bottom: 844 } }).x).toBe(8);
   });
 });

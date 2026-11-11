@@ -5,11 +5,15 @@ import { WorkItemEdge, RelationshipType } from '../types/graph';
 import { getRelationshipConfig, RELATIONSHIP_OPTIONS, getRelationshipIconElement } from '../constants/workItemConstants';
 import { useApolloClient, useMutation } from '@apollo/client';
 import { UPDATE_EDGE, CREATE_EDGE, DELETE_EDGE, GET_RELATIONSHIP } from '../lib/queries';
-import { editorEdge, flipRelationship, relationshipLine, savedRelationship } from '../lib/relationshipEdit';
+import { editorEdge, editorPlacement, flipRelationship, relationshipLine, savedRelationship, type ScreenBox } from '../lib/relationshipEdit';
 
 interface RelationshipEditorWindowProps {
-  /** The relationship being edited; the window is shown only while there is one. */
-  editingEdge: { edge: WorkItemEdge; position: { x: number; y: number } } | null;
+  /**
+   * The relationship being edited; the window is shown only while there is
+   * one. `position` is where it was pressed; `avoid` is the screen box of its
+   * two items, which the window opens beside when there is room.
+   */
+  editingEdge: { edge: WorkItemEdge; position: { x: number; y: number }; avoid?: ScreenBox } | null;
   workItems: any[];
   onClose: () => void;
   /** The edited relationship as saved after a type change or a flip (a flip gives it a new id). */
@@ -96,19 +100,14 @@ export const RelationshipEditorWindow: React.FC<RelationshipEditorWindowProps> =
     const top = (parseFloat(getComputedStyle(document.body).paddingTop) || 0) + margin;
     const contentHeight = Math.min(calculateContentHeight(), window.innerHeight - top - margin);
 
-    // Never obstruct the edge being edited: the window opens on whichever
-    // side of the click point (≈ the edge) has more horizontal room, and
-    // vertically near the click, clamped to the viewport with a margin.
+    // Never obstruct the edge being edited: the window opens beside its two
+    // items when there is room, else beside the pressed point.
     const click = editingEdge?.position;
     if (click) {
-      const placeRight = click.x < window.innerWidth / 2;
-      const x = narrow
-        ? (window.innerWidth - width) / 2
-        : placeRight
-          ? Math.min(click.x + 120, window.innerWidth - width - margin)
-          : Math.max(margin, click.x - 120 - width);
-      const y = Math.max(top, Math.min(click.y - contentHeight / 2, window.innerHeight - contentHeight - margin));
-      setPosition({ x, y });
+      setPosition(editorPlacement({
+        click, avoid: editingEdge?.avoid, width, height: contentHeight,
+        viewport: { width: window.innerWidth, height: window.innerHeight }, top, margin, narrow,
+      }));
     } else {
       const sidebarWidth = getComputedStyle(document.documentElement).getPropertyValue('--sidebar-width') || '16rem';
       const sidebarPixels = sidebarWidth === '4rem' ? 64 : 256;

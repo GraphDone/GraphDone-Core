@@ -51,6 +51,7 @@ import { NodeInspector } from './NodeInspector';
 import { NodeQuickEdit, type QuickEditCommit } from './NodeQuickEdit';
 
 import { WorkItem, WorkItemEdge } from '../types/graph';
+import { endpointId, type ScreenBox } from '../lib/relationshipEdit';
 import { RelationshipType, RELATIONSHIP_OPTIONS, getRelationshipConfig } from '../constants/workItemConstants';
 import { useAdaptiveQuality } from '../hooks/useAdaptiveQuality';
 import { useItemPresentation } from '../hooks/useItemPresentation';
@@ -562,7 +563,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   useEffect(() => { setItemRelationshipScope(null); setItemLabelCount(0); itemPairTriggerRef.current = null; }, [currentGraph?.id]);
   const [createNodePosition, setCreateNodePosition] = useState<{ x: number; y: number; z: number } | undefined>(undefined);
   const [currentTransform, setCurrentTransform] = useState({ x: 0, y: 0, scale: 1 });
-  const [editingEdge, setEditingEdge] = useState<{ edge: WorkItemEdge; position: { x: number; y: number } } | null>(null);
+  const [editingEdge, setEditingEdge] = useState<{ edge: WorkItemEdge; position: { x: number; y: number }; avoid?: ScreenBox } | null>(null);
   // D3 builds the canvas once per data change; it reads the edited edge here so
   // a rebuild (after a type change or flip) keeps marking the right wire.
   const editingEdgeIdRef = useRef<string | null>(null);
@@ -2242,8 +2243,15 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       // A keyboard opens the editor beside the focused label.
       const box = event instanceof MouseEvent ? null : (event.currentTarget as Element | null)?.getBoundingClientRect();
       const position = box ? { x: box.left + box.width / 2, y: box.top + box.height / 2 } : { x: (event as MouseEvent).clientX, y: (event as MouseEvent).clientY };
+      // The editor opens beside the two items it joins, when there is room.
+      const ends = [endpointId(edge.source), endpointId(edge.target)];
+      const cards = svg.selectAll<SVGGElement, WorkItem>('g.node').filter(n => ends.includes(n?.id)).nodes().map(n => n.getBoundingClientRect());
+      const avoid = cards.length ? {
+        left: Math.min(...cards.map(c => c.left)), top: Math.min(...cards.map(c => c.top)),
+        right: Math.max(...cards.map(c => c.right)), bottom: Math.max(...cards.map(c => c.bottom)),
+      } : undefined;
       setSelectedEdge(edge);
-      setEditingEdge({ edge, position });
+      setEditingEdge({ edge, position, avoid });
       setDragOffset({ x: 0, y: 0 });
     };
     const edgeEndTitle = (end: unknown) => (typeof end === 'object' && end ? (end as { title?: string }).title : undefined) ?? 'an item';
@@ -6094,7 +6102,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         workItems={workItems}
         onClose={() => setEditingEdge(null)}
         onEdgeChange={(edge, previousId) => {
-          setEditingEdge(prev => (prev && prev.edge.id === previousId ? { edge, position: prev.position } : prev));
+          setEditingEdge(prev => (prev && prev.edge.id === previousId ? { ...prev, edge } : prev));
           setSelectedEdge(prev => (prev?.id === previousId ? edge : prev));
         }}
         onDeleteEdge={() => setEditingEdge(null)}
