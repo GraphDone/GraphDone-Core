@@ -182,12 +182,13 @@ jobs:
               inspector-readability ci-inspector-readability xvfb
               living-graph-effects - -
               perf-budgets ci-perf
-          - name: toolchain, schematic, LOD, layout
+          - name: toolchain, schematic, LOD, layout, relationship edit
             toolchain: true
             sequences: |
               smoke ci-smoke
               semantic-lod ci-semantic-lod xvfb
               layout-recovery ci-layout-recovery xvfb
+              relationship-edit ci-relationship-edit
     services:
       neo4j:
         image: neo4j:5.26.12

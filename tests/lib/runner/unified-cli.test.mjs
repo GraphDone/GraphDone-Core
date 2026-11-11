@@ -74,7 +74,7 @@ test('disposable Git fixture commits do not spawn background maintenance', t => 
   assert.deepEqual(events.filter(event => event.event === 'child_start' && event.argv?.includes('maintenance')), []);
 });
 
-for (const sequence of ['new-user', 'agent-connection', 'inspector-readability', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'devices', 'perf-budgets']) {
+for (const sequence of ['new-user', 'agent-connection', 'inspector-readability', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'devices', 'perf-budgets', 'relationship-edit']) {
   test(`CLI forwards failure-only tracing without retries for ${sequence}`, t => {
     const { dir, run } = fixture(t);
     const report = { suites: [{ specs: [{ title: 'fixture', ok: true,
@@ -102,6 +102,14 @@ for (const sequence of ['new-user', 'agent-connection', 'inspector-readability',
       assert.equal(SEQUENCES[sequence].blocking, true);
       for (const profile of ['pr', 'full']) assert.ok(PROFILES[profile].includes(sequence));
       assertSmokeGateRuns(sequence, { out: 'ci-inspector-readability', xvfb: true });
+    }
+    if (sequence === 'relationship-edit') {
+      assert.deepEqual(args.filter(arg => arg.endsWith('.spec.ts')), ['tests/e2e/journeys/relationship-edit.spec.ts']);
+      assert.deepEqual(args.filter(arg => arg.startsWith('--project=')), ['--project=journeys', '--project=journeys-ipad', '--project=journeys-iphone']);
+      assert.ok(!args.some(arg => arg.startsWith('--repeat-each')));
+      assert.equal(SEQUENCES[sequence].blocking, true);
+      for (const profile of ['pr', 'full']) assert.ok(PROFILES[profile].includes(sequence));
+      assertSmokeGateRuns(sequence, { out: 'ci-relationship-edit', xvfb: false });
     }
     if (sequence === 'large-symbols') {
       assert.ok(args.includes('tests/e2e/graph/large-graph-symbols.spec.ts'));
@@ -131,8 +139,10 @@ for (const sequence of ['new-user', 'agent-connection', 'inspector-readability',
     assert.deepEqual(args.filter(arg => arg.startsWith('--trace=')), ['--trace=retain-on-failure']);
     assert.deepEqual(args.filter(arg => arg.startsWith('--retries=')), ['--retries=0']);
     // The device matrix only reads (it opens screens and dialogs, never saves),
-    // so its 120+ independent cases may share the stack four at a time.
-    assert.deepEqual(args.filter(arg => arg.startsWith('--workers=')), [sequence === 'devices' ? '--workers=4' : '--workers=1']);
+    // so its 120+ independent cases may share the stack four at a time. Each
+    // relationship-edit trial works in its own new graph, two at a time.
+    const workers = { devices: '--workers=4', 'relationship-edit': '--workers=2' }[sequence] ?? '--workers=1';
+    assert.deepEqual(args.filter(arg => arg.startsWith('--workers=')), [workers]);
   });
 }
 
@@ -330,12 +340,12 @@ test('every Smoke Gate shard warms up with THE GATE, and the summary job keeps t
   }
   assert.equal(runs.smoke.length, shards.length);
   // Every sequence the single Smoke Gate job ran before #274 (its schematic-visual
-  // and toolchain steps are checked above), so a sequence dropped from every
-  // shard fails here. Change this list on purpose only.
+  // and toolchain steps are checked above), plus relationship-edit (#262), so a
+  // sequence dropped from every shard fails here. Change this list on purpose only.
   assert.deepEqual(Object.keys(runs).sort(), [
     'agent-connection', 'inspector-readability', 'item-wires', 'large-symbols', 'layout-recovery',
-    'living-graph-effects', 'mobile', 'nested-lod', 'new-user', 'perf-budgets', 'router-navigation',
-    'semantic-lod', 'smoke',
+    'living-graph-effects', 'mobile', 'nested-lod', 'new-user', 'perf-budgets', 'relationship-edit',
+    'router-navigation', 'semantic-lod', 'smoke',
   ]);
   for (const [sequence, entries] of Object.entries(runs)) {
     if (sequence !== 'smoke') assert.equal(entries.length, 1, `${sequence} runs in exactly one shard`);

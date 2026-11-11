@@ -49,6 +49,8 @@ JOURNEY_REPEAT=30 TEST_URL=http://localhost:3127 node tests/run-unified.mjs --se
 
 `JOURNEY_REPEAT` sets `--repeat-each` (default 10), with 4 workers and no retries;
 `JOURNEY_GREP` limits the run to matching paths (for example `relationship-edit`).
-Report-only: not in CI or the `pr`/`full` profiles.
+The `journeys` sequence is report-only: not in CI or the `pr`/`full` profiles. The
+`relationship-edit` sequence runs that journey once per path and device and is
+blocking (CI shard "toolchain, schematic, LOD, layout, relationship edit").
 
 Up: [`tests/e2e/`](../README.md)
