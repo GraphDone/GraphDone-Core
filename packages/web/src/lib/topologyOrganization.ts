@@ -7,8 +7,19 @@ export interface OrganizationEdge {
   target: string | { id: string };
 }
 
+import { borderReach } from './edgeGeometry';
+
 type Point = { x: number; y: number };
 type Size = { width: number; height: number };
+
+/** Length of the line between two cards' borders (the part a label can use). */
+function visibleLength(from: Point, a: Size, to: Point, b: Size) {
+  const dx = to.x - from.x,
+    dy = to.y - from.y;
+  return (
+    Math.hypot(dx, dy) - borderReach(a, dx, dy) - borderReach(b, dx, dy)
+  );
+}
 
 const endpoint = (value: OrganizationEdge['source']) =>
   typeof value === 'string' ? value : value.id;
@@ -40,7 +51,8 @@ function compactHubRing(
   ring: readonly string[],
   sizes: ReadonlyMap<string, Size>,
   viewport: Size,
-  spacing: number
+  spacing: number,
+  linkGap: (a: string, b: string) => number
 ) {
   const ids = [root, ...ring];
   let best: Map<string, Point> | undefined;
@@ -75,6 +87,17 @@ function compactHubRing(
                 (a.height + b.height) / 2
             );
             if (Math.hypot(dx, dy) < spacing) return false;
+            const need = linkGap(ids[i], ids[j]);
+            if (
+              need > 0 &&
+              visibleLength(
+                { x: units[i].x * radius, y: units[i].y * radius },
+                a,
+                { x: units[j].x * radius, y: units[j].y * radius },
+                b
+              ) < need
+            )
+              return false;
           }
         return true;
       };
@@ -121,14 +144,39 @@ function compactHubRing(
   return best!;
 }
 
-export function organizeTopology<T extends OrganizationNode>(
+export interface OrganizationOptions<E extends OrganizationEdge> {
+  /** Smallest border-to-border gap an edge needs, e.g. room for its label. */
+  edgeGap?: (edge: E) => number;
+  /**
+   * How much to spread one finished component about its first card before
+   * packing (1 keeps it). Called with the component's own coordinates.
+   */
+  spread?: (ids: readonly string[], points: ReadonlyMap<string, Point>) => number;
+}
+
+export function organizeTopology<
+  T extends OrganizationNode,
+  E extends OrganizationEdge = OrganizationEdge,
+>(
   nodes: readonly T[],
-  edges: readonly OrganizationEdge[],
+  edges: readonly E[],
   dimensions: (node: T) => Size,
   viewport: Size,
-  gap = 64
+  gap = 64,
+  options: OrganizationOptions<E> = {}
 ) {
   const adjacency = organizationAdjacency(nodes, edges);
+  // Per connected pair, the widest gap any of its edges asks for.
+  const pairGaps = new Map<string, number>();
+  const pairKey = (a: string, b: string) => (a < b ? `${a}\u0000${b}` : `${b}\u0000${a}`);
+  if (options.edgeGap)
+    for (const edge of edges) {
+      const need = options.edgeGap(edge);
+      if (!(need > 0)) continue;
+      const key = pairKey(endpoint(edge.source), endpoint(edge.target));
+      pairGaps.set(key, Math.max(pairGaps.get(key) ?? 0, need));
+    }
+  const pairGap = (a: string, b: string) => pairGaps.get(pairKey(a, b)) ?? 0;
   const sizes = new Map(
     nodes.map(node => {
       const size = dimensions(node);
@@ -159,6 +207,7 @@ export function organizeTopology<T extends OrganizationNode>(
     rectangleEvaluations: 0,
     maxRectangleEvaluations: 40000,
     clearanceRejections: 0,
+    spreadComponents: 0,
   };
   for (const start of adjacency.keys()) {
     if (visited.has(start)) continue;
@@ -207,18 +256,23 @@ export function organizeTopology<T extends OrganizationNode>(
       }
       const maxWidth = Math.max(...ids.map(id => sizes.get(id)!.width));
       const maxHeight = Math.max(...ids.map(id => sizes.get(id)!.height));
+      // Neighbours along a chain or cycle leave room for the widest link.
+      const linkGap = Math.max(
+        spacing,
+        ...order.map((id, i) => pairGap(id, order[(i + 1) % order.length]))
+      );
       if (kind === 'chain') {
         // Snake the chain into the column count whose extent the viewport can
         // show at the largest (capped) scale, so a short chain on a phone does
         // not become one unreadably wide row. Ties keep the wider reading row.
-        const cellWidth = maxWidth + spacing,
-          cellHeight = maxHeight + spacing;
+        const cellWidth = maxWidth + linkGap,
+          cellHeight = maxHeight + linkGap;
         const readableScale = (count: number) =>
           Math.min(
             1.25,
-            viewport.width / (count * cellWidth - spacing),
+            viewport.width / (count * cellWidth - linkGap),
             viewport.height /
-              (Math.ceil(ids.length / count) * cellHeight - spacing)
+              (Math.ceil(ids.length / count) * cellHeight - linkGap)
           );
         let columns = Math.ceil(
           Math.sqrt(((ids.length * cellHeight) / cellWidth) * 1.5)
@@ -234,14 +288,14 @@ export function organizeTopology<T extends OrganizationNode>(
           const row = Math.floor(index / columns),
             col = index % columns;
           points.set(id, {
-            x: (row % 2 ? columns - 1 - col : col) * (maxWidth + spacing),
-            y: row * (maxHeight + spacing),
+            x: (row % 2 ? columns - 1 - col : col) * cellWidth,
+            y: row * cellHeight,
           });
         });
       } else {
         focus = order[0];
         const radius =
-          (Math.hypot(maxWidth, maxHeight) + spacing) /
+          (Math.hypot(maxWidth, maxHeight) + linkGap) /
           (2 * Math.sin(Math.PI / ids.length));
         order.forEach((id, index) =>
           points.set(id, {
@@ -273,17 +327,29 @@ export function organizeTopology<T extends OrganizationNode>(
           sizes.get(root)!.width,
           sizes.get(root)!.height
         );
-      for (const ring of levels.slice(1)) {
+      for (const [index, ring] of levels.slice(1).entries()) {
         const diameter = Math.max(
           ...ring.map(id =>
             Math.hypot(sizes.get(id)!.width, sizes.get(id)!.height)
           )
         );
+        // Room for the links into this ring, and between its own members.
+        let radialGap = spacing,
+          ringGap = spacing;
+        const inner = new Set(levels[index]),
+          members = new Set(ring);
+        for (const id of ring)
+          for (const neighbor of adjacency.get(id)!) {
+            if (inner.has(neighbor))
+              radialGap = Math.max(radialGap, pairGap(id, neighbor));
+            else if (members.has(neighbor))
+              ringGap = Math.max(ringGap, pairGap(id, neighbor));
+          }
         const radius = Math.max(
-          previousRadius + (previousDiameter + diameter) / 2 + spacing,
+          previousRadius + (previousDiameter + diameter) / 2 + radialGap,
           ring.length < 2
             ? 0
-            : (diameter + spacing) / (2 * Math.sin(Math.PI / ring.length))
+            : (diameter + ringGap) / (2 * Math.sin(Math.PI / ring.length))
         );
         ring.forEach((id, index) =>
           points.set(id, {
@@ -309,7 +375,8 @@ export function organizeTopology<T extends OrganizationNode>(
           levels[1],
           sizes,
           viewport,
-          spacing
+          spacing,
+          pairGap
         ))
           points.set(id, point);
       }
@@ -369,8 +436,24 @@ export function organizeTopology<T extends OrganizationNode>(
                   return Math.hypot(dx, dy) >= spacing;
                 })
               );
-            if (!clear) work.clearanceRejections++;
-            if (clear && score() + 0.01 < before) {
+            const roomy =
+              clear &&
+              [a, b].every(id =>
+                adjacency.get(id)!.every(neighbor => {
+                  const need = pairGap(id, neighbor);
+                  return (
+                    !(need > 0) ||
+                    visibleLength(
+                      points.get(id)!,
+                      sizes.get(id)!,
+                      points.get(neighbor)!,
+                      sizes.get(neighbor)!
+                    ) >= need
+                  );
+                })
+              );
+            if (!roomy) work.clearanceRejections++;
+            if (roomy && score() + 0.01 < before) {
               ring[index] = b;
               ring[(index + 1) % ring.length] = a;
               improved = true;
@@ -382,6 +465,15 @@ export function organizeTopology<T extends OrganizationNode>(
         }
         if (!improved) break;
       }
+    }
+    const factor = options.spread?.(ids, points) ?? 1;
+    if (factor > 1) {
+      const anchor = { ...points.get(root)! };
+      for (const point of points.values()) {
+        point.x = anchor.x + (point.x - anchor.x) * factor;
+        point.y = anchor.y + (point.y - anchor.y) * factor;
+      }
+      work.spreadComponents++;
     }
     const left = Math.min(
       ...ids.map(id => points.get(id)!.x - sizes.get(id)!.width / 2)
