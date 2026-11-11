@@ -150,3 +150,59 @@ it('wraps a wide set of independent tasks instead of making one unreadable strip
     expect(Math.abs(points[i].x-points[j].x)>=194 || Math.abs(points[i].y-points[j].y)>=144).toBe(true);
   }
 });
+
+describe('hierarchical rows with room for relationship labels', () => {
+  const card = () => ({ width: 170, height: 120 });
+  const link = (source: string, target: string, type = 'RELATES_TO') => ({ source, target, type });
+  const view = { width: 1440, height: 900 };
+  const borderGapX = (points: Map<string, { x: number; y: number }>, a: string, b: string) => Math.abs(points.get(b)!.x - points.get(a)!.x) - 170;
+
+  it('keeps linked cards in a row apart by what the edge between them asks, and only them', async () => {
+    const { computeCompactLayout } = await import('../layoutAlgorithms');
+    const edges = [link('A', 'B'), link('B', 'C')];
+    const points = computeCompactLayout([n('A'), n('B'), n('C')], edges, view, card, {
+      edgeGap: edge => (edge.source === 'A' ? 200 : 100),
+    });
+    expect(new Set([...points.values()].map(p => p.y)).size).toBe(1);
+    expect(borderGapX(points, 'A', 'B')).toBeCloseTo(200);
+    expect(borderGapX(points, 'B', 'C')).toBeCloseTo(100);
+    const plain = computeCompactLayout([n('A'), n('B'), n('C')], edges, view, card);
+    expect(borderGapX(plain, 'A', 'B')).toBeCloseTo(36);
+  });
+
+  it('keeps rows apart by what the edges across them ask', async () => {
+    const { computeCompactLayout } = await import('../layoutAlgorithms');
+    const points = computeCompactLayout([n('A'), n('B')], [dep('A', 'B')], view, card, { edgeGap: () => 250 });
+    expect(points.get('A')!.y - points.get('B')!.y - 120).toBeCloseTo(250);
+  });
+
+  it('puts a card under the prerequisite it depends on, not in the middle of its row', async () => {
+    const { computeCompactLayout } = await import('../layoutAlgorithms');
+    const nodes = ['P1', 'P2', 'P3', 'P4', 'X'].map(n);
+    const points = computeCompactLayout(nodes, [dep('X', 'P4')], view, card);
+    expect(points.get('X')!.y).toBeGreaterThan(points.get('P4')!.y);
+    expect(points.get('X')!.x).toBeCloseTo(points.get('P4')!.x);
+  });
+
+  it('splits cards linked inside one dependency layer into rows instead of wiring through a row', async () => {
+    const { computeCompactLayout } = await import('../layoutAlgorithms');
+    // A hub with four spokes: the spokes go on their own row under the hub.
+    const edges = ['S1', 'S2', 'S3', 'S4'].map(id => link('H', id));
+    const points = computeCompactLayout(['H', 'S1', 'S2', 'S3', 'S4'].map(n), edges, view, card);
+    for (const id of ['S1', 'S2', 'S3', 'S4']) expect(points.get(id)!.y).toBeGreaterThan(points.get('H')!.y);
+  });
+
+  it('wraps a long chain back and forth so every link stays short', async () => {
+    const { computeCompactLayout } = await import('../layoutAlgorithms');
+    const ids = Array.from({ length: 12 }, (_, i) => `step-${String(i).padStart(2, '0')}`);
+    const edges = ids.slice(1).map((id, i) => link(ids[i], id, 'FOLLOWS'));
+    const points = computeCompactLayout(ids.map(n), edges, { width: 390, height: 800 }, card, { edgeGap: () => 150 });
+    expect(new Set([...points.values()].map(p => p.y)).size).toBeGreaterThan(1);
+    for (const edge of edges) {
+      const a = points.get(edge.source)!, b = points.get(edge.target)!;
+      // Next to each other in a row, or straight down at a wrap.
+      if (a.y === b.y) expect(borderGapX(points, edge.source, edge.target)).toBeCloseTo(150);
+      else expect(Math.abs(a.x - b.x)).toBeLessThan(170);
+    }
+  });
+});
