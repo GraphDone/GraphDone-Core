@@ -59,16 +59,16 @@ import { mergeSimulationNodes, mergeSimulationEdges } from '../lib/graphDataMerg
 import type { ObstacleBox } from '../lib/edgeLabelLayout';
 import { createParallelEdgeRoute, edgeRouteLabel, edgeRouteArrowBounds, edgeSegmentHitsBox, projectEdgeRoutePointer, type EdgeRouteGeometry, type EdgeRouteLabel } from '../lib/edgeRouteGeometry';
 import { PerfMeter, DriftMeter } from '../lib/perfMeter';
-import { computeGraphFit } from '../lib/graphFit';
+import { computeGraphFit, type FitObstacle } from '../lib/graphFit';
 import { appendNodeControlGlyph, nodeControlGlyphTransform } from '../lib/nodeControlIcons';
 import { graphItemLayout, itemTitleScale, measureGraphText, edgeLabelDimensions, GRAPH_FONT_FAMILY, ITEM_TITLE_SIZE, ITEM_TITLE_LINE, ITEM_HEADER_HEIGHT, EDGE_LABEL_SIZE, ITEM_WIRE_WIDTH } from '../lib/graphSymbolLayout';
 import { placeItemLabels } from '../lib/edgeLabelPlacement';
 import { separateCards } from '../lib/separateCards';
-import { organizeTopology } from '../lib/topologyOrganization';
+import { clearFreeCards, framedZoom, hierarchyWithLabelRoom, labelGap, LABEL_MIN_ZOOM, organizeWithLabelRoom, SPREAD_MAX_CARDS, type LabelEdge, type LabelRoomOptions } from '../lib/labelClearance';
 import { LocalItemNeighborhood } from './LocalItemNeighborhood';
 import { frameOrganizedNeighborhood } from '../lib/organizationCamera';
 import { DEFAULT_PHYSICS, collisionRadius, linkDistance, linkMaxDistance, linkStrength } from '../lib/physicsConfig';
-import { computeCompactLayout, isHierarchicalLayout, parseLayoutMode, LAYOUT_MODE_STORAGE_KEY, type LayoutMode } from '../lib/layoutAlgorithms';
+import { isHierarchicalLayout, parseLayoutMode, LAYOUT_MODE_STORAGE_KEY, type LayoutMode } from '../lib/layoutAlgorithms';
 import { edgeBorderEndpoints, minEdgeLength, clampToMinNeighbors } from '../lib/edgeGeometry';
 import { directionStrategy, arrowVisibility, perpendicularOffset } from '../lib/edgeLOD';
 import { assignParallelEdgeIndices } from '../lib/parallelEdges';
@@ -110,6 +110,40 @@ const DOT_SCALE = 0.2;
 // The smallest zoom a phone frames the graph at: small cards still show their
 // title (kept at 14 px on screen) and status stripe.
 const PHONE_READABLE_SCALE = 0.5;
+
+// The label size the automatic layouts leave room for: a drawn relationship's
+// measured label ("+N" included once the renderer has set it), else none.
+const drawnLabel = (edge: any) => edge._priorityVisible === false ? null
+  : edge._labelDims ?? edgeLabelDimensions(measureGraphText(getRelationshipConfig(edge.type as RelationshipType)?.label || '', EDGE_LABEL_SIZE));
+
+// A new arrangement places labels afresh from the middle of their edges, where
+// the layout left them room; the renderer otherwise starts from each label's
+// last spot. A label a person dragged keeps its place.
+const forgetLabelSpots = (edges: any[]) => {
+  for (const edge of edges) if (!edge.labelTUser) delete edge.labelT;
+};
+
+// Screen rectangles of the fixed graph controls and MiniMap, inside the graph
+// area, that a camera fit keeps cards out of.
+function graphFitObstacles(container: HTMLElement, minimumScale: number): FitObstacle[] {
+  const width = container.clientWidth;
+  const height = container.clientHeight;
+  const containerRect = container.getBoundingClientRect();
+  const gap = 12;
+  return Array.from(document.querySelectorAll<HTMLElement>('[data-graph-fit-obstacle="true"]'))
+    // A passive save note lets taps through and disappears on its own; it
+    // must not reframe the camera under a person's first touch.
+    .filter(element => element.dataset.layoutSavePassive !== 'true' && !(minimumScale > 0 && element.dataset.layoutSaveProgress === 'true'))
+    .map(element => {
+      const rect = element.getBoundingClientRect();
+      return {
+        left: Math.max(0, Math.min(width, rect.left - containerRect.left - gap)),
+        top: Math.max(0, Math.min(height, rect.top - containerRect.top - gap)),
+        right: Math.max(0, Math.min(width, rect.right - containerRect.left + gap)),
+        bottom: Math.max(0, Math.min(height, rect.bottom - containerRect.top + gap)),
+      };
+    });
+}
 
 // Utility functions
 const getSmoothedOpacity = (scale: number, threshold: number, fadeRange: number = 0.2) => {
@@ -1781,6 +1815,16 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     }
     return layout;
   }, [getNodeDimensions]);
+  // Room for every relationship label in "Organize", the hierarchical rows and
+  // a settled force layout, framed as fitViewToNodes will frame it.
+  const labelRoom = useCallback((width: number, height: number, floor: number): LabelRoomOptions<WorkItem, any> => ({
+    dimensionsAt: getNodeDimensionsAt,
+    labelFor: drawnLabel,
+    priority: (edge: any) => relationshipPriorityTier(edge.type),
+    viewport: { width, height },
+    obstacles: containerRef.current ? graphFitObstacles(containerRef.current, floor) : [],
+    floor,
+  }), [getNodeDimensionsAt]);
 
   // Smart data update function - only reinitializes when necessary, preserves camera position
   const updateVisualizationData = useCallback(() => {
@@ -2081,7 +2125,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // (This block used to null every node's fx/fy unconditionally, which is
     //  why arrangements never survived a reload — the real drift bug.)
     const initialOrganization = nodes.length && nodes.every(node => !(node.positionX || node.positionY))
-      ? organizeTopology(nodes, validatedEdges as any[], node => graphItemLayout(node, measureGraphText), {width, height})
+      ? organizeWithLabelRoom(nodes, validatedEdges as any[], labelRoom(width, height, 0))
       : null;
     const spreadCols = Math.max(1, Math.ceil(Math.sqrt(nodes.length)));
     const spreadSpacing = 260; // > collision diameter so the spread has no overlaps
@@ -2182,17 +2226,14 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           const maxDistance = linkMaxDistance(width, height, phys);
           const preferred = currentDistance > maxDistance ? maxDistance : linkDistance(width, height, phys);
           // Floor: never pull connected nodes closer than their edge label
-          // needs to display — the label width sets a minimum edge length so
-          // it always fits in the border-to-border gap (edgeGeometry.minEdgeLength).
-          const label = getRelationshipConfig(d.type as RelationshipType)?.label || '';
-          // Slightly generous estimate of the rendered label box (10px/600 text
-          // + icon + padding) so the gap never UNDER-shoots the real label.
-          const labelW = label.length * 7 + 34;
+          // needs to display — the border-to-border gap its measured label,
+          // clearance and arrowhead take at 100% (labelClearance.labelGap).
           // Pass the edge direction so the minimum is just the per-angle border
-          // reach + label + a small margin (not an oversized half-diagonal buffer).
+          // reach + that gap (not an oversized half-diagonal buffer).
+          const label = drawnLabel(d);
           const dx = (d.target.x || 0) - (d.source.x || 0);
           const dy = (d.target.y || 0) - (d.source.y || 0);
-          const minLen = minEdgeLength(getNodeDimensions(d.source), getNodeDimensions(d.target), labelW, dx, dy);
+          const minLen = label ? minEdgeLength(getNodeDimensions(d.source), getNodeDimensions(d.target), labelGap(label, 1), dx, dy, 0) : 0;
           d._minLen = minLen; // cached for the hard min-edge constraint below
           return Math.max(preferred, minLen);
         })
@@ -3654,11 +3695,12 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       const center = d._labelIconCenter;
       label.select('.edge-label-icon').attr('transform', placement.iconRotation
         ? `rotate(${placement.iconRotation}, ${center.x}, ${center.y})` : null);
-      const angle = placement.rotation * Math.PI / 180;
+      // The turned label itself (edgeRouteLabel tests turned boxes exactly).
       labelRects.set(d.id, {
         x: placement.x, y: placement.y,
-        width: (Math.abs(Math.cos(angle)) * d._labelDims.width + Math.abs(Math.sin(angle)) * d._labelDims.height) * (d._labelScale || 1),
-        height: (Math.abs(Math.sin(angle)) * d._labelDims.width + Math.abs(Math.cos(angle)) * d._labelDims.height) * (d._labelScale || 1)
+        width: d._labelDims.width * (d._labelScale || 1),
+        height: d._labelDims.height * (d._labelScale || 1),
+        rotation: placement.rotation,
       });
     };
     let displayedPriority: typeof priorityProjection | null = null;
@@ -4074,8 +4116,38 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // When the layout settles: record settle time, persist the arrangement so
     // it's durable across reloads, run a final edge-label de-overlap pass, and
     // center the camera. After this the simulation is idle (one-shot physics).
+    // A settled layout can leave cards the simulation placed itself too close
+    // for a label at the zoom the camera will frame them. Move only those free
+    // cards apart, never a saved or organized one (labelClearance.clearFreeCards).
+    // Larger graphs open as an overview without labels (SPREAD_MAX_CARDS).
+    const clearLabelsOfFreeCards = () => {
+      const simNodes = simulation.nodes() as any[];
+      if (simNodes.length > SPREAD_MAX_CARDS || !simNodes.some(node => node.fx == null)) return false;
+      forgetLabelSpots(validatedEdges as any[]);
+      const byId = new Map(simNodes.map(node => [node.id, node]));
+      const room = labelRoom(width, height, 0);
+      const labelled: LabelEdge[] = (validatedEdges as any[]).flatMap(edge => {
+        const label = drawnLabel(edge);
+        return label && byId.has(edge.source?.id) && byId.has(edge.target?.id)
+          ? [{ id: edge.id, source: edge.source.id, target: edge.target.id, label, priority: relationshipPriorityTier(edge.type) }]
+          : [];
+      });
+      let moved = false;
+      for (let pass = 0; pass < 2 && labelled.length; pass++) {
+        const positions = new Map(simNodes.map(node => [node.id, { x: node.x, y: node.y }]));
+        const zoom = Math.max(LABEL_MIN_ZOOM, framedZoom(simNodes, positions, room, 0));
+        const cards = simNodes.map(node => ({ id: node.id, x: node.x, y: node.y, ...getNodeDimensionsAt(node, zoom) }));
+        const cleared = clearFreeCards(cards, labelled, { zoom, free: id => byId.get(id)?.fx == null });
+        for (const [id, point] of cleared.moved) Object.assign(byId.get(id), { x: point.x, y: point.y, vx: 0, vy: 0 });
+        moved ||= cleared.moved.size > 0;
+        if (!cleared.moved.size || !cleared.hidden.length) break;
+      }
+      return moved;
+    };
+
     simulation.on('end.persist', () => {
       if (simulationRef.current !== simulation) return;
+      if (clearLabelsOfFreeCards()) nodeElements.attr('transform', (d: any) => `translate(${d.x || 0},${d.y || 0})`);
       publishPerf(performance.now(), true);
       if (layoutStartRef.current != null && lastSettleMsRef.current == null) {
         lastSettleMsRef.current = Math.round(performance.now() - layoutStartRef.current);
@@ -4235,21 +4307,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // the cards inside the largest rectangle that avoids every control and the
     // MiniMap, measuring each card with the geometry it will have at the fitted
     // scale (full at 100% and above, compact below) so repeated fits settle.
-    const containerRect = container.getBoundingClientRect();
-    const gap = 12;
-    const obstacles = Array.from(document.querySelectorAll<HTMLElement>('[data-graph-fit-obstacle="true"]'))
-      // A passive save note lets taps through and disappears on its own; it
-      // must not reframe the camera under a person's first touch.
-      .filter(element => element.dataset.layoutSavePassive !== 'true' && !(minimumScale > 0 && element.dataset.layoutSaveProgress === 'true'))
-      .map(element => {
-        const rect = element.getBoundingClientRect();
-        return {
-          left: Math.max(0, Math.min(width, rect.left - containerRect.left - gap)),
-          top: Math.max(0, Math.min(height, rect.top - containerRect.top - gap)),
-          right: Math.max(0, Math.min(width, rect.right - containerRect.left + gap)),
-          bottom: Math.max(0, Math.min(height, rect.bottom - containerRect.top + gap)),
-        };
-      });
+    const obstacles = graphFitObstacles(container, minimumScale);
     const cards = simNodes.filter((node: any) => typeof node.x === 'number' && typeof node.y === 'number');
     const fit = computeGraphFit({
       width,
@@ -4536,7 +4594,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     layoutModeRef.current = 'force';
     try { window.localStorage.setItem(LAYOUT_MODE_STORAGE_KEY, 'force'); } catch (error) { console.warn('Unable to save layout mode', error); }
     window.dispatchEvent(new CustomEvent('graphdone-layout-mode-change', { detail: 'force' }));
-    const arranged = organizeTopology(simulation.nodes() as WorkItem[], validatedEdges as any[], node => graphItemLayout(node, measureGraphText), {width:container.clientWidth,height:container.clientHeight});
+    // Room for every relationship label at the zoom the organized graph is framed at.
+    const arranged = organizeWithLabelRoom(simulation.nodes() as WorkItem[], validatedEdges as any[], labelRoom(container.clientWidth, container.clientHeight, 0.65));
     for (const node of simulation.nodes() as any[]) {
       const point = arranged.positions.get(node.id);
       if (!point) continue;
@@ -4550,6 +4609,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       node.userPreferredPosition = null;
       node.userPreferenceVector = null;
     }
+    forgetLabelSpots(validatedEdges as any[]);
     (window as any).__graphOrganization = {components:arranged.components,work:arranged.work};
     organizationZoomFloorRef.current = 0.65;
     organizationFocusRef.current = arranged.components[0]?.focus;
@@ -4563,9 +4623,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       runLabelAvoidanceRef.current?.();
       fitViewToNodes();
     });
-  }, [validatedEdges, fitViewToNodes, persistAllPositions]);
+  }, [validatedEdges, fitViewToNodes, persistAllPositions, labelRoom]);
 
-  // Hierarchical mode packs actual card sizes into compact dependency rows.
+  // Hierarchical mode packs actual card sizes into compact dependency rows,
+  // with room for every relationship label at the zoom they are framed at.
   // Pin both axes so repulsion cannot spread a finished row across the viewport.
   // Switching back restores both original pins, including saved-position pins.
   const layoutModeRef = useRef<LayoutMode>(
@@ -4580,10 +4641,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     if (!sim || !container) return;
     const simNodes = sim.nodes() as any[];
     if (isHierarchicalLayout(mode)) {
-      const positions = computeCompactLayout(
-        simNodes, validatedEdges as any[],
-        { width: container.clientWidth, height: container.clientHeight }, getNodeDimensions,
-      );
+      const { positions } = hierarchyWithLabelRoom(simNodes, validatedEdges as any[],
+        labelRoom(container.clientWidth, container.clientHeight, organizationZoomFloorRef.current));
       simNodes.forEach((node: any) => {
         const point = positions.get(node.id);
         if (!point) return;
@@ -4603,9 +4662,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         delete node.__preLayerFy;
       });
     }
+    forgetLabelSpots(validatedEdges as any[]);
     sim.alpha(DEFAULT_PHYSICS.alpha.loadEnergy).restart();
     if (isHierarchicalLayout(mode)) requestAnimationFrame(() => fitViewToNodes());
-  }, [validatedEdges, getNodeDimensions, fitViewToNodes]);
+  }, [validatedEdges, labelRoom, fitViewToNodes]);
   // Stable handle so the window hook + load effect don't churn when the edge
   // poll re-creates applyLayoutMode (which would reheat the sim every poll).
   const applyLayoutModeRef = useRef(applyLayoutMode);
