@@ -6,6 +6,7 @@ import {
   ownedGraphIdsFixture,
   type OwnedGraphs,
 } from '../../lib/ownedGraphIdsFixture';
+import { isExampleWrite } from '../../../packages/web/src/lib/exampleOperations';
 
 const test = base.extend<{ ownedGraphIds: OwnedGraphs }>({
   ownedGraphIds: [ownedGraphIdsFixture, { timeout: 60000 }],
@@ -46,7 +47,7 @@ test('item wire paths, hitboxes, arrows and dragged labels retain original relat
   page.on('pageerror', error => errors.push(error.message));
   await page.route('**/api/graphql', async route => {
     const body = route.request().postDataJSON();
-    if (/^\s*mutation\b/.test(body?.query ?? '')) {
+    if (/^\s*mutation\b/.test(body?.query ?? '') && !isExampleWrite(body?.operationName)) {
       writes.push(body.operationName || 'mutation');
       await route.abort('blockedbyclient');
     } else await route.continue();
@@ -398,7 +399,7 @@ test('initially hidden item labels retain full conservative sizing @item-wires',
     writes: string[] = [];
   await page.route('**/api/graphql', async route => {
     const body = route.request().postDataJSON();
-    if (/^\s*mutation\b/.test(body?.query ?? '')) {
+    if (/^\s*mutation\b/.test(body?.query ?? '') && !isExampleWrite(body?.operationName)) {
       writes.push(body.operationName || 'mutation');
       await route.abort('blockedbyclient');
     } else await route.continue();

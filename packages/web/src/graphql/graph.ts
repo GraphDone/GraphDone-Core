@@ -329,6 +329,34 @@ export const UPDATE_GRAPH = gql`
   }
 `;
 
+/**
+ * The example workspace's own graph writes (counts, tags, removing an empty
+ * duplicate). Named apart from the views' UpdateGraph and DeleteGraph so every
+ * write the example makes is a `…Starter…` operation, which a view that must
+ * not write (and its tests) can tell from its own.
+ */
+export const UPDATE_STARTER_GRAPH = gql`
+  mutation UpdateStarterGraph($id: ID!, $input: GraphUpdateInput!) {
+    updateGraphs(where: { id: $id }, update: $input) {
+      graphs {
+        id
+        tags
+        nodeCount
+        edgeCount
+        lastActivity
+      }
+    }
+  }
+`;
+
+export const DELETE_STARTER_GRAPH = gql`
+  mutation DeleteStarterGraph($id: ID!) {
+    deleteGraphs(where: { id: $id }) {
+      nodesDeleted
+    }
+  }
+`;
+
 /** The graphs inside a graph, asked of the backend before a delete rather than read from a list that may be stale. */
 export const GET_CHILD_GRAPHS = gql`
   query GetChildGraphs($id: String!) {

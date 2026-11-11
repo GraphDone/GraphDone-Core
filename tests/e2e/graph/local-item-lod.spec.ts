@@ -11,6 +11,7 @@ import {
   ownedGraphIdsFixture,
   type OwnedGraphs,
 } from '../../lib/ownedGraphIdsFixture';
+import { isExampleWrite } from '../../../packages/web/src/lib/exampleOperations';
 
 type Item = {
   id: string;
@@ -157,7 +158,7 @@ for (const [width, height] of [
       page.on('pageerror', error => errors.push(error.message));
       await page.route('**/api/graphql', async route => {
         const body = route.request().postDataJSON();
-        if (!/^\s*mutation\b/.test(body?.query ?? '')) return route.continue();
+        if (!/^\s*mutation\b/.test(body?.query ?? '') || isExampleWrite(body?.operationName)) return route.continue();
         const variables = body.variables;
         if (
           allowedEdit &&
