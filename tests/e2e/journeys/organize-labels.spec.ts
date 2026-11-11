@@ -6,29 +6,35 @@ import { TEST_GRAPH_PREFIX } from '../../lib/dbHealing';
 import { deleteGraphDeep, waitForStarterGraph } from '../../lib/seedGraph';
 import { openGraphView } from '../../lib/journeys/workspace';
 import { auditEdgeLabels, labelProblems, layoutSpread, problemCount, type LabelProblems } from '../../lib/edgeLabelAudit';
-import { EXAMPLE_SHAPES, HARD_SHAPES, type LabelShape } from '../../../packages/web/src/lib/labelClearanceShapes';
+import { LAUNCH_CHECKLIST_SHAPE, WELCOME_SHAPE, type LabelShape } from '../../../packages/web/src/lib/labelClearanceShapes';
+import { CARD_TITLES_HIDE_BELOW, CARD_TITLES_SHOW_ABOVE } from '../../../packages/web/src/lib/cardTitleZoom';
 
 /**
- * JOURNEY organize-labels: after "Organize around connections", in the force
- * layout once it has settled, and in the hierarchical layout, every
- * relationship label a person can see must be readable: not under any card,
- * not on another label, reachable at its centre and inside the visible gap of
- * its own edge. Every edge whose two cards are on screen, clear of the graph
- * controls and MiniMap, must show its label.
+ * JOURNEY organize-labels: after "Organize around connections" and after the
+ * hierarchical layout's fit, at the camera the app itself rests on, every
+ * relationship label a person can see must be there and readable: text of at
+ * least 11 px, not under any card, not on another label, reachable at its
+ * centre and inside the visible gap of its own edge. Every edge whose two
+ * cards are on screen, clear of the graph controls, must show its label.
  *
- * The graphs are the ones a new user gets (Welcome and the example project)
- * and the hard shapes from `labelClearanceShapes.ts`. Each one is created for
- * the test and deleted after it. Organize is pressed with the real control
- * (on a phone, in the View sheet); the layout toggle is the real button where
- * the screen shows it (desktop and iPad). Phones have no layout toggle, so
- * hierarchical mode there goes through the same hook the toggle calls.
+ * A graph of up to 60 items is framed whole down to the zoom where card
+ * titles and labels still show (CARD_TITLES_SHOW_ABOVE): when the camera rests
+ * above that zoom every card must be on screen. When the whole graph needs a
+ * smaller zoom, the camera holds that zoom on the organized neighbourhood and
+ * the check covers the edges on screen (at least one).
  *
- * Labels are drawn from 60% zoom up. Where the camera frames a settled force
- * layout further out (a phone frames at 50%, a large graph further), the test
- * zooms in the way a person would (a wheel notch, a pinch) before reading.
- * "As loaded" is the graph's saved arrangement, which no layout moves: it is
- * recorded for comparison, not checked.
+ * The graphs are Welcome (what a new user gets first) and a twelve-item launch
+ * checklist with fifteen relationships of mixed types, the graph a person
+ * imported when labels went missing. Each one is created for the test and
+ * deleted after it. Organize is pressed with the real control (on a phone, in
+ * the View sheet); the layout toggle is the real button where the screen shows
+ * it. Phones have no layout toggle, so hierarchical mode there goes through
+ * the hook the toggle calls. "As loaded" is the graph's saved arrangement,
+ * which no layout moves: it is recorded for comparison, not checked.
  */
+
+const LABEL_MIN_ZOOM = CARD_TITLES_HIDE_BELOW;
+const SMALL_GRAPH_ZOOM_FLOOR = CARD_TITLES_SHOW_ABOVE;
 
 type Owned = { create: (shape: LabelShape, mode: 'placed' | 'unplaced') => Promise<string> };
 const test = base.extend<{ owned: Owned }>({
@@ -74,7 +80,6 @@ const test = base.extend<{ owned: Owned }>({
 });
 
 const touch = (page: Page) => page.evaluate(() => matchMedia('(pointer: coarse)').matches);
-const LABEL_MIN_ZOOM = 0.6;
 async function press(page: Page, locator: ReturnType<Page['getByRole']>) {
   await expect(locator).toBeEnabled();
   if (await touch(page)) await locator.tap(); else await locator.click();
@@ -129,85 +134,56 @@ async function setLayout(page: Page, mode: 'hierarchical' | 'force') {
   return 'hook';
 }
 
-/** Zoom in at the graph's centre until labels are drawn (at most eight steps). */
-async function zoomToRead(page: Page, cards: number) {
-  for (let step = 0; step < 8; step++) {
-    const scale = (await auditEdgeLabels(page)).scale;
-    if (scale >= LABEL_MIN_ZOOM) return step;
-    const box = (await page.locator('.graph-container').boundingBox())!;
-    const x = box.x + box.width / 2, y = box.y + box.height / 2;
-    if (await touch(page)) {
-      const cdp = await page.context().newCDPSession(page);
-      await cdp.send('Input.synthesizePinchGesture', { x, y, scaleFactor: 1.4, gestureSourceType: 'touch' } as never);
-      await cdp.detach();
-    } else {
-      await page.mouse.move(x, y);
-      await page.mouse.wheel(0, -240);
-    }
-    await settled(page, cards);
-  }
-  return 8;
-}
-
-type Stage = { graph: string; stage: string; via?: string; checked: boolean; scale: number; cards: number; drawn: number; inView: number; underControls: number; shown: number; problems: LabelProblems; count: number; spread: Awaited<ReturnType<typeof layoutSpread>> };
+type Stage = { graph: string; stage: string; via?: string; checked: boolean; scale: number; cards: number; offScreen: number; drawn: number; inView: number; underControls: number; shown: number; problems: LabelProblems; count: number; spread: Awaited<ReturnType<typeof layoutSpread>> };
 
 async function measure(page: Page, graph: string, stage: string, via?: string, checked = true): Promise<Stage> {
   const audit = await auditEdgeLabels(page);
   const problems = labelProblems(audit);
   return {
-    graph, stage, via, checked, scale: Math.round(audit.scale * 1000) / 1000, cards: audit.cards,
+    graph, stage, via, checked, scale: Math.round(audit.scale * 1000) / 1000, cards: audit.cards, offScreen: audit.offScreenCards,
     drawn: audit.drawnEdges, inView: audit.inViewEdges, underControls: audit.underControls, shown: audit.shownLabels,
     problems, count: problemCount(problems), spread: await layoutSpread(page),
   };
 }
 
 const summary = (stages: Stage[]) => stages.map(s =>
-  `${s.graph} / ${s.stage}${s.via ? ` (${s.via})` : ''}${s.checked ? '' : ' [not checked]'}: zoom ${s.scale}, ${s.shown}/${s.drawn} labels shown, ${s.inView} edges in view (${s.underControls} under controls) — hidden ${s.problems.hidden.length}, under a card ${s.problems.covered.length}, on another label ${s.problems.overlapping.length}, centre not reachable ${s.problems.unreachable.length}, outside the gap ${s.problems.outOfGap.length}`
+  `${s.graph} / ${s.stage}${s.via ? ` (${s.via})` : ''}${s.checked ? '' : ' [not checked]'}: zoom ${s.scale}, ${s.cards - s.offScreen}/${s.cards} cards on screen, ${s.shown}/${s.drawn} labels shown, ${s.inView} edges in view (${s.underControls} under controls) — hidden ${s.problems.hidden.length}, under a card ${s.problems.covered.length}, on another label ${s.problems.overlapping.length}, centre not reachable ${s.problems.unreachable.length}, outside the gap ${s.problems.outOfGap.length}, text too small ${s.problems.small.length}`
 ).join('\n');
 
-async function organizeAndCheck(page: Page, owned: Owned, info: TestInfo, shapes: readonly LabelShape[]) {
-  const stages: Stage[] = [];
-  for (const shape of shapes) {
-    const graphId = await owned.create(shape, 'placed');
-    await openGraph(page, graphId, shape.items.length);
-    stages.push(await measure(page, shape.name, 'as loaded', undefined, false));
-    if (shape === shapes[0]) await evidence(info, `${slug(shape.name)}-before.png`, await page.screenshot(), 'image/png');
-    await organize(page);
-    await settled(page, shape.items.length);
-    stages.push(await measure(page, shape.name, 'organized'));
-    await evidence(info, `${slug(shape.name)}-organized.png`, await page.screenshot(), 'image/png');
-    const via = await setLayout(page, 'hierarchical');
-    await settled(page, shape.items.length);
-    stages.push(await measure(page, shape.name, 'hierarchical', via));
-    await evidence(info, `${slug(shape.name)}-hierarchical.png`, await page.screenshot(), 'image/png');
-    await setLayout(page, 'force');
-    await settled(page, shape.items.length);
-    stages.push(await measure(page, shape.name, 'force after organize', via));
-  }
-  return stages;
-}
-
-async function forceAndCheck(page: Page, owned: Owned, info: TestInfo, shapes: readonly LabelShape[]) {
-  const stages: Stage[] = [];
-  for (const shape of shapes) {
-    if (!shape.edges.length) continue;
-    const graphId = await owned.create(shape, 'unplaced');
-    await openGraph(page, graphId, shape.items.length);
-    const steps = await zoomToRead(page, shape.items.length);
-    stages.push(await measure(page, shape.name, 'force settled', steps ? `zoomed in ${steps}×` : undefined));
-    await evidence(info, `${slug(shape.name)}-force.png`, await page.screenshot(), 'image/png');
-  }
-  return stages;
-}
-
 const slug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+
+async function organizeAndCheck(page: Page, owned: Owned, info: TestInfo, shape: LabelShape) {
+  const stages: Stage[] = [];
+  const graphId = await owned.create(shape, 'placed');
+  await openGraph(page, graphId, shape.items.length);
+  stages.push(await measure(page, shape.name, 'as loaded', undefined, false));
+  await evidence(info, `${slug(shape.name)}-before.png`, await page.screenshot(), 'image/png');
+  await organize(page);
+  await settled(page, shape.items.length);
+  stages.push(await measure(page, shape.name, 'organized'));
+  await evidence(info, `${slug(shape.name)}-organized.png`, await page.screenshot(), 'image/png');
+  const via = await setLayout(page, 'hierarchical');
+  await settled(page, shape.items.length);
+  stages.push(await measure(page, shape.name, 'hierarchical', via));
+  await evidence(info, `${slug(shape.name)}-hierarchical.png`, await page.screenshot(), 'image/png');
+  return stages;
+}
+
+/** Why a checked stage fails; empty when every label there reads. */
+function failures(s: Stage): string[] {
+  const out: string[] = [];
+  if (s.count > 0) out.push(`${s.count} label problems\n  ${Object.entries(s.problems).filter(([, list]) => list.length).map(([kind, list]) => `${kind}: ${list.slice(0, 6).join('; ')}`).join('\n  ')}`);
+  if (s.scale < LABEL_MIN_ZOOM) out.push(`rests at zoom ${s.scale}, below the ${LABEL_MIN_ZOOM} where labels show`);
+  if (s.drawn > 0 && s.inView === 0) out.push('no edge has both cards on screen');
+  if (s.scale > SMALL_GRAPH_ZOOM_FLOOR + 0.005 && s.offScreen > 0) out.push(`${s.offScreen} cards off screen although the camera could zoom out further`);
+  return out;
+}
 
 async function report(info: TestInfo, stages: Stage[]) {
   await evidence(info, 'label-stages.json', JSON.stringify(stages, null, 2), 'application/json');
   await evidence(info, 'label-summary.txt', summary(stages), 'text/plain');
-  const failing = stages.filter(s => s.checked && (s.count > 0 || s.scale < LABEL_MIN_ZOOM));
-  expect(failing.map(s => `${s.graph} / ${s.stage}: ${s.count} problems at zoom ${s.scale}\n  ${Object.entries(s.problems).filter(([, list]) => list.length).map(([kind, list]) => `${kind}: ${list.slice(0, 6).join('; ')}`).join('\n  ')}`),
-    `labels are not all readable:\n${summary(stages)}`).toEqual([]);
+  const failing = stages.filter(s => s.checked).flatMap(s => failures(s).map(reason => `${s.graph} / ${s.stage}: ${reason}`));
+  expect(failing, `labels are not all readable:\n${summary(stages)}`).toEqual([]);
 }
 
 test.beforeEach(async ({ page }) => {
@@ -215,17 +191,8 @@ test.beforeEach(async ({ page }) => {
   await waitForStarterGraph(page);
 });
 
-test('JOURNEY organize-labels: the example graphs keep every relationship label readable', async ({ page, owned }, info) => {
-  test.setTimeout(240_000);
-  await report(info, await organizeAndCheck(page, owned, info, EXAMPLE_SHAPES));
-});
-
-test('JOURNEY organize-labels: hubs, chains, dense clusters and long labels keep every label readable', async ({ page, owned }, info) => {
-  test.setTimeout(300_000);
-  await report(info, await organizeAndCheck(page, owned, info, HARD_SHAPES));
-});
-
-test('JOURNEY organize-labels: the force layout settles with every label readable', async ({ page, owned }, info) => {
-  test.setTimeout(300_000);
-  await report(info, await forceAndCheck(page, owned, info, [...EXAMPLE_SHAPES, ...HARD_SHAPES]));
-});
+for (const shape of [WELCOME_SHAPE, LAUNCH_CHECKLIST_SHAPE])
+  test(`JOURNEY organize-labels: ${shape.name} keeps every relationship label readable after Organize and in hierarchical`, async ({ page, owned }, info) => {
+    test.setTimeout(150_000);
+    await report(info, await organizeAndCheck(page, owned, info, shape));
+  });

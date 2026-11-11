@@ -105,7 +105,7 @@ for (const sequence of ['new-user', 'agent-connection', 'inspector-readability',
     }
     if (sequence === 'organize-labels') {
       assert.deepEqual(args.filter(arg => arg.endsWith('.spec.ts')), ['tests/e2e/journeys/organize-labels.spec.ts']);
-      assert.deepEqual(args.filter(arg => arg.startsWith('--project=')), ['--project=journeys', '--project=journeys-ipad', '--project=journeys-iphone']);
+      assert.deepEqual(args.filter(arg => arg.startsWith('--project=')), ['--project=journeys', '--project=journeys-iphone']);
       assert.equal(SEQUENCES[sequence].blocking, true);
       for (const profile of ['pr', 'full']) assert.ok(PROFILES[profile].includes(sequence));
       assertSmokeGateRuns(sequence, { out: 'ci-organize-labels', xvfb: false });

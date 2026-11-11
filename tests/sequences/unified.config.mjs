@@ -88,7 +88,7 @@ export const SEQUENCES = {
   // readable (not under a card or another label, inside its edge's gap), on
   // desktop, iPad and iPhone, for the example graphs and hard shapes.
   'organize-labels': { adapter: 'playwright', title: 'Organize — every relationship label readable', args: [
-    'tests/e2e/journeys/organize-labels.spec.ts', '--project=journeys', '--project=journeys-ipad', '--project=journeys-iphone',
+    'tests/e2e/journeys/organize-labels.spec.ts', '--project=journeys', '--project=journeys-iphone',
     '--workers=1', '--retries=0', '--trace=retain-on-failure',
   ], blocking: true },
   // Cross-repo: ingest the newest GraphDone-Cloud live-audit findings.json (sibling

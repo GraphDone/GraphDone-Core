@@ -18,7 +18,11 @@ import type { Page } from '@playwright/test';
  * - `labels`: ids of the other shown labels whose box intersects this one;
  * - `hit`: `elementFromPoint` at the label's centre lands on the label itself;
  * - `inGap`: the label lies alongside the visible part of its own edge, the
- *   line between the two cards' borders.
+ *   line between the two cards' borders;
+ * - `textPx`: the label text's font size on screen, in CSS pixels.
+ *
+ * `offScreenCards` counts the cards not wholly inside the graph area or
+ * under a control: with none, the whole graph is on screen.
  *
  * Boxes that only touch (within half a pixel) do not count as overlapping.
  */
@@ -38,6 +42,7 @@ export interface AuditedLabel {
   labels: string[];
   hit: boolean;
   inGap: boolean;
+  textPx: number;
   box: { x: number; y: number }[];
 }
 
@@ -48,6 +53,7 @@ export interface LabelAudit {
   inViewEdges: number;
   underControls: number;
   shownLabels: number;
+  offScreenCards: number;
   labels: AuditedLabel[];
 }
 
@@ -62,7 +68,12 @@ export interface LabelProblems {
   unreachable: string[];
   /** Shown labels outside the visible gap of their edge. */
   outOfGap: string[];
+  /** Shown labels whose text is smaller than READABLE_TEXT_PX on screen. */
+  small: string[];
 }
+
+/** Smallest label text, in CSS pixels, that counts as readable. */
+export const READABLE_TEXT_PX = 11;
 
 export async function auditEdgeLabels(page: Page): Promise<LabelAudit> {
   return page.evaluate(() => {
@@ -70,7 +81,7 @@ export async function auditEdgeLabels(page: Page): Promise<LabelAudit> {
     const area = document.querySelector('.graph-container');
     const svg = area?.querySelector('svg');
     const group = svg?.querySelector('g.main-graph-group');
-    if (!area || !svg) return { scale: 0, cards: 0, drawnEdges: 0, inViewEdges: 0, underControls: 0, shownLabels: 0, labels: [] };
+    if (!area || !svg) return { scale: 0, cards: 0, drawnEdges: 0, inViewEdges: 0, underControls: 0, shownLabels: 0, offScreenCards: 0, labels: [] };
     const scale = Number(/scale\(([^)]+)\)/.exec(group?.getAttribute('transform') ?? '')?.[1] ?? 1);
     const bounds = area.getBoundingClientRect();
     const painted = (el: Element | null) => {
@@ -150,7 +161,7 @@ export async function auditEdgeLabels(page: Page): Promise<LabelAudit> {
         source, target, sourceTitle: titles.get(source) ?? source, targetTitle: titles.get(target) ?? target, shown,
         inView: onScreen && !covered,
         underControls: covered,
-        cards: [], labels: [], hit: false, inGap: false,
+        cards: [], labels: [], hit: false, inGap: false, textPx: 0,
         box: shown ? quad(bg!) : [],
         line: [{ x: a.x, y: a.y }, { x: b.x, y: b.y }],
       });
@@ -162,6 +173,9 @@ export async function auditEdgeLabels(page: Page): Promise<LabelAudit> {
       const cx = label.box.reduce((s, p) => s + p.x, 0) / 4, cy = label.box.reduce((s, p) => s + p.y, 0) / 4;
       const hitEl = document.elementFromPoint(cx, cy);
       label.hit = !!hitEl && hitEl.closest('.edge-label-group') === labelGroups.get(label.id);
+      const text = labelGroups.get(label.id)?.querySelector<SVGGraphicsElement>('.edge-label');
+      const ctm = text?.getScreenCTM();
+      label.textPx = text && ctm ? parseFloat(getComputedStyle(text).fontSize) * Math.hypot(ctm.a, ctm.b) : 0;
       const [a, b] = label.line!;
       const len = Math.hypot(b.x - a.x, b.y - a.y);
       const ux = (b.x - a.x) / len, uy = (b.y - a.y) / len;
@@ -171,6 +185,7 @@ export async function auditEdgeLabels(page: Page): Promise<LabelAudit> {
       });
     }
     for (const label of labels) delete label.line;
+    const offScreenCards = [...cards.values()].filter(card => !inside(card) || controls.some(control => intersects(control, card))).length;
     return {
       scale,
       cards: cards.size,
@@ -178,6 +193,7 @@ export async function auditEdgeLabels(page: Page): Promise<LabelAudit> {
       inViewEdges: labels.filter(l => l.inView).length,
       underControls: labels.filter(l => l.underControls).length,
       shownLabels: shown.length,
+      offScreenCards,
       labels,
     };
   });
@@ -229,6 +245,7 @@ export function labelProblems(audit: LabelAudit): LabelProblems {
     })),
     unreachable: shown.filter(l => !l.hit).map(name),
     outOfGap: shown.filter(l => !l.inGap).map(name),
+    small: shown.filter(l => l.textPx < READABLE_TEXT_PX).map(name),
   };
 }
 
