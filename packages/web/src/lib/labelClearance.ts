@@ -603,14 +603,18 @@ const cardsOverlap = (a: LabelCard, b: LabelCard, clearance: number) =>
 
 /**
  * After the force layout settles: move only the cards the simulation is free
- * to move (never a pinned, saved card) until every label in `edges` shows at
- * `zoom`. First a hidden label's free card steps away from the card at the
- * other end of its edge, enough for the label and a little more to get clear
- * of crowding; when wires still cross labels, the free cards spread out about
- * the pinned ones (or their own centre) by the smallest factor that frees
- * them, and the steps run once more. A moved card that lands on another card
- * keeps going the same way. Returns the new centres of the cards it moved and
- * the labels still hidden (both ends pinned, or out of work).
+ * to move (never a pinned, saved card) until every label in `edges` with a
+ * free card at one end shows at `zoom`. A label between two pinned cards is
+ * left as it is: nothing moves for it. First a hidden label's free card steps
+ * away from the card at the other end of its edge, enough for the label and a
+ * little more to get clear of crowding (the steps are kept only when they
+ * show more of those labels). When wires still cross labels, the free cards of
+ * the groups those labels are in spread out about the other cards by the
+ * smallest factor that shows every label of the cards it moves, kept only when
+ * it does. A moved card that lands on another card keeps going the same way.
+ * So running it again on its own result moves nothing. Returns the new centres
+ * of the cards it moved and the labels still hidden (both ends pinned, or out
+ * of work).
  */
 export function clearFreeCards(
   cards: readonly LabelCard[],
@@ -674,33 +678,78 @@ export function clearFreeCards(
     for (const [id, p] of push) shift(current.get(id)!, p.x, p.y);
     return push.size > 0;
   };
-  const steps = () => {
-    let hidden = hiddenNow();
-    for (let round = 0; round < rounds && hidden?.length && step(hidden); round++) hidden = hiddenNow();
-    return hidden;
+  // Hidden labels a free card can do something about.
+  const freeable = (hidden: string[]) =>
+    hidden.filter(id => options.free(byEdge.get(id)!.source) || options.free(byEdge.get(id)!.target));
+  const saved = () => ({ at: new Map([...current].map(([id, card]) => [id, { x: card.x, y: card.y }])), moved: new Set(moved) });
+  const restore = (state: ReturnType<typeof saved>) => {
+    for (const [id, p] of state.at) Object.assign(current.get(id)!, p);
+    moved.clear();
+    for (const id of state.moved) moved.add(id);
   };
-  let hidden = steps();
-  if (hidden?.length) {
-    const free = [...current.values()].filter(card => options.free(card.id));
-    const pinned = [...current.values()].filter(card => !options.free(card.id));
-    const around = pinned.length ? pinned : free;
+  // `change` kept when it shows more of the freeable labels (or `good` says
+  // so), else undone; the labels then hidden, or null.
+  const keepIfBetter = (
+    hidden: string[],
+    change: () => boolean,
+    good = (after: string[]) => freeable(after).length < freeable(hidden).length
+  ) => {
+    const before = saved();
+    if (!change()) return null;
+    const after = hiddenNow();
+    if (after && good(after)) return after;
+    restore(before);
+    return null;
+  };
+  // Up to `rounds` steps, kept together when they show more of those labels.
+  const steps = (hidden: string[] | null) => {
+    if (!hidden || !freeable(hidden).length) return hidden;
+    let last: string[] | null = hidden;
+    const kept = keepIfBetter(hidden, () => {
+      let any = false;
+      for (let round = 0; round < rounds && last && freeable(last).length && step(freeable(last)); round++) {
+        any = true;
+        last = hiddenNow();
+      }
+      return any;
+    });
+    return kept ?? hidden;
+  };
+  let hidden = steps(hiddenNow());
+  if (hidden && freeable(hidden).length) {
+    // The free cards of the groups (linked cards) the hidden labels are in.
+    const group = new Map([...current.keys()].map(id => [id, id]));
+    const root = (id: string): string => (group.get(id) === id ? id : root(group.get(id)!));
+    for (const edge of edges) if (current.has(edge.source) && current.has(edge.target)) group.set(root(edge.source), root(edge.target));
+    const groups = new Set(freeable(hidden).map(id => root(byEdge.get(id)!.source)));
+    const movers = new Set([...current.keys()].filter(id => options.free(id) && groups.has(root(id))));
+    const still = [...current.values()].filter(card => !movers.has(card.id));
+    const around = still.length ? still : [...current.values()];
     const anchor = {
       x: around.reduce((sum, card) => sum + card.x, 0) / around.length,
       y: around.reduce((sum, card) => sum + card.y, 0) / around.length,
     };
     const points = new Map([...current].map(([id, card]) => [id, { x: card.x, y: card.y }]));
     const sizes = new Map([...current].map(([id, card]) => [id, { width: card.width, height: card.height }]));
-    const factor = spreadForLabels(points, sizes, edges, { zoom: options.zoom, anchor, work, moves: options.free });
-    if (factor > 1) {
-      for (const card of free) {
-        const to = spreadPoint(card, anchor, factor);
-        card.x = to.x;
-        card.y = to.y;
-        moved.add(card.id);
-      }
-      for (const card of free) shift(card, 0, 0, card.x - anchor.x, card.y - anchor.y);
-      hidden = steps();
-    }
+    // The smallest spread that shows every label of the cards it moves, kept
+    // only when it does (spreadForLabels gives its largest when none does).
+    const theirs = edges.filter(edge => movers.has(edge.source) || movers.has(edge.target));
+    const factor = spreadForLabels(points, sizes, theirs, { zoom: options.zoom, anchor, work, moves: id => movers.has(id) });
+    const spread =
+      factor > 1 &&
+      keepIfBetter(hidden, () => {
+        for (const id of movers) {
+          const card = current.get(id)!;
+          Object.assign(card, spreadPoint(card, anchor, factor));
+          moved.add(id);
+        }
+        for (const id of movers) {
+          const card = current.get(id)!;
+          shift(card, 0, 0, card.x - anchor.x, card.y - anchor.y);
+        }
+        return true;
+      }, after => !theirs.some(edge => after.includes(edge.id)));
+    if (spread) hidden = spread;
   }
   return {
     moved: new Map([...moved].map(id => [id, { x: current.get(id)!.x, y: current.get(id)!.y }])),

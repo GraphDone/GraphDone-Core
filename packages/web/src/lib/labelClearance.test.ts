@@ -347,6 +347,53 @@ describe('clearFreeCards', () => {
     expect(stuck.moved.size).toBe(0);
     expect(stuck.hidden.length).toBeGreaterThan(0);
   });
+
+  // One card an agent or the API added to a saved graph has no saved position,
+  // so it is the only free card when the layout settles. Two saved cards sit
+  // so close that their own label is hidden: only a person can fix that, and
+  // it must not throw the new card away (as the settled layout does it twice).
+  describe('one new card in a saved graph whose saved cards hide a label', () => {
+    const g = graph({
+      name: 'Saved graph and one new card',
+      items: [['a', 'Draft the plan'], ['b', 'Review the plan'], ['c', 'Ship the release'], ['n', 'Added by an agent']]
+        .map(([key, title]) => ({ key, title, type: 'TASK', status: 'NOT_STARTED' })),
+      edges: [{ source: 'a', target: 'b', type: 'BLOCKS' }, { source: 'c', target: 'n', type: 'BLOCKS' }],
+    });
+    const zoom = 0.5;
+    const free = (id: string) => id === 'n';
+    const settle = (start: Record<string, { x: number; y: number }>) => {
+      const after: Points[] = [];
+      let positions: Points = new Map(Object.entries(start));
+      for (let pass = 0; pass < 3; pass++) {
+        const { moved } = clearFreeCards(cardsAt(g, positions, zoom), g.drawn, { zoom, free });
+        positions = new Map([...positions].map(([id, p]) => [id, moved.get(id) ?? p]));
+        after.push(positions);
+      }
+      return after;
+    };
+    const ab = g.drawn.find(edge => edge.source === 'a')!.id, cn = g.drawn.find(edge => edge.source === 'c')!.id;
+    // The new card's visible gap to the saved card it is linked to.
+    const gapToC = (positions: Points) => {
+      const [c, n] = cardsAt(g, positions, zoom).filter(card => card.id === 'c' || card.id === 'n');
+      return Math.hypot(n.x - c.x, n.y - c.y) - c.width / 2 - n.width / 2;
+    };
+
+    it('leaves the new card where it is when its own label shows', () => {
+      const start = { a: { x: 0, y: 0 }, b: { x: 230, y: 0 }, c: { x: 0, y: 400 }, n: { x: 600, y: 400 } };
+      expect(problems(g, new Map(Object.entries(start)), zoom).hidden).toEqual([ab]);
+      for (const positions of settle(start)) expect(positions.get('n')).toEqual(start.n);
+    });
+
+    it('moves the new card only as far as its own label needs, and only once', () => {
+      const start = { a: { x: 0, y: 0 }, b: { x: 230, y: 0 }, c: { x: 0, y: 400 }, n: { x: 260, y: 400 } };
+      expect(problems(g, new Map(Object.entries(start)), zoom).hidden).toEqual([ab, cn]);
+      const [first, ...later] = settle(start);
+      expect(problems(g, first, zoom).hidden).toEqual([ab]);
+      // Its label's gap and some room to spare, beside the card it is linked to.
+      expect(gapToC(first)).toBeLessThan(1.5 * labelGap(g.drawn.find(edge => edge.id === cn)!.label, zoom));
+      for (const positions of later) expect(positions.get('n')).toEqual(first.get('n'));
+    });
+  });
 });
 
 // Item ids break ties in the organizer and in the label order, and real ids are
