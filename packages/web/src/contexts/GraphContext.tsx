@@ -114,6 +114,7 @@ export function GraphProvider({ children }: GraphProviderProps) {
         variables: {
           input: inputs.map(input => ({
             ...input,
+            ...(input.parentGraphId && { parentGraph: { connect: { where: { node: { id: input.parentGraphId } } } } }),
             status: 'ACTIVE',
             teamId,
             createdBy: userId,
