@@ -3,8 +3,14 @@ import { editorEdge, editorPlacement, endpointId, flipRelationship, relationship
 
 const original: SavedRelationship = { id: 'e1', type: 'BLOCKS', weight: 0.8, sourceId: 'a', targetId: 'b', metadata: null };
 
-/** A store of saved relationships the flip works against, with optional failures. */
-function store(options: { failCreate?: boolean; failRemove?: string[]; createWrong?: boolean; createNothing?: boolean } = {}) {
+/**
+ * A store of saved relationships the flip works against, with optional
+ * failures: a write that fails, or one that is saved but whose reply is lost.
+ */
+function store(options: {
+  failCreate?: boolean; failRemove?: string[]; createWrong?: boolean; createNothing?: boolean;
+  loseCreateReply?: boolean; loseRemoveReply?: string[]; cannotRead?: boolean;
+} = {}) {
   const rows = new Map<string, SavedRelationship>([[original.id, { ...original }]]);
   const calls: string[] = [];
   let next = 1;
@@ -15,18 +21,26 @@ function store(options: { failCreate?: boolean; failRemove?: string[]; createWro
         calls.push(`create ${input.source.connect.where.node.id}>${input.target.connect.where.node.id} ${input.type} ${input.weight}`);
         if (options.failCreate) throw new Error('Network down');
         if (options.createNothing) return null;
+        const lost = options.loseCreateReply;
         const row = {
           id: `n${next++}`, type: input.type, weight: input.weight,
           sourceId: options.createWrong ? input.target.connect.where.node.id : input.source.connect.where.node.id,
           targetId: options.createWrong ? input.source.connect.where.node.id : input.target.connect.where.node.id,
         };
         rows.set(row.id, row);
+        if (lost) throw new Error('Request timed out');
         return row;
       },
       async remove(id: string) {
         calls.push(`remove ${id}`);
         if (options.failRemove?.includes(id)) throw new Error(`Cannot delete ${id}`);
         rows.delete(id);
+        if (options.loseRemoveReply?.includes(id)) throw new Error('Request timed out');
+      },
+      async between(a: string, b: string) {
+        calls.push('read');
+        if (options.cannotRead) throw new Error('Network down');
+        return [...rows.values()].filter(r => [r.sourceId, r.targetId].sort().join() === [a, b].sort().join());
       },
     },
   };
@@ -54,7 +68,7 @@ describe('flipRelationship', () => {
     const s = store({ failCreate: true });
     const outcome = await flipRelationship(original, s.ops);
     expect(outcome).toEqual({ ok: false, message: 'Network down. The relationship was not changed.' });
-    expect(s.calls).toEqual(['create b>a BLOCKS 0.8']);
+    expect(s.calls).toEqual(['create b>a BLOCKS 0.8', 'read']);
     expect([...s.rows.keys()]).toEqual(['e1']);
   });
 
@@ -77,7 +91,7 @@ describe('flipRelationship', () => {
     const s = store({ failRemove: ['e1'] });
     const outcome = await flipRelationship(original, s.ops);
     expect(outcome).toEqual({ ok: false, message: 'Cannot delete e1. The relationship was not changed.' });
-    expect(s.calls).toEqual(['create b>a BLOCKS 0.8', 'remove e1', 'remove n1']);
+    expect(s.calls).toEqual(['create b>a BLOCKS 0.8', 'remove e1', 'read', 'remove n1']);
     expect([...s.rows.keys()]).toEqual(['e1']);
   });
 
@@ -88,6 +102,38 @@ describe('flipRelationship', () => {
     expect(!outcome.ok && outcome.message).toBe('Cannot delete e1. Both directions are now saved; delete the one you do not want.');
     expect(!outcome.ok && outcome.bothDirections?.id).toBe('n1');
     expect(s.rows.size).toBe(2);
+  });
+
+  it('a delete that was saved but whose reply was lost completes the flip, never rolling it back', async () => {
+    const s = store({ loseRemoveReply: ['e1'] });
+    const outcome = await flipRelationship(original, s.ops);
+    expect(outcome).toEqual({ ok: true, edge: { id: 'n1', type: 'BLOCKS', weight: 0.8, sourceId: 'b', targetId: 'a' } });
+    expect(s.calls).toEqual(['create b>a BLOCKS 0.8', 'remove e1', 'read']);
+    expect([...s.rows.keys()]).toEqual(['n1']);
+  });
+
+  it('a create that was saved but whose reply was lost is used, so the flip leaves one relationship', async () => {
+    const s = store({ loseCreateReply: true });
+    const outcome = await flipRelationship(original, s.ops);
+    expect(outcome.ok && outcome.edge.id).toBe('n1');
+    expect(s.calls).toEqual(['create b>a BLOCKS 0.8', 'read', 'remove e1']);
+    expect([...s.rows.values()]).toEqual([{ id: 'n1', type: 'BLOCKS', weight: 0.8, sourceId: 'b', targetId: 'a' }]);
+  });
+
+  it('when a failure cannot be checked, it removes nothing more and says the outcome is unknown', async () => {
+    const s = store({ failRemove: ['e1'], cannotRead: true });
+    const outcome = await flipRelationship(original, s.ops);
+    expect(outcome.ok).toBe(false);
+    expect(!outcome.ok && outcome.message).toBe("Cannot delete e1. What was saved could not be checked; reload to see this pair's relationships.");
+    expect(s.calls).toEqual(['create b>a BLOCKS 0.8', 'remove e1', 'read']);
+    expect(s.rows.size).toBe(2);
+  });
+
+  it('a rollback whose reply was lost still says the relationship was not changed', async () => {
+    const s = store({ failRemove: ['e1'], loseRemoveReply: ['n1'] });
+    const outcome = await flipRelationship(original, s.ops);
+    expect(outcome).toEqual({ ok: false, message: 'Cannot delete e1. The relationship was not changed.' });
+    expect([...s.rows.keys()]).toEqual(['e1']);
   });
 
   it('refuses a relationship from an item to itself without writing', async () => {

@@ -23,7 +23,12 @@ function backend(options: { failDelete?: string; holdUpdates?: boolean } = {}) {
       const v = operation.variables as any;
       const finish = (data: Record<string, unknown>) => { observer.next({ data }); observer.complete(); };
       switch (operation.operationName) {
-        case 'GetRelationship': finish({ edges: rows.has(v.where.id) ? [edge(rows.get(v.where.id)!)] : [] }); break;
+        case 'GetRelationship': {
+          // By id, or every relationship between two items (OR of both directions).
+          const between = (row: Row) => (v.where.OR ?? []).some((w: any) => w.source.id === row.source && w.target.id === row.target);
+          finish({ edges: [...rows.values()].filter(row => v.where.id ? row.id === v.where.id : between(row)).map(edge) });
+          break;
+        }
         case 'GetEdges': finish({ edges: [...rows.values()].map(edge) }); break;
         case 'GetWorkItems': finish({ workItems: [] }); break;
         case 'UpdateEdges': {
@@ -48,7 +53,7 @@ function backend(options: { failDelete?: string; holdUpdates?: boolean } = {}) {
           log.push(`delete ${v.where.id}`);
           if (options.failDelete === v.where.id) { observer.error(new Error('Delete refused')); break; }
           rows.delete(v.where.id);
-          finish({ deleteEdges: { __typename: 'DeleteInfo', nodesDeleted: 1 } });
+          finish({ deleteEdges: { __typename: 'DeleteInfo', nodesDeleted: 1, relationshipsDeleted: 2 } });
           break;
         }
         default: observer.error(new Error(`unexpected ${operation.operationName}`));

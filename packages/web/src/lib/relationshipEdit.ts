@@ -51,8 +51,10 @@ export type FlipOutcome =
 export interface FlipOperations {
   /** Save a new relationship; resolves to it as saved, or null when nothing was saved. */
   create(input: ReturnType<typeof reversedEdgeInput>): Promise<SavedRelationship | null>;
-  /** Delete one relationship by id. */
+  /** Delete one relationship by id; rejects when nothing was deleted. */
   remove(id: string): Promise<void>;
+  /** Read again, from the store itself, every relationship saved between two items, either way round. */
+  between(aId: string, bId: string): Promise<SavedRelationship[]>;
 }
 
 const sentence = (error: unknown) => {
@@ -62,27 +64,47 @@ const sentence = (error: unknown) => {
 };
 
 const UNCHANGED = 'The relationship was not changed.';
+const UNKNOWN = 'What was saved could not be checked; reload to see this pair\'s relationships.';
 
 /**
  * Flip a relationship without ever losing it. The reversed relationship is
- * saved first and the original removed only once it exists. If removing the
- * original fails, the reversed copy is removed again so the relationship stays
- * as it was; only when that cleanup also fails are both directions left, and
- * the message says so.
+ * saved first and the original removed only once it exists. A write that
+ * reports a failure may still have been saved (its reply lost on the way
+ * back), so after any failure the pair is read again and the outcome follows
+ * what is actually saved: a create that went through is used, a delete that
+ * went through completes the flip. If the original is still there, the
+ * reversed copy is removed so the relationship stays as it was; only when
+ * that also fails are both directions left, and the message says so. When
+ * the pair cannot be read, nothing more is removed and the message says the
+ * outcome is unknown.
  */
 export async function flipRelationship(edge: SavedRelationship, ops: FlipOperations): Promise<FlipOutcome> {
   if (edge.sourceId === edge.targetId) {
     return { ok: false, message: `This relationship joins an item to itself, so it has no direction to flip. ${UNCHANGED}` };
   }
+  const isReversed = (r: SavedRelationship) => r.id !== edge.id && r.sourceId === edge.targetId
+    && r.targetId === edge.sourceId && r.type === edge.type;
+  /** What is saved between the pair now, or null when it cannot be read. */
+  const saved = async () => {
+    try {
+      const rows = await ops.between(edge.sourceId, edge.targetId);
+      return { original: rows.some(r => r.id === edge.id), reversed: rows.filter(isReversed) };
+    } catch {
+      return null;
+    }
+  };
+
   let reversed: SavedRelationship | null;
   try {
     reversed = await ops.create(reversedEdgeInput(edge));
   } catch (error) {
-    return { ok: false, message: `${sentence(error)} ${UNCHANGED}` };
+    const now = await saved();
+    if (!now) return { ok: false, message: `${sentence(error)} ${UNKNOWN}` };
+    // Saved although the reply was lost: carry on with it.
+    if (!now.reversed.length) return { ok: false, message: `${sentence(error)} ${UNCHANGED}` };
+    reversed = now.reversed[0];
   }
-  const faithful = !!reversed && reversed.id !== edge.id && reversed.sourceId === edge.targetId
-    && reversed.targetId === edge.sourceId && reversed.type === edge.type;
-  if (!reversed || !faithful) {
+  if (!reversed || !isReversed(reversed)) {
     if (reversed && reversed.id !== edge.id) {
       try {
         await ops.remove(reversed.id);
@@ -95,9 +117,15 @@ export async function flipRelationship(edge: SavedRelationship, ops: FlipOperati
   try {
     await ops.remove(edge.id);
   } catch (error) {
+    const now = await saved();
+    if (!now) return { ok: false, message: `${sentence(error)} ${UNKNOWN}`, bothDirections: reversed };
+    // Deleted although the reply was lost: the flip is done.
+    if (!now.original) return { ok: true, edge: reversed };
     try {
       await ops.remove(reversed.id);
     } catch {
+      const after = await saved();
+      if (after && !after.reversed.some(r => r.id === reversed!.id)) return { ok: false, message: `${sentence(error)} ${UNCHANGED}` };
       return { ok: false, message: `${sentence(error)} Both directions are now saved; delete the one you do not want.`, bothDirections: reversed };
     }
     return { ok: false, message: `${sentence(error)} ${UNCHANGED}` };

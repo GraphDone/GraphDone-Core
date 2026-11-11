@@ -434,6 +434,7 @@ export const DELETE_EDGE = gql`
   mutation DeleteEdges($where: EdgeWhere!) {
     deleteEdges(where: $where) {
       nodesDeleted
+      relationshipsDeleted
     }
   }
 `;

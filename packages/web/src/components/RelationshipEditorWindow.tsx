@@ -5,7 +5,7 @@ import { WorkItemEdge, RelationshipType } from '../types/graph';
 import { getRelationshipConfig, RELATIONSHIP_OPTIONS, getRelationshipIconElement } from '../constants/workItemConstants';
 import { useApolloClient, useMutation } from '@apollo/client';
 import { UPDATE_EDGE, CREATE_EDGE, DELETE_EDGE, GET_RELATIONSHIP } from '../lib/queries';
-import { editorEdge, editorPlacement, flipRelationship, relationshipLine, savedRelationship, type ScreenBox } from '../lib/relationshipEdit';
+import { editorEdge, editorPlacement, flipRelationship, relationshipLine, savedRelationship, type SavedRelationship, type ScreenBox } from '../lib/relationshipEdit';
 
 interface RelationshipEditorWindowProps {
   /**
@@ -219,7 +219,20 @@ export const RelationshipEditorWindow: React.FC<RelationshipEditorWindowProps> =
       }
       const outcome = await flipRelationship(saved, {
         create: async input => savedRelationship((await client.mutate({ mutation: CREATE_EDGE, variables: { input: [input] } })).data?.createEdges?.edges?.[0]),
-        remove: async id => { await client.mutate({ mutation: DELETE_EDGE, variables: { where: { id } } }); },
+        remove: async id => {
+          const deleted = (await client.mutate({ mutation: DELETE_EDGE, variables: { where: { id } } })).data?.deleteEdges;
+          // A server counts the edge as a node; the guest's store counts it as a relationship.
+          if (!((deleted?.nodesDeleted ?? 0) + (deleted?.relationshipsDeleted ?? 0))) throw new Error('The relationship was not deleted.');
+        },
+        between: async (a, b) => {
+          const { data } = await client.query({
+            query: GET_RELATIONSHIP,
+            variables: { where: { OR: [{ source: { id: a }, target: { id: b } }, { source: { id: b }, target: { id: a } }] } },
+            fetchPolicy: 'network-only',
+          });
+          return ((data?.edges ?? []) as unknown[]).map(savedRelationship)
+            .filter((r): r is SavedRelationship => !!r && [r.sourceId, r.targetId].sort().join() === [a, b].sort().join());
+        },
       });
       await client.refetchQueries({ include: REFRESH }).catch(() => undefined);
       if (outcome.ok) {
