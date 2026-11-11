@@ -6,6 +6,7 @@ import {
   ownedGraphIdsFixture,
   type OwnedGraphs,
 } from '../../lib/ownedGraphIdsFixture';
+import { isExampleWrite } from '../../packages/web/src/lib/exampleOperations';
 
 const test = base.extend<{ ownedGraphIds: OwnedGraphs }>({
   ownedGraphIds: [ownedGraphIdsFixture, { timeout: 60000 }],
@@ -136,7 +137,7 @@ for (const width of [1440, 390]) {
     page.on('pageerror', error => errors.push(error.message));
     await page.route('**/api/graphql', async route => {
       const body = route.request().postDataJSON();
-      if (/^\s*mutation\b/.test(body?.query ?? '')) {
+      if (/^\s*mutation\b/.test(body?.query ?? '') && !isExampleWrite(body?.operationName)) {
         writes.push(body.operationName ?? 'mutation');
         await route.abort('blockedbyclient');
       } else await route.continue();

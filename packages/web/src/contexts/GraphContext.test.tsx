@@ -7,6 +7,7 @@ import { valueFromASTUntyped, type FieldNode, type SelectionSetNode } from 'grap
 import { GraphProvider, useGraph } from './GraphContext';
 import { EXAMPLE_ITEM_TAG, EXAMPLE_MAX_FAILURES, EXAMPLE_PENDING_TAG, buildStarterWorkspace, exampleFailures } from '../lib/starterWorkspace';
 import type { GraphContextType } from '../types/graph';
+import { isExampleWrite } from '../lib/exampleOperations';
 
 const user = { id: 'me', role: 'USER', name: 'New user' };
 const team = { id: 'team-1', name: 'Team' };
@@ -149,8 +150,8 @@ const exampleDone = (backend: ReturnType<typeof fakeBackend>) => {
     && localStorage.getItem('graphdone:starter-pending:me') === null;
 };
 const named = (backend: ReturnType<typeof fakeBackend>, name: string) => backend.graphs.find(g => g.name === name)!;
-/** Writes the example made under a view's own operation name, which a view that must not write would count as its own. */
-const unnamedExampleWrites = (backend: ReturnType<typeof fakeBackend>) => backend.mutations.filter(name => !/Starter/.test(name));
+/** Writes the example made outside EXAMPLE_WRITE_OPERATIONS, which a view that must not write would count as its own. */
+const unnamedExampleWrites = (backend: ReturnType<typeof fakeBackend>) => backend.mutations.filter(name => !isExampleWrite(name));
 
 beforeEach(() => localStorage.clear());
 afterEach(() => cleanup());
@@ -197,7 +198,7 @@ describe('a new user while the example project is still being written', () => {
     expect(graph.currentGraph?.name).toBe('Welcome');
     expect(localStorage.getItem('currentGraphId')).toBe(named(backend, 'Welcome').id);
     expect(backend.mutations.length).toBeGreaterThan(0);
-    expect(unnamedExampleWrites(backend), 'every write the example makes is a …Starter… operation').toEqual([]);
+    expect(unnamedExampleWrites(backend), 'every write the example makes is in EXAMPLE_WRITE_OPERATIONS').toEqual([]);
   });
 
   it('reads what it wrote with its own small queries, never the views\' item and connection queries', async () => {
@@ -237,7 +238,30 @@ describe('a new user while the example project is still being written', () => {
     expect(backend.items.some(item => item.id === 'item-zzz'), 'the duplicate is removed').toBe(false);
     expect(backend.edges.filter(edge => !backend.items.includes(edge.source as Row) || !backend.items.includes(edge.target as Row)), 'no connection is left without its item').toEqual([]);
     expect(backend.items.filter(item => item.graph === launch).map(item => item.title).sort()).toEqual(steps.map(step => step.title).sort());
-    expect(unnamedExampleWrites(backend), 'every write the resume makes is a …Starter… operation').toEqual([]);
+    expect(unnamedExampleWrites(backend), 'every write the resume makes is in EXAMPLE_WRITE_OPERATIONS').toEqual([]);
+  });
+
+  it('removes an empty duplicate graph and clears the tag of a part the example no longer matches, with example writes only', async () => {
+    const backend = fakeBackend();
+    const fixBugs = plan.graphs.find(g => g.name === 'Fix bugs')!;
+    const graphRow = (id: string, name: string, type: string, parentGraphId: string | null, tags: string[], createdAt = '2026-11-09T12:00:00Z') =>
+      ({ __typename: 'Graph', id, name, type, createdBy: 'me', parentGraphId, tags, path: parentGraphId ? [parentGraphId] : [], depth: parentGraphId ? 1 : 0, createdAt });
+    backend.graphs.push(
+      graphRow('gs', 'Getting started', 'PROJECT', null, ['example', EXAMPLE_PENDING_TAG]),
+      graphRow('w', 'Welcome', 'SUBGRAPH', 'gs', ['tutorial', 'welcome', 'getting-started']),
+      graphRow('fix-a', 'Fix bugs', fixBugs.type, 'gs', ['example', EXAMPLE_PENDING_TAG]),
+      graphRow('fix-b', 'Fix bugs', fixBugs.type, 'gs', ['example', EXAMPLE_PENDING_TAG], '2026-11-09T12:00:05Z'),
+      graphRow('renamed', 'My bugs', fixBugs.type, 'gs', ['example', 'mine', EXAMPLE_PENDING_TAG]),
+    );
+    localStorage.setItem('graphdone:starter-pending:me', JSON.stringify({ hierarchy: true, startedAt: Date.now(), inflight: [] }));
+    await start(backend);
+    await waitFor(() => expect(exampleDone(backend)).toBe(true), { timeout: 10000 });
+
+    expect(backend.graphs.filter(g => g.name === 'Fix bugs' && g.parentGraphId === 'gs'), 'the empty duplicate is removed').toHaveLength(1);
+    expect(backend.graphs.find(g => g.id === 'renamed')?.tags, 'the renamed part keeps its other tags').toEqual(['example', 'mine']);
+    expect(backend.mutations).toContain('DeleteStarterGraph');
+    expect(backend.mutations).toContain('UpdateStarterGraph');
+    expect(unnamedExampleWrites(backend), 'every write the resume makes is in EXAMPLE_WRITE_OPERATIONS').toEqual([]);
   });
 
   it('stops resuming a part after three failed tries: clears its tag, keeps its other tags, and leaves what exists', async () => {
@@ -266,6 +290,6 @@ describe('a new user while the example project is still being written', () => {
     expect(backend.graphs.filter(g => (g.tags as string[]).includes(EXAMPLE_PENDING_TAG)).map(g => g.name)).toEqual([]);
     expect(backend.operations.slice(before).filter(operation => operation.startsWith('CreateStarter'))).toEqual([]);
     expect(localStorage.getItem('graphdone:starter-pending:me')).toBeNull();
-    expect(unnamedExampleWrites(backend), 'counting failures and giving up are …Starter… operations too').toEqual([]);
+    expect(unnamedExampleWrites(backend), 'counting failures and giving up are in EXAMPLE_WRITE_OPERATIONS too').toEqual([]);
   });
 });

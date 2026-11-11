@@ -12,6 +12,7 @@ import {
 } from '../../lib/ownedGraphIdsFixture';
 import type { SeededGraph } from '../../lib/seedGraph';
 import { inspectSchematicOverview } from '../../lib/schematicOverview';
+import { isExampleWrite } from '../../packages/web/src/lib/exampleOperations';
 
 const test = base.extend<{
   ownedGraphIds: OwnedGraphs;
@@ -111,7 +112,7 @@ for (const width of [1440, 390])
       expect(before.edges).toHaveLength(seeded.edgeCount);
       await page.route('**/api/graphql', async route => {
         const body = route.request().postDataJSON();
-        if (/^\s*mutation\b/.test(body?.query ?? '')) {
+        if (/^\s*mutation\b/.test(body?.query ?? '') && !isExampleWrite(body?.operationName)) {
           writes.push(body.operationName || 'mutation');
           await route.abort('blockedbyclient');
         } else await route.continue();

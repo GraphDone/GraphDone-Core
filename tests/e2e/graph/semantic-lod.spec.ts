@@ -9,6 +9,7 @@ import {
   ownedGraphIdsFixture,
   type OwnedGraphs,
 } from '../../lib/ownedGraphIdsFixture';
+import { isExampleWrite } from '../../packages/web/src/lib/exampleOperations';
 
 // Cold Neo4j query planning belongs to fixture setup, not the interaction
 // budget. Both budgets are bounded; slow clicks and assertions still fail.
@@ -126,7 +127,7 @@ for (const width of [1440, 390])
         // the background (a context an earlier spec closed left it unfinished).
         // Its writes are all …Starter… operations, never navigation, so they
         // pass; every other write is navigation writing, and fails the test.
-        if (/^\s*mutation\b/.test(body?.query ?? '') && !/Starter/.test(body?.operationName ?? '')) {
+        if (/^\s*mutation\b/.test(body?.query ?? '') && !isExampleWrite(body?.operationName)) {
           attemptedWrites.push(body.operationName ?? 'unnamed mutation');
           await route.abort('blockedbyclient');
         } else await route.continue();
