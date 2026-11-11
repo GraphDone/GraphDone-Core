@@ -25,7 +25,7 @@ flowchart LR
 | Profile | npm script | What it runs |
 | --- | --- | --- |
 | `smoke` | `npm run test:unified:smoke` | Web unit tests, the smoke gate, passwordless sign-in focus. |
-| `pr` | `npm run test:pr` | `smoke` plus the graph, agent, inspector, level-of-detail, wire, large-graph, schematic, layout-recovery, organize-labels, routing, mobile, UI fit and performance-budget sequences. All blocking. |
+| `pr` | `npm run test:pr` | `smoke` plus the graph, agent, inspector, level-of-detail, wire, large-graph, schematic, layout-recovery, organize-labels, routing, mobile, UI fit, performance-budget and zoom-out sequences. All blocking. |
 | `full` | `npm run test:unified` | `pr` plus the report-only diagnostics, showcase, matrix, VLM, scale sweep and cloud-audit sequences. |
 | `report` | none | Only the report-only capture sequences. |
 | `live` | none | The guest journey on the live hosted site (`live-journey`). |

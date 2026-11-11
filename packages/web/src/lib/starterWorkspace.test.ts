@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  EXAMPLE_ITEM_TAG,
+  EXAMPLE_MAX_FAILURES,
   EXAMPLE_PENDING_TAG,
+  exampleFailures,
+  withExampleFailure,
+  withoutPendingTag,
   STARTER_POSITION_BOX,
+  examplePendingParts,
   awaitExampleIdle,
   buildStarterWorkspace,
   isExamplePending,
@@ -182,8 +188,8 @@ function fakeBackend() {
     await Promise.resolve();
     try { return await run(); } finally { busy--; }
   };
-  const items = new Map<string, { graphId: string; title: string }>();
-  const edges: StarterLink[] = [];
+  const items = new Map<string, { graphId: string; title: string; tags?: string[] }>();
+  const edges: Array<StarterLink & { id: string }> = [];
   const counts = new Map<string, { nodeCount: number; edgeCount: number }>();
   const opened: string[] = [];
   const deleted: string[] = [];
@@ -196,17 +202,17 @@ function fakeBackend() {
       return [...inputs].reverse().map(input => {
         const graphId = id('graph');
         created.push({ name: input.name, tags: [...input.tags] });
-        graphs.set(graphId, { ...input, createdAt: String(next).padStart(6, '0') });
+        graphs.set(graphId, { ...input, createdAt: new Date(time + next).toISOString() });
         return { id: graphId, name: input.name };
       });
     },
     async createItems(graphId: string, list: StarterItem[]) {
       log.push(`items ${name(graphId)}`);
-      return list.map(entry => { const itemId = id('item'); items.set(itemId, { graphId, title: entry.title }); return itemId; });
+      return list.map(entry => { const itemId = id('item'); items.set(itemId, { graphId, title: entry.title, tags: entry.tags }); return itemId; });
     },
     async createEdges(list: StarterLink[]) {
       log.push(`edges ${name(items.get(list[0].sourceId)!.graphId)}`);
-      edges.push(...list);
+      edges.push(...list.map(link => ({ ...link, id: id('edge') })));
     },
     async setCounts(graphId: string, { tags, ...value }: { nodeCount: number; edgeCount: number; tags?: string[] }) {
       log.push(`counts ${name(graphId)}`);
@@ -241,9 +247,20 @@ function fakeBackend() {
     async content(graphId) {
       await land();
       return {
-        items: [...items].filter(([, entry]) => entry.graphId === graphId).map(([itemId, entry]) => ({ id: itemId, title: entry.title })),
-        edges: edges.filter(edge => items.get(edge.sourceId)!.graphId === graphId),
+        items: [...items].filter(([, entry]) => entry.graphId === graphId).map(([itemId, entry]) => ({ id: itemId, title: entry.title, tags: entry.tags })),
+        edges: edges.filter(edge => items.get(edge.sourceId)?.graphId === graphId),
       };
+    },
+    async deleteContent(itemIds, edgeIds) {
+      await land();
+      log.push(`delete ${itemIds.length} items, ${edgeIds.length} connections`);
+      for (let i = edges.length - 1; i >= 0; i--) if (edgeIds.includes(edges[i].id) || itemIds.includes(edges[i].sourceId) || itemIds.includes(edges[i].targetId)) edges.splice(i, 1);
+      for (const itemId of itemIds) items.delete(itemId);
+    },
+    async setTags(graphId, tags) {
+      await land();
+      log.push(`tags ${name(graphId)}`);
+      graphs.get(graphId)!.tags = tags;
     },
     async deleteGraph(graphId) {
       await land();
@@ -543,6 +560,117 @@ describe('keeping the unfinished example on the backend', () => {
     };
     expect(await awaitExampleIdle(other, 30_000, finished.clock), 'the other session finished it').toBe(false);
     expect(finished.clock.now()).toBeLessThan(30_000);
+  });
+});
+
+describe('resuming without races', () => {
+  const pendingTags = (backend: Backend) => [...backend.graphs.values()].filter(graph => graph.tags.includes(EXAMPLE_PENDING_TAG)).map(graph => graph.name);
+  const graphId = (backend: Backend, name: string) => [...backend.graphs].find(([, g]) => g.name === name)![0];
+  const plan = full();
+  const placed = () => starterGraphCount(plan) + graphNamed('Welcome').items.length + graphNamed('Welcome').edges.length + 1;
+
+  it('two browsers finishing the same parts at once leave each item and connection once', async () => {
+    for (const extra of [0, 3, 7]) {
+      const backend = fakeBackend();
+      await createStarterWorkspace(plan, reloadAfter(backend, placed() + extra, () => false), { pending: true, clock: backend.clock }).catch(() => undefined);
+      const resume = () => createStarterWorkspace(plan, backend.api, { resume: true, pending: true, clock: backend.clock });
+      await Promise.all([resume(), resume()]);
+
+      const at = `stopped ${extra} writes after the graphs were placed`;
+      expect(pendingTags(backend), at).toEqual([]);
+      for (const graph of plan.graphs) {
+        const id = graphId(backend, graph.name);
+        expect(titlesIn(backend, id).sort(), `${graph.name}: each item once (${at})`).toEqual(graph.items.map(entry => entry.title).sort());
+        const links = backend.edges.filter(edge => backend.items.get(edge.sourceId)?.graphId === id);
+        expect(links, `${graph.name}: each connection once (${at})`).toHaveLength(graph.edges.length);
+        for (const edge of links) expect(backend.items.has(edge.targetId), `${graph.name}: no connection to a removed item (${at})`).toBe(true);
+      }
+    }
+  });
+
+  it('clears the tag of a pending part the user renamed, or whose project they deleted', async () => {
+    const backend = fakeBackend();
+    await createStarterWorkspace(plan, reloadAfter(backend, placed(), () => false), { pending: true, clock: backend.clock }).catch(() => undefined);
+    backend.graphs.get(graphId(backend, 'Fix bugs'))!.name = 'Bugs';
+    backend.graphs.delete(graphId(backend, 'Home'));
+    expect(pendingTags(backend).sort()).toEqual(['Bugs', 'Getting started', 'Ideas', 'Move house', 'Plan a launch']);
+
+    await createStarterWorkspace(plan, backend.api, { resume: true, pending: true, clock: backend.clock });
+
+    expect(pendingTags(backend)).toEqual([]);
+    expect(backend.graphs.get(graphId(backend, 'Bugs'))!.tags).toEqual(['example']);
+  });
+
+  it("keeps a part's other tags when it clears the pending one", async () => {
+    const backend = fakeBackend();
+    const api: StarterApi = {
+      ...backend.api,
+      async createItems(id, list) {
+        const graph = backend.graphs.get(id)!;
+        if (!graph.tags.includes('mine')) graph.tags = [...graph.tags, 'mine'];
+        return backend.api.createItems(id, list);
+      },
+    };
+    await createStarterWorkspace(plan, api, { pending: true, clock: backend.clock });
+    expect(backend.graphs.get(graphId(backend, 'Welcome'))!.tags).toEqual([...graphNamed('Welcome').tags, 'mine']);
+    expect(pendingTags(backend)).toEqual([]);
+  });
+
+  it('keeps a user item titled like an example item, and its connections', async () => {
+    const backend = fakeBackend();
+    await createStarterWorkspace(plan, reloadAfter(backend, placed() + 2 + 3, () => false), { pending: true, clock: backend.clock }).catch(() => undefined);
+    const launch = graphId(backend, 'Plan a launch');
+    const title = graphNamed('Plan a launch').items[0].title;
+    expect(titlesIn(backend, launch), 'the example item exists').toContain(title);
+    backend.items.set('item-0-mine', { graphId: launch, title, tags: ['mine'] });
+    backend.items.set('item-0-mine-too', { graphId: launch, title: 'My own step', tags: [] });
+    backend.edges.push({ id: 'edge-0-mine', sourceId: 'item-0-mine', targetId: 'item-0-mine-too', type: 'DEPENDS_ON' });
+
+    await createStarterWorkspace(plan, backend.api, { resume: true, pending: true, clock: backend.clock });
+
+    expect(backend.items.has('item-0-mine'), "the user's item stays").toBe(true);
+    expect(backend.edges.some(edge => edge.id === 'edge-0-mine'), "the user's connection stays").toBe(true);
+    const example = [...backend.items].filter(([, entry]) => entry.graphId === launch && entry.tags?.includes(EXAMPLE_ITEM_TAG)).map(([, entry]) => entry.title);
+    expect(example.sort(), 'each example item once').toEqual(graphNamed('Plan a launch').items.map(entry => entry.title).sort());
+    expect(pendingTags(backend)).toEqual([]);
+  });
+
+  it('removes a duplicate example item with every connection to it, from other graphs too', async () => {
+    const backend = fakeBackend();
+    await createStarterWorkspace(plan, reloadAfter(backend, placed() + 2 + 3, () => false), { pending: true, clock: backend.clock }).catch(() => undefined);
+    const launch = graphId(backend, 'Plan a launch');
+    const title = graphNamed('Plan a launch').items[0].title;
+    backend.items.set('item-zzz-duplicate', { graphId: launch, title, tags: ['example', EXAMPLE_ITEM_TAG] });
+    const welcomeItem = [...backend.items].find(([, entry]) => entry.graphId === graphId(backend, 'Welcome'))![0];
+    backend.edges.push({ id: 'edge-cross', sourceId: welcomeItem, targetId: 'item-zzz-duplicate', type: 'RELATES_TO' });
+
+    await createStarterWorkspace(plan, backend.api, { resume: true, pending: true, clock: backend.clock });
+
+    expect(backend.items.has('item-zzz-duplicate')).toBe(false);
+    expect(backend.edges.filter(edge => !backend.items.has(edge.sourceId) || !backend.items.has(edge.targetId)), 'no connection left pointing at a removed item').toEqual([]);
+    expect(titlesIn(backend, launch).sort()).toEqual(graphNamed('Plan a launch').items.map(entry => entry.title).sort());
+  });
+
+  it('still finishes a part left pending a day ago', async () => {
+    const backend = fakeBackend();
+    await createStarterWorkspace(plan, reloadAfter(backend, placed() + 4, () => false), { pending: true, clock: backend.clock }).catch(() => undefined);
+    await backend.clock.sleep(24 * 60 * 60_000);
+    expect(await awaitExampleIdle(backend.api, 40_000, backend.clock), 'a day-old part is still open').toBe(true);
+    await createStarterWorkspace(plan, backend.api, { resume: true, pending: true, clock: backend.clock });
+    expect(pendingTags(backend)).toEqual([]);
+    for (const graph of plan.graphs) expect(titlesIn(backend, graphId(backend, graph.name)).sort(), graph.name).toEqual(graph.items.map(entry => entry.title).sort());
+  });
+
+  it('gives up on a part after three failed resumes, and forgets the count once it is finished', () => {
+    let graph = { id: 'p', name: 'Plan a launch', type: 'SUBGRAPH', tags: ['example', 'mine', EXAMPLE_PENDING_TAG] };
+    const parts = () => examplePendingParts([graph]);
+    for (let failure = 1; failure <= EXAMPLE_MAX_FAILURES; failure++) {
+      expect(parts().open, `open before failure ${failure}`).toHaveLength(1);
+      graph = { ...graph, tags: withExampleFailure(graph) };
+      expect(exampleFailures(graph)).toBe(failure);
+    }
+    expect(parts()).toEqual({ open: [], abandoned: [graph] });
+    expect(withoutPendingTag(graph.tags)).toEqual(['example', 'mine']);
   });
 });
 

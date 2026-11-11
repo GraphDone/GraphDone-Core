@@ -18,6 +18,7 @@ flowchart LR
 | Path | What it is |
 | --- | --- |
 | [`workspace.ts`](workspace.ts) | `enterWorkspace` (sign in and create a new graph, or "Continue as Guest" when `JOURNEY_BACKEND=hosted-guest`), `createItem` with the toolbar control, `storedEdges` (GraphQL for self-host, the `graphdone-offline` IndexedDB for a guest), `drawnEdges`, `cardBox`, `clickable`, and `SetupError` (messages start with `SETUP:` so reports keep setup failures apart). |
+| [`readableLabels.ts`](readableLabels.ts) | `readableLabels`: the text a person can actually read in the graph view — shown, at least 11 px tall, inside the graph area and not under a control. DOM text alone does not count. Used by the zoom-out journey. |
 | [`linkPaths.ts`](linkPaths.ts) | `LINK_PATHS`: every way to connect two items — + then click, inspector Connect, Shift-click, Alt-drag, the card menu, quick edit "Details & connections". Each path returns its friction (zoom-in, zoom-out and pan steps). Helpers tap on touch and click on desktop, long-press, pinch or wheel to zoom, and pan items into view. |
 
 ## Adding a path or a journey

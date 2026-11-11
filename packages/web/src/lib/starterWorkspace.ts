@@ -290,10 +290,32 @@ export interface ExistingGraph {
  */
 export const EXAMPLE_PENDING_TAG = 'example:pending';
 export const isExamplePending = (graph: { tags?: string[] | null }) => !!graph.tags?.includes(EXAMPLE_PENDING_TAG);
+/** Marks each item the example writes on the self-hosted server, so its duplicate cleanup never touches the user's own items. */
+export const EXAMPLE_ITEM_TAG = 'example:item';
+/** A resume that failed this many times on a part gives up on it: its tag is cleared and what exists is left. */
+export const EXAMPLE_MAX_FAILURES = 3;
+const FAILED_PREFIX = 'example:failed:';
+export const exampleFailures = (graph: { tags?: string[] | null }) =>
+  Math.max(0, ...(graph.tags || []).filter(tag => tag.startsWith(FAILED_PREFIX)).map(tag => Number(tag.slice(FAILED_PREFIX.length)) || 0));
+export const withExampleFailure = (graph: { tags?: string[] | null }) =>
+  [...(graph.tags || []).filter(tag => !tag.startsWith(FAILED_PREFIX)), `${FAILED_PREFIX}${exampleFailures(graph) + 1}`];
+export const withoutPendingTag = (tags: string[] | null | undefined) =>
+  (tags || []).filter(tag => tag !== EXAMPLE_PENDING_TAG && !tag.startsWith(FAILED_PREFIX));
+
+/** Pending parts a sign-in should finish (`open`), and those a resume failed on too often (`abandoned`). */
+export function examplePendingParts<G extends ExistingGraph>(graphs: G[]): { open: G[]; abandoned: G[] } {
+  const pending = graphs.filter(isExamplePending);
+  return {
+    open: pending.filter(graph => exampleFailures(graph) < EXAMPLE_MAX_FAILURES),
+    abandoned: pending.filter(graph => exampleFailures(graph) >= EXAMPLE_MAX_FAILURES),
+  };
+}
+
+const byId = (a: { id?: string }, b: { id?: string }) => ((a.id ?? '') < (b.id ?? '') ? -1 : (a.id ?? '') > (b.id ?? '') ? 1 : 0);
 
 export interface StarterContent {
-  items: Array<{ id: string; title: string }>;
-  edges: StarterLink[];
+  items: Array<{ id: string; title: string; tags?: string[] | null }>;
+  edges: Array<StarterLink & { id?: string }>;
 }
 
 export interface StarterApi {
@@ -308,6 +330,10 @@ export interface StarterApi {
   ownGraphs?(): Promise<ExistingGraph[]>;
   content?(graphId: string): Promise<StarterContent>;
   deleteGraph?(graphId: string): Promise<void>;
+  /** Removes connections by id and every connection to or from the items, then the items. */
+  deleteContent?(itemIds: string[], edgeIds: string[]): Promise<void>;
+  /** Replaces a graph's tags. */
+  setTags?(graphId: string, tags: string[]): Promise<void>;
   /**
    * Resolves once the user's own view is not waiting for the backend. The
    * example waits for it before each of its reads and writes, so it never
@@ -401,7 +427,7 @@ export function starterDuplicateGroups(plan: StarterWorkspace, own: ExistingGrap
 export function duplicateStarterGraphs(plan: StarterWorkspace, own: ExistingGraph[], itemCounts: Map<string, number>): string[] {
   const used = (g: ExistingGraph) => own.some(other => other.parentGraphId === g.id) || (itemCounts.get(g.id) ?? 1) > 0;
   return starterDuplicateGroups(plan, own).flatMap(group => [...group]
-    .sort((a, b) => Number(used(b)) - Number(used(a)) || (a.createdAt ?? '').localeCompare(b.createdAt ?? '') || a.id.localeCompare(b.id))
+    .sort((a, b) => Number(used(b)) - Number(used(a)) || ((a.createdAt ?? '') < (b.createdAt ?? '') ? -1 : (a.createdAt ?? '') > (b.createdAt ?? '') ? 1 : 0) || byId(a, b))
     .slice(1)
     .filter(g => !used(g))
     .map(g => g.id));
@@ -430,16 +456,23 @@ async function awaitInflight(writes: StarterWrite[], api: StarterApi, limitMs: n
  * true once the unfinished parts and their items and connections have not
  * changed for `idleMs`: nobody is writing them, so this browser may finish them.
  */
+/**
+ * How long nothing may change before a browser that is not writing the
+ * example decides nobody is: longer than the time a resuming browser waits for
+ * its own lost writes (`writeLimitMs`), plus its first checks and reads.
+ */
+export const exampleIdleMs = (writeLimitMs: number) => writeLimitMs + 10_000;
+
 export async function awaitExampleIdle(api: StarterApi, idleMs: number, clock: StarterClock = realClock): Promise<boolean> {
   if (!api.ownGraphs) return true;
   let seen = '';
   let since = clock.now();
   for (;;) {
     await api.idle?.();
-    const open = (await api.ownGraphs()).filter(isExamplePending);
+    const { open } = examplePendingParts(await api.ownGraphs());
     if (!open.length) return false;
     const parts: string[] = [];
-    for (const graph of [...open].sort((a, b) => a.id.localeCompare(b.id))) {
+    for (const graph of [...open].sort(byId)) {
       const content = graph.parentGraphId && api.content ? await api.content(graph.id) : null;
       parts.push(`${graph.id}:${content?.items.length ?? '-'}:${content?.edges.length ?? '-'}`);
     }
@@ -506,6 +539,12 @@ export async function createStarterWorkspace(
     await api.idle?.();
     await api.setCounts(graphId, counts);
   };
+  const tagsWithoutPending = async (graphId: string, planned: string[]) => {
+    if (!api.ownGraphs) return withoutPendingTag(planned);
+    await api.idle?.();
+    const graph = (await api.ownGraphs()).find(g => g.id === graphId);
+    return withoutPendingTag(graph ? graph.tags : planned);
+  };
   const ids: Record<string, string> = {};
   const found = new Map<string, ExistingGraph>();
   // In pending mode, a part the backend shows without the tag is finished: nothing is added to it.
@@ -539,31 +578,60 @@ export async function createStarterWorkspace(
     if (graph.project && finished(graph.project) && !inPlace) return;
     await ensureGraph(graph.key, { name: graph.name, description: graph.description, type: graph.type, tags: graph.tags, parentGraphId: parent, depth: parent ? 1 : 0, path: parent ? [parent] : [] });
   };
+  const ours = (items: StarterContent['items']) => (pending ? items.filter(item => item.tags?.includes(EXAMPLE_ITEM_TAG)) : items);
+  const canonical = (items: StarterContent['items'], title: string) => ours(items).filter(item => item.title === title).sort(byId)[0];
   const fill = async (graph: StarterGraph) => {
     const graphId = ids[graph.key];
     if (!graphId || finished(graph.key)) return;
-    if (resume) await api.idle?.();
-    const have = resume && api.content ? await api.content(graphId) : { items: [], edges: [] };
+    const read = async (): Promise<StarterContent> => {
+      if (!resume || !api.content) return { items: [], edges: [] };
+      await api.idle?.();
+      return api.content(graphId);
+    };
     const byKey = new Map<string, string>();
     for (const entry of graph.items) {
-      const existing = have.items.find(item => item.title === entry.title);
+      const existing = canonical((await read()).items, entry.title);
       if (existing) {
         byKey.set(entry.key, existing.id);
         continue;
       }
       const [itemId] = await tracked(
         { id: writeId(), sentAt: clock.now(), kind: 'items', graphId, titles: [entry.title] },
-        () => api.createItems(graphId, [entry])
+        () => api.createItems(graphId, [pending ? { ...entry, tags: [...entry.tags, EXAMPLE_ITEM_TAG] } : entry])
       );
       if (!itemId) throw new Error(`The example item "${entry.title}" was not created in "${graph.name}".`);
       byKey.set(entry.key, itemId);
     }
-    for (const edge of graph.edges) {
-      const link = { sourceId: byKey.get(edge.source)!, targetId: byKey.get(edge.target)!, type: edge.type };
-      if (have.edges.some(e => sameLink(e, link))) continue;
-      await tracked({ id: writeId(), sentAt: clock.now(), kind: 'edges', graphId, links: [link] }, () => api.createEdges([link]));
+    const titleOf = (key: string) => graph.items.find(entry => entry.key === key)!.title;
+    const connect = async () => {
+      for (const edge of graph.edges) {
+        const have = await read();
+        const idOf = (key: string) => canonical(have.items, titleOf(key))?.id ?? byKey.get(key)!;
+        const link = { sourceId: idOf(edge.source), targetId: idOf(edge.target), type: edge.type };
+        if (have.edges.some(e => sameLink(e, link))) continue;
+        await tracked({ id: writeId(), sentAt: clock.now(), kind: 'edges', graphId, links: [link] }, () => api.createEdges([link]));
+      }
+    };
+    await connect();
+    if (resume && pending && api.deleteContent) {
+      const have = await read();
+      const kept = new Set(graph.items.map(entry => canonical(have.items, entry.title)?.id));
+      const titles = new Set(graph.items.map(entry => entry.title));
+      const extraItems = ours(have.items).filter(item => titles.has(item.title) && !kept.has(item.id)).map(item => item.id);
+      const extraEdges: string[] = [];
+      for (const edge of graph.edges) {
+        const sourceId = canonical(have.items, titleOf(edge.source))?.id;
+        const targetId = canonical(have.items, titleOf(edge.target))?.id;
+        const same = have.edges.filter(e => e.sourceId === sourceId && e.targetId === targetId && e.type === edge.type).sort(byId);
+        extraEdges.push(...same.slice(1).flatMap(e => (e.id ? [e.id] : [])));
+      }
+      if (extraItems.length || extraEdges.length) {
+        await api.idle?.();
+        await api.deleteContent(extraItems, extraEdges);
+        await connect();
+      }
     }
-    await setCounts(graphId, { nodeCount: graph.items.length, edgeCount: graph.edges.length, ...(pending && { tags: graph.tags }) });
+    await setCounts(graphId, { nodeCount: graph.items.length, edgeCount: graph.edges.length, ...(pending && { tags: await tagsWithoutPending(graphId, graph.tags) }) });
   };
   const first = plan.graphs.find(graph => graph.key === plan.opensFirst);
   if (first) {
@@ -580,12 +648,18 @@ export async function createStarterWorkspace(
   }
   if (pending) {
     for (const project of plan.projects) {
-      if (!finished(project.key)) await setCounts(ids[project.key], { nodeCount: 0, edgeCount: 0, tags: project.tags });
+      if (!finished(project.key)) await setCounts(ids[project.key], { nodeCount: 0, edgeCount: 0, tags: await tagsWithoutPending(ids[project.key], project.tags) });
     }
   }
   for (const graph of plan.graphs) {
     if (graph !== first) await fill(graph);
   }
   if (resume) await removeDuplicates(plan, api);
+  if (resume && pending && api.ownGraphs && api.setTags) {
+    const example = new Set(Object.values(ids));
+    for (const graph of (await api.ownGraphs()).filter(isExamplePending)) {
+      if (!example.has(graph.id)) await api.setTags(graph.id, withoutPendingTag(graph.tags));
+    }
+  }
   return { ids, opensFirst: plan.opensFirst };
 }

@@ -74,7 +74,7 @@ test('disposable Git fixture commits do not spawn background maintenance', t => 
   assert.deepEqual(events.filter(event => event.event === 'child_start' && event.argv?.includes('maintenance')), []);
 });
 
-for (const sequence of ['new-user', 'example-resume', 'agent-connection', 'inspector-readability', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'devices', 'perf-budgets', 'organize-labels']) {
+for (const sequence of ['new-user', 'example-resume', 'agent-connection', 'inspector-readability', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'devices', 'perf-budgets', 'zoom-out', 'organize-labels']) {
   test(`CLI forwards failure-only tracing without retries for ${sequence}`, t => {
     const { dir, run } = fixture(t);
     const report = { suites: [{ specs: [{ title: 'fixture', ok: true,
@@ -116,6 +116,13 @@ for (const sequence of ['new-user', 'example-resume', 'agent-connection', 'inspe
       assert.equal(SEQUENCES[sequence].blocking, true);
       for (const profile of ['pr', 'full']) assert.ok(PROFILES[profile].includes(sequence));
       assertSmokeGateRuns(sequence, { out: 'ci-organize-labels', xvfb: false });
+    }
+    if (sequence === 'zoom-out') {
+      assert.deepEqual(args.filter(arg => arg.endsWith('.spec.ts')), ['tests/e2e/journeys/zoom-out.spec.ts']);
+      assert.deepEqual(args.filter(arg => arg.startsWith('--project=')), ['--project=journeys', '--project=journeys-ipad', '--project=journeys-iphone']);
+      assert.equal(SEQUENCES[sequence].blocking, true);
+      for (const profile of ['pr', 'full']) assert.ok(PROFILES[profile].includes(sequence));
+      assertSmokeGateRuns(sequence, { out: 'ci-zoom-out', xvfb: false });
     }
     if (sequence === 'large-symbols') {
       assert.ok(args.includes('tests/e2e/graph/large-graph-symbols.spec.ts'));
@@ -344,12 +351,12 @@ test('every Smoke Gate shard warms up with THE GATE, and the summary job keeps t
   }
   assert.equal(runs.smoke.length, shards.length);
   // Every sequence the single Smoke Gate job ran before #274 (its schematic-visual
-  // and toolchain steps are checked above), plus organize-labels, so a sequence
-  // dropped from every shard fails here. Change this list on purpose only.
+  // and toolchain steps are checked above), plus organize-labels and zoom-out (#277),
+  // so a sequence dropped from every shard fails here. Change this list on purpose only.
   assert.deepEqual(Object.keys(runs).sort(), [
     'agent-connection', 'example-resume', 'inspector-readability', 'item-wires', 'large-symbols', 'layout-recovery',
     'living-graph-effects', 'mobile', 'nested-lod', 'new-user', 'organize-labels', 'perf-budgets',
-    'router-navigation', 'semantic-lod', 'smoke',
+    'router-navigation', 'semantic-lod', 'smoke', 'zoom-out',
   ]);
   for (const [sequence, entries] of Object.entries(runs)) {
     if (sequence !== 'smoke') assert.equal(entries.length, 1, `${sequence} runs in exactly one shard`);
