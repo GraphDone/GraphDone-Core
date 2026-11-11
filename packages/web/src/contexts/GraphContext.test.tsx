@@ -33,6 +33,7 @@ function fakeBackend() {
   const items: Row[] = [];
   const edges: Row[] = [];
   const operations: string[] = [];
+  const mutations: string[] = [];
   let next = 0;
   let release: () => void = () => undefined;
   let held = false;
@@ -114,7 +115,8 @@ function fakeBackend() {
   };
   const link = new ApolloLink(operation => new Observable(observer => {
     operations.push(operation.operationName);
-    const definition = getMainDefinition(operation.query) as { selectionSet: SelectionSetNode };
+    const definition = getMainDefinition(operation.query) as { selectionSet: SelectionSetNode; operation?: string };
+    if (definition.operation === 'mutation') mutations.push(operation.operationName);
     (async () => {
       const data: Row = {};
       for (const field of definition.selectionSet.selections as FieldNode[]) {
@@ -125,7 +127,7 @@ function fakeBackend() {
       observer.complete();
     })().catch(error => observer.error(error));
   }));
-  return { graphs, items, edges, operations, link, release, isHeld: () => held, failing };
+  return { graphs, items, edges, operations, mutations, link, release, isHeld: () => held, failing };
 }
 
 let graph: GraphContextType;
@@ -147,6 +149,8 @@ const exampleDone = (backend: ReturnType<typeof fakeBackend>) => {
     && localStorage.getItem('graphdone:starter-pending:me') === null;
 };
 const named = (backend: ReturnType<typeof fakeBackend>, name: string) => backend.graphs.find(g => g.name === name)!;
+/** Writes the example made under a view's own operation name, which a view that must not write would count as its own. */
+const unnamedExampleWrites = (backend: ReturnType<typeof fakeBackend>) => backend.mutations.filter(name => !/Starter/.test(name));
 
 beforeEach(() => localStorage.clear());
 afterEach(() => cleanup());
@@ -192,6 +196,8 @@ describe('a new user while the example project is still being written', () => {
 
     expect(graph.currentGraph?.name).toBe('Welcome');
     expect(localStorage.getItem('currentGraphId')).toBe(named(backend, 'Welcome').id);
+    expect(backend.mutations.length).toBeGreaterThan(0);
+    expect(unnamedExampleWrites(backend), 'every write the example makes is a …Starter… operation').toEqual([]);
   });
 
   it('reads what it wrote with its own small queries, never the views\' item and connection queries', async () => {
@@ -231,6 +237,7 @@ describe('a new user while the example project is still being written', () => {
     expect(backend.items.some(item => item.id === 'item-zzz'), 'the duplicate is removed').toBe(false);
     expect(backend.edges.filter(edge => !backend.items.includes(edge.source as Row) || !backend.items.includes(edge.target as Row)), 'no connection is left without its item').toEqual([]);
     expect(backend.items.filter(item => item.graph === launch).map(item => item.title).sort()).toEqual(steps.map(step => step.title).sort());
+    expect(unnamedExampleWrites(backend), 'every write the resume makes is a …Starter… operation').toEqual([]);
   });
 
   it('stops resuming a part after three failed tries: clears its tag, keeps its other tags, and leaves what exists', async () => {
@@ -259,5 +266,6 @@ describe('a new user while the example project is still being written', () => {
     expect(backend.graphs.filter(g => (g.tags as string[]).includes(EXAMPLE_PENDING_TAG)).map(g => g.name)).toEqual([]);
     expect(backend.operations.slice(before).filter(operation => operation.startsWith('CreateStarter'))).toEqual([]);
     expect(localStorage.getItem('graphdone:starter-pending:me')).toBeNull();
+    expect(unnamedExampleWrites(backend), 'counting failures and giving up are …Starter… operations too').toEqual([]);
   });
 });

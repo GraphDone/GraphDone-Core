@@ -122,7 +122,11 @@ for (const width of [1440, 390])
       const originalEdges = (await gql(page, 'query($id:ID!){edges(where:{source:{graph:{id:$id}}}){id type source{id} target{id}}}', { id: seeded.graphId })).edges;
       await page.route('**/api/graphql', async route => {
         const body = route.request().postDataJSON();
-        if (/^\s*mutation\b/.test(body?.query ?? '')) {
+        // The example workspace may still be finishing for this shared user in
+        // the background (a context an earlier spec closed left it unfinished).
+        // Its writes are all …Starter… operations, never navigation, so they
+        // pass; every other write is navigation writing, and fails the test.
+        if (/^\s*mutation\b/.test(body?.query ?? '') && !/Starter/.test(body?.operationName ?? '')) {
           attemptedWrites.push(body.operationName ?? 'unnamed mutation');
           await route.abort('blockedbyclient');
         } else await route.continue();
