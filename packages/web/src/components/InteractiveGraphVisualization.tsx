@@ -63,7 +63,7 @@ import { PerfMeter, DriftMeter } from '../lib/perfMeter';
 import { computeGraphFit, type FitObstacle } from '../lib/graphFit';
 import { appendNodeControlGlyph, nodeControlGlyphTransform } from '../lib/nodeControlIcons';
 import { graphItemLayout, itemTitleScale, measureGraphText, edgeLabelDimensions, GRAPH_FONT_FAMILY, ITEM_TITLE_SIZE, ITEM_TITLE_LINE, ITEM_HEADER_HEIGHT, EDGE_LABEL_SIZE, ITEM_WIRE_WIDTH } from '../lib/graphSymbolLayout';
-import { placeItemLabels } from '../lib/edgeLabelPlacement';
+import { placeItemLabels, labelsMissed } from '../lib/edgeLabelPlacement';
 import { separateCards } from '../lib/separateCards';
 import { organizeTopology } from '../lib/topologyOrganization';
 import { PHONE_READABLE_SCALE } from '../lib/cardTitleZoom';
@@ -3795,8 +3795,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       // Spots remembered from earlier frames keep labels steady while cards
       // move, but they can box out a label that a fresh placement shows (the
       // layouts leave room for a fresh one, see labelClearance): in a small
-      // graph, try one whenever a label is missing and keep it if it shows more.
-      if (candidates.length <= FRESH_LABEL_RETRY_MAX && result.placements.size < candidates.filter(c => c.eligible).length) {
+      // graph, when a label on screen found no spot (labelsMissed), try fresh
+      // spots and keep them if they show more.
+      if (candidates.length <= FRESH_LABEL_RETRY_MAX && labelsMissed(result)) {
         const fresh = placeItemLabels(candidates.map(c => c.dragged ? c : { ...c, t: 0.5, offset: Math.abs(c.offset) }), placeOptions);
         if (fresh.placements.size > result.placements.size) result = fresh;
       }

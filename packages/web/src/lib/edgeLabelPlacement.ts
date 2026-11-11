@@ -82,3 +82,15 @@ export function placeItemLabels(
     checks: limits.checks - budget.remaining,
   };
 }
+
+/**
+ * Whether placing the same labels again from other spots could show more: a
+ * label on screen was tried and found no spot, and the label cap leaves room
+ * for it. Labels off screen, not drawn, or past the cap are never tried.
+ */
+export function labelsMissed(
+  result: { placements: ReadonlyMap<string, unknown>; attempts: number },
+  limits: ItemLabelBudget = ITEM_LABEL_BUDGET
+) {
+  return result.placements.size < Math.min(result.attempts, limits.labels);
+}

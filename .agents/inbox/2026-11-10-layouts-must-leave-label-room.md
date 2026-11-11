@@ -41,11 +41,14 @@ concerns the room between connected cards.
   and break ties in the organizer and the label order. Keep only spreads that
   were checked, check the finished layout as a whole (`checkedWhole`), and
   test several id orders (`label room whatever the item ids`). The renderer
-  starts each label from its spot in the previous frame; in a small graph it
-  retries a missing label from fresh spots, the placement the layouts leave
-  room for.
+  starts each label from its spot in the previous frame; in a small graph,
+  when a label on screen found no spot (`labelsMissed`), it retries from fresh
+  spots, the placement the layouts leave room for.
 - Never move a saved or organized (pinned) card to make room; after the force
-  layout settles, move only the cards it placed itself (`clearFreeCards`).
+  layout settles, move only the cards it placed itself (`clearFreeCards`), only
+  for labels with such a card at one end, and keep a move only when it shows
+  more of them. A label between two saved cards once made a new card in a
+  saved graph fly 4 and then 16 times as far away; now nothing moves for it.
 - Test readability with the renderer's own geometry: the browser audit reads
   every label from the DOM (turned boxes, `elementFromPoint`) and an edge whose
   cards are on screen and clear of the controls must show its label.
@@ -59,8 +62,12 @@ graphs keep the plain layouts and the 0.65 Organize floor (an early version
 searched up to 200 cards and froze the page for seconds). A phone keeps the
 0.65 Organize floor and 0.5 in the hierarchical layout: two compact cards and
 a label side by side do not fit 390 px at a zoom where titles still fit whole
-(below about 0.45 a title breaks mid-word), so a whole graph there needs
-compact label chips. A graph's saved
+(below about 0.45 a long word is cut short), so a whole graph there needs
+compact label chips. Above 60 cards the hierarchical rows are the old ones,
+wrapped at the screen's reading width (pinned by golden numbers in
+`layoutAlgorithms.test.ts`); up to 60, a row that edges leave does not wrap
+(wrapped cards would sit on those edges), so a hub with many dependents is
+wide. A graph of unplaced items opens organized as before. A graph's saved
 arrangement is never moved, so labels hidden there stay hidden until the person
 organizes. Labels under a control or the MiniMap are a camera matter, recorded
 by the audit but not counted.

@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
 import { createEdgeRoute } from '../edgeRouteGeometry';
 import {
+  labelsMissed,
   placeItemLabels,
   ITEM_LABEL_BUDGET,
   type ItemLabelCandidate,
@@ -102,4 +103,18 @@ it('places labels along the visible slice of a long route without changing its i
   expect(label!.t).toBeCloseTo(label!.x / long.length);
   expect(result.attempts).toBe(1);
   expect(result.checks).toBeLessThan(ITEM_LABEL_BUDGET.checks);
+});
+
+// The renderer places labels again from fresh spots only when that could show
+// more: not for labels off screen, not drawn or past the label cap.
+it('a label is missed only when one on screen was tried and found no spot', () => {
+  const options = { viewport, obstacles: [], segments: route.segments };
+  const offScreen = { ...candidate('b-off'), route: createEdgeRoute([{ x: 10000, y: 0 }, { x: 11000, y: 0 }])! };
+  const notDrawn = { ...candidate('c-hidden'), eligible: false };
+  expect(labelsMissed(placeItemLabels([candidate('a'), offScreen, notDrawn], options))).toBe(false);
+  const below = { ...candidate('d-below'), route: createEdgeRoute([{ x: 0, y: 200 }, { x: 300, y: 200 }])! };
+  const capped = { labels: 1, attempts: 128, checks: 200000 };
+  expect(labelsMissed(placeItemLabels([candidate('a'), below], options, capped), capped)).toBe(false);
+  const blocked = placeItemLabels([candidate('a')], { ...options, obstacles: [{ x: 150, y: 0, width: 1000, height: 1000 }] });
+  expect(labelsMissed(blocked)).toBe(true);
 });
