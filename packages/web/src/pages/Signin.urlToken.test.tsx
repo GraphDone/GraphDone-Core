@@ -1,4 +1,4 @@
-import { act, render } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Signin } from './Signin';
@@ -54,4 +54,10 @@ it('leaves an existing session untouched when the sign-in address carries a toke
   expect(stored()).toEqual(before);
   expect(view.session).not.toHaveBeenCalled();
   expect(window.location.search).toBe('');
+});
+
+it('tells a person who was signed out on this device to sign in again', async () => {
+  await open('/login?error=signed_out');
+  expect(screen.getByRole('alert')).toHaveTextContent('You were signed out on this device. Sign in again.');
+  expect(stored()).toEqual([['authToken', null, null], ['currentUser', null, null], ['graphdone:keepLoggedIn', null, null]]);
 });

@@ -8,6 +8,7 @@ import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
 import { createClient } from 'graphql-ws';
 import { cloudFailure, preserveCloudDraft, refreshHostedUsage } from './hostedUsage';
 import { getToken, getSessionOwnerId, clearSession } from './authStorage';
+import { handleSessionRevoked, isSessionRevoked } from './sessionRevoked';
 
 // Dynamically construct GraphQL URLs based on current host
 const getGraphQLUrl = () => {
@@ -39,6 +40,12 @@ export const errorLink = onError(({ graphQLErrors, networkError, operation, forw
     if (definition.kind === 'OperationDefinition' && definition.operation === 'mutation' && /workitem|edge|graph/i.test(operation.operationName)) preserveCloudDraft(operation.operationName, operation.variables);
     for (const error of graphQLErrors || []) cloudFailure(String(error.extensions?.code || ''));
     if (networkError && 'result' in networkError) cloudFailure((networkError.result as any)?.code);
+  }
+  if (graphQLErrors?.some(error => isSessionRevoked(error.extensions?.code))
+    || (networkError && 'result' in networkError && isSessionRevoked((networkError.result as { code?: unknown } | undefined)?.code))) {
+    const header = operation.getContext().headers?.authorization;
+    handleSessionRevoked(typeof header === 'string' && header.startsWith('Bearer ') ? header.slice(7) : getToken());
+    return;
   }
   if (graphQLErrors) {
     for (const error of graphQLErrors) {

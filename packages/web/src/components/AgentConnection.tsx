@@ -6,6 +6,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Bot, Check, Copy, KeyRound, MessageSquare, Plus, RefreshCw, ShieldCheck, X } from 'lucide-react';
 import { getToken } from '../lib/authStorage';
+import { handleSessionRevoked, isSessionRevoked } from '../lib/sessionRevoked';
 import { useDialog } from '../hooks/useDialogManager';
 import { useModalA11y } from '../hooks/useModalA11y';
 
@@ -23,13 +24,14 @@ export async function agentRequest(graphId: string, path: string, method = 'GET'
   }
   if(offlineEnabled && path==='/tokens' && (localGuest() || !navigator.onLine))throw Error('Sign in and connect to the internet to manage agent tokens. Notes are saved on this device.');
   try {
+  const token = getToken();
   const response = await fetch(`${agentBase}${path}?graphId=${encodeURIComponent(graphId)}`, {
-    signal: AbortSignal.timeout(10000), method, headers: { Authorization: `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
+    signal: AbortSignal.timeout(10000), method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     ...(body ? { body: JSON.stringify(body) } : {})
   });
   if (!response.headers.get('content-type')?.includes('application/json')) throw new Error('Agent connections are not available on this server yet.');
   const data = await response.json();
-  if (!response.ok) { cloudFailure(data.code); throw new Error(data.error || 'Unable to connect'); }
+  if (!response.ok) { cloudFailure(data.code); if (isSessionRevoked(data.code)) handleSessionRevoked(token); throw new Error(data.error || 'Unable to connect'); }
   if(method!=='GET')void refreshHostedUsage(true);
   return data;
   } catch(error) { if (method !== 'GET' && (path === '/notes' || path === '/items')) preserveCloudDraft(`agent${path}`, {graphId,...body}); throw error; }

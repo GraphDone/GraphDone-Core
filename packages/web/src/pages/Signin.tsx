@@ -244,6 +244,11 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
           action: 'Check your GitHub account settings and try again.'
         },
         invalid_magic_link: INVALID_MAGIC_LINK,
+        signed_out: {
+          title: 'Signed Out',
+          message: 'You were signed out on this device. Sign in again.',
+          action: ''
+        },
         expired_magic_link: {
           title: 'Expired Magic Link',
           message: 'This magic link has expired. Links are valid for 15 minutes.',

@@ -26,7 +26,7 @@ flowchart TD
 | [`Ontology.tsx`](Ontology.tsx) | `/ontology` | Reference of item types, statuses and relationships, with requirements coverage. |
 | [`Agents.tsx`](Agents.tsx) | `/agents` | Connect an AI agent and see the work agents have recorded. |
 | [`Analytics.tsx`](Analytics.tsx) | `/analytics` | Summaries and charts of the current graph. |
-| [`Settings.tsx`](Settings.tsx) | `/settings` | Quality tier, storage and usage, layout recovery, feedback, version. |
+| [`Settings.tsx`](Settings.tsx) | `/settings` | Quality tier, storage and usage, sign out of all devices (hosted accounts), layout recovery, feedback, version. |
 | [`Admin.tsx`](Admin.tsx) | `/admin` (`ADMIN` only) | Tabs: feedback and operations, users, registration, OAuth providers, database, security, backup. |
 | [`Backend.tsx`](Backend.tsx) | `/backend` (not `GUEST` or `VIEWER`) | Service status page: checks `/health` and makes test GraphQL requests. |
 | [`AgentApproval.tsx`](AgentApproval.tsx) | `/agent-approval` | Approve or reject an agent's email enrollment. Calls `/api/enrollment`. |
