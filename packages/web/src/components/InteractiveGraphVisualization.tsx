@@ -51,6 +51,7 @@ import { NodeInspector } from './NodeInspector';
 import { NodeQuickEdit, type QuickEditCommit } from './NodeQuickEdit';
 
 import { WorkItem, WorkItemEdge } from '../types/graph';
+import { endpointId, type ScreenBox } from '../lib/relationshipEdit';
 import { RelationshipType, RELATIONSHIP_OPTIONS, getRelationshipConfig } from '../constants/workItemConstants';
 import { useAdaptiveQuality } from '../hooks/useAdaptiveQuality';
 import { useItemPresentation } from '../hooks/useItemPresentation';
@@ -78,6 +79,8 @@ import { spawnCelebration } from '../lib/celebration';
 import { buildNeighborhood } from '../lib/graphAdjacency';
 import { UndoStack } from '../lib/undoStack';
 import { createSerialQueue } from '../lib/serialQueue';
+import { GraphZoomContext } from './GraphZoomContext';
+import type { ZoomLevel } from '../lib/graphZoomContext';
 
 // Level-of-detail zoom thresholds (single source of truth): below each scale the
 // matching per-node detail is hidden, for legibility and paint cost. (Values are
@@ -562,7 +565,11 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   useEffect(() => { setItemRelationshipScope(null); setItemLabelCount(0); itemPairTriggerRef.current = null; }, [currentGraph?.id]);
   const [createNodePosition, setCreateNodePosition] = useState<{ x: number; y: number; z: number } | undefined>(undefined);
   const [currentTransform, setCurrentTransform] = useState({ x: 0, y: 0, scale: 1 });
-  const [editingEdge, setEditingEdge] = useState<{ edge: WorkItemEdge; position: { x: number; y: number } } | null>(null);
+  const [editingEdge, setEditingEdge] = useState<{ edge: WorkItemEdge; position: { x: number; y: number }; avoid?: ScreenBox } | null>(null);
+  // D3 builds the canvas once per data change; it reads the edited edge here so
+  // a rebuild (after a type change or flip) keeps marking the right wire.
+  const editingEdgeIdRef = useRef<string | null>(null);
+  editingEdgeIdRef.current = editingEdge?.edge.id ?? null;
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -571,7 +578,6 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const contextMenuRef = useRef<HTMLDivElement>(null);
   const [contextMenuPlacement, setContextMenuPlacement] = useState<{ left: number; top: number; maxHeight: number } | null>(null);
   const [isFlippingEdge, setIsFlippingEdge] = useState(false);
-  const [showRelationshipWindow, setShowRelationshipWindow] = useState(false);
   const [selectedNodes, setSelectedNodes] = useState<Set<string>>(new Set());
   // Inline rename: an input floats over the node — no modal (W2)
   const [inlineEdit, setInlineEdit] = useState<{ nodeId: string; value: string; original: string; graphX: number; graphY: number } | null>(null);
@@ -847,21 +853,6 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           .style('filter', `url(#${filterId})`);
       });
     }
-    
-    // Apply relationship-specific glow to active edge if editingEdge is visible
-    if (editingEdge && editingEdge.edge) {
-      const relationshipConfig = getRelationshipConfig(editingEdge.edge.type as RelationshipType);
-      const edgeColor = relationshipConfig.hexColor;
-      const edgeFilterId = `edge-glow-${editingEdge.edge.type.toLowerCase()}`;
-      
-      createGlowFilter(defs, edgeFilterId, edgeColor, { x: '-150%', y: '-150%', width: '400%', height: '400%', stdDeviation: '25', animValues: '15;35;15', dur: '1.5s' });
-
-      svg.selectAll('.edge')
-        .filter((d: any) => d && d.id === editingEdge.edge?.id)
-        .style('filter', `url(#${edgeFilterId})`)
-        .attr('stroke-width', 12); // Also make the edge thicker
-    }
-    
     
   }, [nodeMenu.visible, nodeMenu.node?.id, editingEdge?.edge?.id, selectedEdge?.id, selectedNodes]);
   
@@ -1523,6 +1514,32 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   // A graph owns one simulation. Detached simulations otherwise keep mutating
   // shared node objects after a rebuild and can fight the visible simulation.
   const [semanticOverviewActive, setSemanticOverviewActive] = useState(false);
+  // Zoom-out level (#277): 0 items, 1 graph frame, 2 neighbouring graphs, 3 projects.
+  const [zoomLevel, setZoomLevel] = useState<ZoomLevel>(0);
+  // The zoom-out limit: 0.1 normally, lower when there are graphs and projects
+  // around this one. Kept in a ref so a rebuilt zoom behaviour starts from it.
+  const zoomMinScaleRef = useRef(0.1);
+  const handleZoomLevel = useCallback((level: ZoomLevel, minScale: number) => {
+    setZoomLevel(level);
+    zoomMinScaleRef.current = minScale;
+    // Zooming out may go further when there are graphs and projects around this one.
+    const zoom = zoomBehaviorRef.current;
+    if (zoom && Math.abs(zoom.scaleExtent()[0] - minScale) > 1e-6) zoom.scaleExtent([minScale, zoom.scaleExtent()[1]]);
+  }, []);
+  // Until this time, wheel events are the tail of the gesture that opened a
+  // graph from the zoom-out view, not the person placing the new graph's camera.
+  const zoomSwitchUntilRef = useRef(0);
+  const openZoomGraph = useCallback((graphId: string) => {
+    zoomSwitchUntilRef.current = performance.now() + 1000;
+    fittedGraphsRef.current.delete(graphId);
+    void descendInto(graphId);
+  }, [descendInto]);
+  // A project folder (a graph holding other graphs) with no items of its own
+  // opens on its graphs instead of an empty canvas.
+  const projectGraphs = useMemo(
+    () => (currentGraph ? availableGraphs.filter(graph => graph.parentGraphId === currentGraph.id) : []),
+    [availableGraphs, currentGraph]
+  );
   // True between a programmatic zoom transition's start and end, so leaving
   // the overview mid-transition can leave item presentation to the zoom's
   // single terminal pass. User gestures (wheel, pinch, drag) never set it: a
@@ -1558,7 +1575,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     
     if (isFirstInit) {
       // First initialization - clear everything and create core structure
-      svg.selectAll(':scope > :not(.semantic-overview-host)').remove();
+      svg.selectAll(':scope > :not(.semantic-overview-host):not(.graph-zoom-context)').remove();
       d3.select(containerRef.current).selectAll('.node-labels-container').remove();
     } else {
       // Surgical update - only clear data elements, preserve core structure
@@ -1576,7 +1593,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // Create zoom behavior for empty canvas with reversed wheel direction
     const zoom = d3.zoom<SVGSVGElement, unknown>()
       .filter(event => !(event.target as Element)?.closest('[data-lod-controls]') && (event.type === 'wheel' || !(event.target as Element)?.closest('[data-local-item-card]')) && (!event.ctrlKey || event.type === 'wheel') && !event.button)
-      .scaleExtent([0.1, 3])
+      .scaleExtent([zoomMinScaleRef.current, 3])
       .wheelDelta((event: WheelEvent) => {
         // Standard direction (like maps/most apps): scroll UP (deltaY<0) zooms IN.
         return -event.deltaY * (event.deltaMode === 1 ? 0.05 : event.deltaMode ? 1 : 0.002);
@@ -1586,9 +1603,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         if (!g.empty()) {
           g.attr('transform', event.transform);
         }
+        svg.select('g.graph-zoom-context').attr('transform', event.transform.toString());
       });
 
-    const g = isFirstInit ? svg.insert('g', '.semantic-overview-host').attr('class', 'main-graph-group') : existingMainGroup;
+    const g = isFirstInit ? svg.insert('g', '.graph-zoom-context').attr('class', 'main-graph-group') : existingMainGroup;
     
     // Create grid pattern and overlay (only on first init)
     if (isFirstInit) {
@@ -1921,7 +1939,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     
     if (isFirstInit) {
       // First initialization - clear everything and create core structure
-      svg.selectAll(':scope > :not(.semantic-overview-host)').remove();
+      svg.selectAll(':scope > :not(.semantic-overview-host):not(.graph-zoom-context)').remove();
       d3.select(containerRef.current).selectAll('.node-labels-container').remove();
     } else {
       // Surgical update - only clear data elements, preserve core structure
@@ -1943,23 +1961,25 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // Create or reuse zoom behavior with reversed wheel direction
     const zoom = d3.zoom<SVGSVGElement, unknown>()
       .filter(event => !(event.target as Element)?.closest('[data-lod-controls]') && (event.type === 'wheel' || !(event.target as Element)?.closest('[data-local-item-card]')) && (!event.ctrlKey || event.type === 'wheel') && !event.button)
-      .scaleExtent([0.1, 4])
+      .scaleExtent([zoomMinScaleRef.current, 4])
       .wheelDelta((event: WheelEvent) => {
         // Standard direction (like maps/most apps): scroll UP (deltaY<0) zooms IN.
         return -event.deltaY * (event.deltaMode === 1 ? 0.05 : event.deltaMode ? 1 : 0.002);
       });
 
-    const g = isFirstInit ? svg.insert('g', '.semantic-overview-host').attr('class', 'main-graph-group') : existingMainGroup;
+    const g = isFirstInit ? svg.insert('g', '.graph-zoom-context').attr('class', 'main-graph-group') : existingMainGroup;
 
     // Create or reuse background for capturing clicks  
     let background = g.select('rect.background');
     if (background.empty()) {
+      // Large enough to stay under the whole screen at the furthest zoom-out
+      // (the zoom-out view can go well below 0.1 when there are projects).
       background = g.append('rect')
         .attr('class', 'background')
-        .attr('x', -10000)
-        .attr('y', -10000)
-        .attr('width', 20000)
-        .attr('height', 20000)
+        .attr('x', -1000000)
+        .attr('y', -1000000)
+        .attr('width', 2000000)
+        .attr('height', 2000000)
         .attr('fill', 'transparent')
         .style('cursor', 'default') as any;
     }
@@ -2027,8 +2047,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       const hasOpenDialogs =
         nodeMenu.visible ||
         edgeMenu.visible ||
-        editingEdge !== null ||
-        false; // Removed edge details dialog
+        editingEdgeIdRef.current !== null;
 
       if (hasOpenDialogs) {
         // Close all dialogs and menus - first click
@@ -2255,9 +2274,15 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       // A keyboard opens the editor beside the focused label.
       const box = event instanceof MouseEvent ? null : (event.currentTarget as Element | null)?.getBoundingClientRect();
       const position = box ? { x: box.left + box.width / 2, y: box.top + box.height / 2 } : { x: (event as MouseEvent).clientX, y: (event as MouseEvent).clientY };
+      // The editor opens beside the two items it joins, when there is room.
+      const ends = [endpointId(edge.source), endpointId(edge.target)];
+      const cards = svg.selectAll<SVGGElement, WorkItem>('g.node').filter(n => ends.includes(n?.id)).nodes().map(n => n.getBoundingClientRect());
+      const avoid = cards.length ? {
+        left: Math.min(...cards.map(c => c.left)), top: Math.min(...cards.map(c => c.top)),
+        right: Math.max(...cards.map(c => c.right)), bottom: Math.max(...cards.map(c => c.bottom)),
+      } : undefined;
       setSelectedEdge(edge);
-      setShowRelationshipWindow(true);
-      setEditingEdge({ edge, position });
+      setEditingEdge({ edge, position, avoid });
       setDragOffset({ x: 0, y: 0 });
     };
     const edgeEndTitle = (end: unknown) => (typeof end === 'object' && end ? (end as { title?: string }).title : undefined) ?? 'an item';
@@ -2299,42 +2324,20 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         if (flowClass) {
           classes += ` ${flowClass}`;
         }
-        // Add pulsing class if edge dialog is active
-        if (editingEdge && editingEdge.edge && editingEdge.edge.id === d.id) {
-          classes += ' dialog-active-pulse';
+        // The edited wire keeps its type's colour and glows in it (index.css
+        // .edge-editing); a forced highlight colour hid every type change.
+        if (editingEdgeIdRef.current === d.id) {
+          classes += ' edge-editing';
         }
         return classes;
       })
-      .attr('stroke', (d: WorkItemEdge) => {
-        // Use relationship color for active dialog (same as normal)
-        const config = getRelationshipConfig(d.type as RelationshipType);
-        return config.hexColor;
-      })
-      .attr('stroke-width', (d: WorkItemEdge) => {
-        // Much thicker for active dialog
-        if (editingEdge && editingEdge.edge && editingEdge.edge.id === d.id) {
-          return 10; // Very thick to make it obvious
-        }
-        return ITEM_WIRE_WIDTH;
-      })
-      .attr('stroke-opacity', (d: WorkItemEdge) => {
-        // Full opacity for active dialog
-        if (editingEdge && editingEdge.edge && editingEdge.edge.id === d.id) {
-          return 1;
-        }
-        return 0.9;
-      })
-      .style('filter', (d: WorkItemEdge) => {
-        // Apply pulsing glow to edges with active dialogs
-        if (editingEdge && editingEdge.edge && editingEdge.edge.id === d.id) {
-          return 'url(#dialog-glow)';
-        }
-        return null;
-      })
+      .attr('stroke', (d: WorkItemEdge) => getRelationshipConfig(d.type as RelationshipType).hexColor)
+      .attr('color', (d: WorkItemEdge) => getRelationshipConfig(d.type as RelationshipType).hexColor)
+      .attr('stroke-width', ITEM_WIRE_WIDTH)
+      .attr('stroke-opacity', 0.9)
       .on('mouseenter', function(event: MouseEvent, d: WorkItemEdge) {
-        // Skip hover effect if edge has active dialog (glow is already applied)
-        if ((editingEdge && editingEdge.edge && editingEdge.edge.id === d.id) ||
-            false) { // Removed edge details dialog
+        // The edited wire keeps its glow instead of the hover highlight
+        if (editingEdgeIdRef.current === d.id) {
           return;
         }
         
@@ -2346,9 +2349,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           .style('filter', 'drop-shadow(0 0 4px #ffffff)');
       })
       .on('mouseleave', function(event: MouseEvent, d: WorkItemEdge) {
-        // Skip hover reset if edge has active dialog (glow should remain)
-        if ((editingEdge && editingEdge.edge && editingEdge.edge.id === d.id) ||
-            false) { // Removed edge details dialog
+        if (editingEdgeIdRef.current === d.id) {
           return;
         }
         
@@ -2932,7 +2933,6 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       event.preventDefault();
       setNodeMenu({ node: null, position: { x: 0, y: 0 }, visible: false });
       setEditingEdge(null);
-      setShowRelationshipWindow(false);
       setConnectionSource(d.id);
       setIsConnecting(true);
     };
@@ -3163,7 +3163,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .data(visibleEdges)
       .enter()
       .append('g')
-      .attr('class', 'edge-label-group')
+      .attr('class', (d: WorkItemEdge) => editingEdgeIdRef.current === d.id ? 'edge-label-group edge-editing-label' : 'edge-label-group')
       .attr('data-edge-id', (d: WorkItemEdge) => d.id)
       // Every connection label is a button: it opens the connection editor
       // (or, for a summarized pair, the list of its relationships).
@@ -3220,19 +3220,18 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         // Get the exact same centralized React component as the dropdown
         const { IconComponent } = getRelationshipIconForD3(d.type as RelationshipType);
         
-        // Create a unique container for each icon
-        const uniqueId = `edge-icon-${d.id}`;
-        
         d3.select(this)
           .style('width', '14px')
           .style('height', '14px')
           .style('display', 'flex')
           .style('align-items', 'center')
           .style('justify-content', 'center')
-          .html(`<div id="${uniqueId}" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;"></div>`);
-        
-        // Render the centralized React component in the unique container
-        const container = document.getElementById(uniqueId);
+          .html(`<div id="edge-icon-${d.id}" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;"></div>`);
+
+        // Render into this label's own container, not the first element with
+        // its id: during a rebuild an outgoing label can still hold that id,
+        // and the new label would then show no icon.
+        const container = (this as Element).firstElementChild;
         if (container) {
           const root = ReactDOM.createRoot(container);
           root.render(React.createElement(IconComponent, { 
@@ -3757,20 +3756,24 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       setItemLabelCount(result.placements.size);
     };
 
+    // d3.pointer reads clientX, which a touch drag's TouchEvent lacks (a tap on
+    // a label threw on tablets); d3.pointers reads the finger instead.
+    const labelPointer = (event: any) => d3.pointers(event, g.node() as any)[0] ?? null;
     edgeLabelGroups
       .style('cursor', 'grab')
       .call(d3.drag<any, any>()
         .filter((event: any) => !interactionLockedRef.current && !event.ctrlKey && !event.button)
         .on('start', (event, d: any) => {
           event.sourceEvent?.stopPropagation();
-          const [x, y] = d3.pointer(event, g.node() as any);
-          d._labelGrab = d._routeLabel
-            ? { x: x - d._routeLabel.x, y: y - d._routeLabel.y }
+          const pointer = labelPointer(event);
+          d._labelGrab = d._routeLabel && pointer
+            ? { x: pointer[0] - d._routeLabel.x, y: pointer[1] - d._routeLabel.y }
             : { x: 0, y: 0 };
         })
         .on('drag', function(event, d: any) {
-          if (!d._route || !d._labelGrab) return;
-          const [x, y] = d3.pointer(event, g.node() as any);
+          const pointer = labelPointer(event);
+          if (!d._route || !d._labelGrab || !pointer) return;
+          const [x, y] = pointer;
           const t = projectEdgeRoutePointer(d._route, {
             x: x - d._labelGrab.x, y: y - d._labelGrab.y
           }, d.labelT, { offset: d._routeLabel?.offset ?? 25 });
@@ -3983,23 +3986,23 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           directionStrategy(scale) === 'hidden' ? 0 : arrowVisibility(scale, d?._pTotal || 1).opacity);
       linkElements.filter((d: any) => edgeDisplay(d) !== 'none')
         .style('opacity', Math.max(0.1, getSmoothedOpacity(LOD_THRESHOLDS.VERY_FAR, 0.1)))
-        .attr('stroke-width', function(d: any) {
-          // Don't override stroke width if this edge has an active dialog
-          if (editingEdge && editingEdge.edge && editingEdge.edge.id === d.id) {
-            return 10; // Keep thick for active dialog
-          }
-          return ITEM_WIRE_WIDTH;
-        });
+        .attr('stroke-width', ITEM_WIRE_WIDTH);
     };
     zoom.on('zoom', (event) => {
       // D3 sets sourceEvent only for direct wheel/pointer gestures. Programmatic
       // fit/restore transforms must remain distinguishable so an automatic fit
       // that later clips a restored task can be repaired on reload.
-      if (event.sourceEvent) {
+      // The rest of a wheel gesture that just opened a graph (zoom-out view)
+      // must not mark the new graph as placed, or it would skip its fit.
+      const switching = performance.now() < zoomSwitchUntilRef.current;
+      if (event.sourceEvent && !switching) {
         cameraManuallyPositionedRef.current = true;
         if (currentGraphIdRef.current) fittedGraphsRef.current.add(currentGraphIdRef.current);
       }
       g.attr('transform', event.transform);
+      // The zoom-out context (graph frame, neighbouring graphs, projects) moves
+      // in the same frame as the items; React only redraws its labels.
+      svg.select('g.graph-zoom-context').attr('transform', event.transform.toString());
       setCurrentTransform({
         x: event.transform.x,
         y: event.transform.y,
@@ -4009,7 +4012,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       // reload and isn't reset on the next visit. localStorage only — no D1 chatter.
       {
         const gid = currentGraphIdRef.current;
-        if (gid) {
+        if (gid && !switching) {
           // Stamp the viewport size with the camera so a later restore can tell
           // the window was resized materially (rotate / maximize) and re-fit
           // instead of applying a transform framed for a different size.
@@ -4381,7 +4384,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       cameraManuallyPositionedRef.current = true;
       if (currentGraphIdRef.current) fittedGraphsRef.current.add(currentGraphIdRef.current);
       const svg = d3.select(svgRef.current);
-      const k = Math.max(0.1, Math.min(4, targetK));
+      const k = Math.max(zoomBehaviorRef.current.scaleExtent()[0], Math.min(4, targetK));
       const w = containerRef.current.clientWidth;
       const h = containerRef.current.clientHeight;
       const t = d3.zoomIdentity.translate(w / 2 - graphX * k, h / 2 - graphY * k).scale(k);
@@ -5397,7 +5400,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
 
   return (
-    <div ref={containerRef} className="graph-container relative w-full h-full overflow-hidden select-none" data-overview={semanticOverviewActive || localItemActive || undefined} data-local-item-lod={localItemActive || undefined} data-quality={qualityTier} data-dense={isDenseGraph ? 'true' : undefined} data-simplify={isSimplified ? 'true' : undefined} data-dots={isDotMode ? 'true' : undefined}
+    <div ref={containerRef} className="graph-container relative w-full h-full overflow-hidden select-none" data-zoom-level={zoomLevel} data-overview={semanticOverviewActive || localItemActive || undefined} data-local-item-lod={localItemActive || undefined} data-quality={qualityTier} data-dense={isDenseGraph ? 'true' : undefined} data-simplify={isSimplified ? 'true' : undefined} data-dots={isDotMode ? 'true' : undefined}
       data-relationship-priority={relationshipLevel} data-relationship-total={workItemEdges.length}
       data-priority-summarized={priorityProjection.summarized.length} data-priority-represented={priorityProjection.represented.length} data-priority-pending={priorityProjection.pending.length}>
       {workItems.length < 40 && (!compactWorkspace || localItemControls) && <div data-graph-fit-obstacle="true" className="absolute left-3 right-16 top-3 md:left-16 md:right-40 z-20 flex flex-wrap gap-3">{!compactWorkspace && priorityControl}{localItemControls}</div>}
@@ -5435,7 +5438,6 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           if (!edge) return;
           setItemRelationshipScope(null);
           setSelectedEdge(edge);
-          setShowRelationshipWindow(true);
           setEditingEdge({ edge, position: { x: window.innerWidth / 2, y: window.innerHeight / 2 } });
           setDragOffset({ x: 0, y: 0 });
         }}
@@ -5447,6 +5449,16 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         aria-label="Interactive work-item dependency graph"
         aria-describedby="graph-a11y-desc"
       >
+        <GraphZoomContext
+          graphs={availableGraphs}
+          currentGraphId={currentGraph?.id ?? null}
+          camera={currentTransform}
+          readPositions={readOverviewPositions}
+          itemSize={getNodeDimensions}
+          overview={semanticOverviewActive}
+          onOpen={openZoomGraph}
+          onLevel={handleZoomLevel}
+        />
         <foreignObject className="semantic-overview-host" width="100%" height="100%" style={{ pointerEvents: 'none' }}>
       {currentGraph && workItems.length >= 40 && <SemanticGraphOverview
         key={layoutScope ?? currentGraph.id}
@@ -5501,12 +5513,32 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
             <div className="text-green-400 text-4xl mb-4">
               🌱
             </div>
+            {projectGraphs.length > 0 ? <>
+              <h3 className="text-2xl font-bold text-white mb-2">{currentGraph?.name}</h3>
+              <div className="text-gray-200 mb-4 leading-relaxed text-base max-w-md mx-auto">
+                {`This project holds ${projectGraphs.length === 1 ? '1 graph' : `${projectGraphs.length} graphs`}. Open one, or add a work item here.`}
+              </div>
+              <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-6 text-left" aria-label={`Graphs in ${currentGraph?.name ?? 'this project'}`}>
+                {projectGraphs.map(graph => (
+                  <li key={graph.id}>
+                    <button
+                      type="button"
+                      onClick={() => openZoomGraph(graph.id)}
+                      className="w-full rounded-lg border border-gray-600/60 bg-gray-900/60 hover:border-emerald-400/70 px-3 py-2 text-white font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-300"
+                    >
+                      {graph.name}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </> : <>
             <h3 className="text-2xl font-bold bg-gradient-to-r from-emerald-400 via-green-300 to-blue-400 bg-clip-text text-transparent mb-3">
               Start with one idea
             </h3>
             <div className="text-gray-200 mb-8 leading-relaxed text-base max-w-md mx-auto">
               Add a work item, give it a name, then use + to grow a connected idea.
             </div>
+            </>}
             
             <button 
               onClick={() => {
@@ -6129,29 +6161,20 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       )}
 
       {/* Relationship Editor Window */}
+      {/* Relationship editor: open exactly while an edge is being edited, so
+          closing, Escape, or selecting something else closes it, and a type
+          change or flip keeps it on the saved relationship. */}
       <RelationshipEditorWindow
-        isVisible={showRelationshipWindow}
         editingEdge={editingEdge}
-        selectedNodes={selectedNodes}
         workItems={workItems}
-        onClose={() => setShowRelationshipWindow(false)}
-        onFlipDirection={() => {
-          // The component handles flip internally
-          setEditingEdge(null); // Clear after flip
+        onClose={() => setEditingEdge(null)}
+        onEdgeChange={(edge, previousId) => {
+          setEditingEdge(prev => (prev && prev.edge.id === previousId ? { ...prev, edge } : prev));
+          setSelectedEdge(prev => (prev?.id === previousId ? edge : prev));
         }}
-        onDeleteEdge={(edgeId) => {
-          setEditingEdge(null); // Clear after delete
-        }}
-        onCreateEdge={(sourceId, targetId, type) => {
-          // Clear selection after create
-          setSelectedNodes(new Set());
-        }}
+        onDeleteEdge={() => setEditingEdge(null)}
         showSuccess={showSuccess}
         showError={showError}
-        refetchEdges={refetchEdges}
-        onClearSelection={() => {
-          setSelectedNodes(new Set());
-        }}
       />
 
 

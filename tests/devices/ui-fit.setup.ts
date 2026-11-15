@@ -7,10 +7,10 @@ import { UI_FIT_AUTH, UI_FIT_FIXTURE } from '../lib/ui-fit/devices.mjs';
 // One real login shared by every device project (cookies and storage are
 // browser-independent, so WebKit devices reuse the Chromium session).
 //
-// The signed-in user's own starter graph has no connections, so the setup
-// also creates a small connected graph through the real API for the
-// connection screens. It is an "[E2E]" graph: the teardown project deletes
-// it, and the test-data sweep removes it if a run is interrupted.
+// The setup also creates a small connected graph of its own through the real
+// API, so the connection screens do not depend on the example workspace a new
+// user gets (#277). It is an "[E2E]" graph: the teardown project deletes it,
+// and the test-data sweep removes it if a run is interrupted.
 setup('sign in once and create the connected fixture graph', async ({ page }) => {
   // One-time fixture work on a fresh database, not a screen budget: sign-in
   // alone waits ~8 s, and the first writes on a cold Neo4j can take ~20 s.

@@ -429,37 +429,61 @@ check_disk_space() {
         if [ "$available_gb" -lt "$required_gb" ]; then
             warn "Low disk space: ${available_gb}GB available (${required_gb}GB recommended)"
             printf "${CYAN}ℹ${NC} Continue anyway? ${GRAY}[y/N]${NC} "
-            read -r response || response="n"
-            if [ "$response" != "y" ] && [ "$response" != "Y" ]; then
+            if ! ask_continue; then
                 error "Installation cancelled due to low disk space"
             fi
         fi
     fi
 }
 
+# Ask "Continue? [y/N]" of the person at the terminal. The answer is read
+# from the terminal, not stdin: under `curl ... | sh` stdin is this script.
+# With no terminal (CI, a pipe) the answer is no. GRAPHDONE_TTY is for tests.
+ask_continue() {
+    local answer=""
+    { read -r answer < "${GRAPHDONE_TTY:-/dev/tty}"; } 2>/dev/null || answer=""
+    [ "$answer" = "y" ] || [ "$answer" = "Y" ]
+}
+
+# Whether GitHub answers. One dropped request is not "no network": it asks up
+# to GRAPHDONE_NETWORK_TRIES times (default 3), GRAPHDONE_NETWORK_PAUSE
+# seconds apart (default 2), before saying it is unreachable.
+network_reachable() {
+    local test_url="https://github.com"
+    local tries="${GRAPHDONE_NETWORK_TRIES:-3}"
+    local pause="${GRAPHDONE_NETWORK_PAUSE:-2}"
+    case "$tries" in ''|*[!0-9]*|0) tries=3 ;; esac
+    case "$pause" in ''|*[!0-9]*) pause=2 ;; esac
+    local attempt=1
+
+    while :; do
+        if command -v curl >/dev/null 2>&1; then
+            curl -sf --max-time 5 "$test_url" >/dev/null 2>&1 && return 0
+        elif command -v wget >/dev/null 2>&1; then
+            # --tries=1: wget's own default is 20 tries, minutes on a dropped route
+            wget -q --tries=1 --timeout=5 --spider "$test_url" 2>/dev/null && return 0
+        else
+            return 0  # nothing to test with; the downloads will say
+        fi
+        [ "$attempt" -ge "$tries" ] && return 1
+        attempt=$((attempt + 1))
+        sleep "$pause"
+    done
+}
+
+# GitHub did not answer: go on only if the person says so.
+network_unreachable() {
+    warn "Network connectivity test failed"
+    printf "${CYAN}ℹ${NC} This may cause download failures. Continue? ${GRAY}[y/N]${NC} "
+    if ! ask_continue; then
+        printf "\n"
+        error "Installation cancelled - network required"
+    fi
+}
+
 # Check network connectivity
 check_network() {
-    local test_url="https://github.com"
-
-    if command -v curl >/dev/null 2>&1; then
-        if ! curl -sf --max-time 5 "$test_url" >/dev/null 2>&1; then
-            warn "Network connectivity test failed"
-            printf "${CYAN}ℹ${NC} This may cause download failures. Continue? ${GRAY}[y/N]${NC} "
-            read -r response || response="n"
-            if [ "$response" != "y" ] && [ "$response" != "Y" ]; then
-                error "Installation cancelled - network required"
-            fi
-        fi
-    elif command -v wget >/dev/null 2>&1; then
-        if ! wget -q --timeout=5 --spider "$test_url" 2>/dev/null; then
-            warn "Network connectivity test failed"
-            printf "${CYAN}ℹ${NC} This may cause download failures. Continue? ${GRAY}[y/N]${NC} "
-            read -r response || response="n"
-            if [ "$response" != "y" ] && [ "$response" != "Y" ]; then
-                error "Installation cancelled - network required"
-            fi
-        fi
-    fi
+    network_reachable || network_unreachable
 }
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -3008,17 +3032,14 @@ install_graphdone() {
     printf "\n"
     printf "${TEAL}────────────────────────────────────${NC}  ${CYAN}${BOLD}✈️  Pre-flight Checks${NC}  ${TEAL}────────────────────────────────────────${NC}\n"
 
-    # Check network connectivity with 4-dot animation
-    check_network &
+    # Check network connectivity with 4-dot animation. Only the check runs in
+    # the background: a prompt there could never be answered.
+    network_reachable &
     network_pid=$!
 
-    for cycle in 1 2 3 4 5 6; do
-        # Check if network check is still running
-        if ! kill -0 $network_pid 2>/dev/null; then
-            break
-        fi
-
-        # Build the dots display based on cycle
+    cycle=1
+    while kill -0 $network_pid 2>/dev/null; do
+        # Build the dots display based on cycle (it repeats while retries run)
         dots_display=""
         if [ $cycle -ge 2 ]; then
             dots_display=" ${GRAY}●${NC}"
@@ -3036,15 +3057,19 @@ install_graphdone() {
         printf "\r  ${BLUE}◉${NC} ${GRAY}Checking network${NC}$dots_display"
         printf "\033[K"
         sleep 0.5
+        cycle=$((cycle % 5 + 1))
     done
 
-    wait $network_pid
-
-    # Show all 4 dots completed
-    printf "\r  ${BLUE}◉${NC} ${GRAY}Checking network${NC} ${GRAY}●${NC} ${BLUE}●${NC} ${CYAN}●${NC} ${GREEN}●${NC}"
-    sleep 0.3
-
-    printf "\r\033[K  ${GREEN}✓${NC} ${GRAY}Network:${NC} ${BOLD}Connected${NC}\n"
+    if wait $network_pid; then
+        # Show all 4 dots completed
+        printf "\r  ${BLUE}◉${NC} ${GRAY}Checking network${NC} ${GRAY}●${NC} ${BLUE}●${NC} ${CYAN}●${NC} ${GREEN}●${NC}"
+        sleep 0.3
+        printf "\r\033[K  ${GREEN}✓${NC} ${GRAY}Network:${NC} ${BOLD}Connected${NC}\n"
+    else
+        printf "\r\033[K"
+        network_unreachable
+        printf "  ${YELLOW}⚠${NC} ${GRAY}Network:${NC} ${BOLD}GitHub not reachable, continuing${NC}\n"
+    fi
 
     # Test download speed with 4-dot animation
     local download_tmp="/tmp/graphdone_download_$$"
@@ -3241,8 +3266,7 @@ install_graphdone() {
         printf "  ${GRAY}Your version (${BOLD}${MACOS_VERSION}${NC}${GRAY}) may not be fully supported${NC}\n"
         printf "\n"
         printf "  ${CYAN}ℹ${NC} Continue installation anyway? ${GRAY}[y/N]${NC} "
-        read -r response || response="n"
-        if [ "$response" != "y" ] && [ "$response" != "Y" ]; then
+        if ! ask_continue; then
             printf "\n"
             error "Installation cancelled - please upgrade to macOS 10.15 or later"
         fi

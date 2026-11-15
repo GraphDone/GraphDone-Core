@@ -3,7 +3,7 @@ import { offlineEnabled } from '../lib/offline/engine';
 import { skipBackgroundPoll, useHostedUsage } from '../lib/hostedUsage';
 import { WorkspaceViewTabs } from '../components/WorkspaceViewTabs';
 import { AgentConnection } from '../components/AgentConnection';
-import type { WorkItem } from '../types/graph';
+import type { Graph, WorkItem } from '../types/graph';
 import { useState, useEffect, useCallback } from 'react';
 import { Plus, Share2, Users, Network, Orbit, Database, AlertTriangle, Map, X, Minimize2, Maximize2, Edit3, Trash2, FolderPlus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { createPortal } from 'react-dom';
@@ -39,6 +39,7 @@ export function Workspace() {
   const [showDeleteGraphModal, setShowDeleteGraphModal] = useState(false);
   const [showGraphSelectionModal, setShowGraphSelectionModal] = useState(false);
   const [graphToEdit, setGraphToEdit] = useState<any>(null);
+  const [graphToDelete, setGraphToDelete] = useState<Graph | null>(null);
   const { viewMode, setViewMode } = useViewMode();
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== 'undefined' && window.matchMedia(COMPACT_WORKSPACE_QUERY).matches
@@ -169,7 +170,10 @@ export function Workspace() {
                     setGraphToEdit(graph);
                     setShowUpdateGraphModal(true);
                   }}
-                  onDeleteGraph={(graph) => setShowDeleteGraphModal(true)}
+                  onDeleteGraph={(graph) => {
+                    setGraphToDelete(graph);
+                    setShowDeleteGraphModal(true);
+                  }}
                 />
               </div>
             </div>
@@ -231,7 +235,7 @@ export function Workspace() {
       {breadcrumb.length > 1 && (
         <div
           data-testid="graph-breadcrumb"
-          className="bg-gray-800/30 backdrop-blur-sm border-b border-gray-700/20 px-4 sm:px-6 lg:px-8 py-2 flex items-center gap-1 text-sm overflow-x-auto"
+          className="bg-gray-800/30 backdrop-blur-sm border-b border-gray-700/20 px-4 sm:px-6 lg:px-8 py-2 flex items-center gap-1 text-sm overflow-x-auto short:hidden"
         >
           <button
             onClick={() => ascendTo(breadcrumb[breadcrumb.length - 2].id)}
@@ -531,10 +535,14 @@ export function Workspace() {
       )}
 
       {/* Delete Graph Modal */}
-      {showDeleteGraphModal && currentGraph && (
+      {showDeleteGraphModal && (graphToDelete || currentGraph) && (
         <DeleteGraphModal
           isOpen={showDeleteGraphModal}
-          onClose={() => setShowDeleteGraphModal(false)}
+          graph={graphToDelete}
+          onClose={() => {
+            setShowDeleteGraphModal(false);
+            setGraphToDelete(null);
+          }}
         />
       )}
     </div>

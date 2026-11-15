@@ -1020,3 +1020,18 @@ html:not([data-theme="contrast"]) .workspace-surface .graph-container .node-titl
   .task-editor-badges [data-testid$="-badge"] { width: 100%; min-height: 44px; padding: 6px 8px; gap: 4px; transform: none; }
   .task-editor-badges [data-testid="details-status-dropdown"] { left: auto; right: 0; }
 }
+
+/* Zoom-out context (#277): the graph's frame, the graphs beside it and the
+   projects around them. Drawn in world space; strokes stay a fixed width. */
+.graph-zoom-context { pointer-events: none; }
+.graph-zoom-context [role="button"] { pointer-events: auto; cursor: pointer; outline: none; }
+.graph-zoom-context .zoom-frame { fill: none; stroke: var(--gd-accent); stroke-opacity: .6; stroke-width: 1.5; stroke-dasharray: 6 5; }
+.graph-zoom-context .zoom-tile-bg { stroke: var(--gd-line); stroke-width: 1.5; }
+.graph-zoom-context .zoom-tile-graph .zoom-tile-bg { fill: var(--gd-surface); fill-opacity: .94; }
+.graph-zoom-context .zoom-tile-project .zoom-tile-bg { fill: var(--gd-chrome); fill-opacity: .6; }
+.graph-zoom-context [role="button"]:hover .zoom-tile-bg { stroke: var(--gd-accent); }
+.graph-zoom-context [role="button"]:focus-visible .zoom-tile-bg { stroke: var(--gd-accent); stroke-width: 3; }
+.graph-zoom-context .zoom-label-backing { fill: var(--gd-canvas); fill-opacity: .85; }
+.graph-zoom-context .zoom-child { fill: var(--gd-surface); stroke: var(--gd-line); stroke-width: 1; }
+.graph-zoom-context .zoom-label { fill: var(--gd-ink); font-family: system-ui, sans-serif; font-weight: 700; }
+.graph-zoom-context .zoom-label-detail, .graph-zoom-context .zoom-more { fill: var(--gd-muted); font-weight: 500; }

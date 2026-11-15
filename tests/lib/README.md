@@ -16,7 +16,8 @@ flowchart LR
 - `auth.ts` — battle-tested `login` / `navigateToWorkspace` / `TEST_USERS` (the
   foundation for every authenticated E2E spec)
 - `api.ts` — GraphQL/REST helpers that authenticate the way the UI does
-- `seedGraph.ts` — seed graphs/work items for a test
+- `seedGraph.ts` — seed graphs/work items for a test; `waitForStarterGraph`
+  waits until a new user's whole example workspace is written
 - `dbHealing.ts` — DB isolation + cleanup for heavy suites
 - `testEnv.ts` — `.env.test.local` loader (VLM endpoints, etc.)
 - `mobileAudit.ts`, `zorder.ts` — DOM auditors used by the mobile/z-order specs
