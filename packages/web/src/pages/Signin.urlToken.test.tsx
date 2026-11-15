@@ -19,23 +19,30 @@ beforeEach(() => {
   sessionStorage.clear();
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) }));
 });
-afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); window.history.replaceState(null, '', '/'); });
 
 async function open(url: string) {
-  const replaceState = vi.spyOn(window.history, 'replaceState');
+  window.history.replaceState(null, '', url);
   const session = vi.fn();
   window.addEventListener('graphdone-session', session);
   render(<MemoryRouter initialEntries={[url]}><Signin /></MemoryRouter>);
   await act(async () => {});
   window.removeEventListener('graphdone-session', session);
-  return { replaceState, session };
+  return { session };
 }
 
-it('stores no session from a token in the sign-in address and does not reload', async () => {
+it('stores no session from a token in the sign-in address and removes it from the address', async () => {
   const view = await open('/login?token=owned-url-token');
   expect(stored()).toEqual([['authToken', null, null], ['currentUser', null, null], ['graphdone:keepLoggedIn', null, null]]);
   expect(view.session).not.toHaveBeenCalled();
-  expect(view.replaceState).not.toHaveBeenCalled();
+  expect(window.location.pathname).toBe('/login');
+  expect(window.location.search).toBe('');
+});
+
+it('removes only the token from an address that carries other parameters', async () => {
+  await open('/login?error=github&token=owned-url-token');
+  expect(window.location.search).toBe('?error=github');
+  expect(stored()).toEqual([['authToken', null, null], ['currentUser', null, null], ['graphdone:keepLoggedIn', null, null]]);
 });
 
 it('leaves an existing session untouched when the sign-in address carries a token', async () => {
@@ -46,5 +53,5 @@ it('leaves an existing session untouched when the sign-in address carries a toke
   const view = await open('/login?token=owned-url-token');
   expect(stored()).toEqual(before);
   expect(view.session).not.toHaveBeenCalled();
-  expect(view.replaceState).not.toHaveBeenCalled();
+  expect(window.location.search).toBe('');
 });

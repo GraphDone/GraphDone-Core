@@ -5,13 +5,14 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, gql } from '@apollo/client';
 import { Eye, EyeOff, ArrowRight, Mail, Lock, Users, Github, Zap, Check, CheckCircle, XCircle, AlertTriangle, Shield } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { setToken } from '../lib/authStorage';
+import { getToken, setToken } from '../lib/authStorage';
 import { InsecureConnectionBanner } from '../components/TlsStatusIndicator';
 import { GuestModeDialog } from '../components/GuestModeDialog';
 import { PasswordRequirements } from '../components/PasswordRequirements';
 import { isValidEmail } from '../utils/validation';
 import { AuthCaptcha } from '../components/AuthCaptcha';
 import { TurnstileChallenge } from '../components/TurnstileChallenge';
+import { SessionHandover } from '../components/SessionHandover';
 import { magicLinkFocusTarget, hasEnteredEmail } from '../lib/loginFocus';
 import { formatLoginCodeInput, isCompleteLoginCode } from '../lib/loginCode';
 
@@ -85,6 +86,14 @@ const GET_SYSTEM_SETTINGS = gql`
   }
 `;
 
+const INVALID_MAGIC_LINK = {
+  title: 'Invalid Magic Link',
+  message: 'This magic link is not valid or has already been used.',
+  action: 'Request a new magic link below.'
+};
+
+const HANDOVER_PREFIX = '#handover=';
+
 export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean } = {}) {
   const navigate = useNavigate();
   const { login: setAuthUser } = useAuth();
@@ -125,11 +134,69 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
   const [turnstileSiteKey, setTurnstileSiteKey] = useState<string | undefined>();
   const [guestDescription, setGuestDescription] = useState<string | undefined>();
   const [showGuestInfo, setShowGuestInfo] = useState(false);
+  const [handover, setHandover] = useState<{ code: string; account: string | null; busy: boolean } | null>(() => {
+    const code = window.location.hash.startsWith(HANDOVER_PREFIX) ? window.location.hash.slice(HANDOVER_PREFIX.length) : '';
+    return code ? { code, account: null, busy: false } : null;
+  });
+  const handoverCode = handover?.code;
   const [oauthConfig, setOauthConfig] = useState<{
     google: { enabled: boolean; configured: boolean };
     github: { enabled: boolean; configured: boolean };
     linkedin: { enabled: boolean; configured: boolean };
   } | null>(null);
+
+  useEffect(() => {
+    const address = new URL(window.location.href);
+    if (address.searchParams.has('token')) address.searchParams.delete('token');
+    if (address.hash.startsWith(HANDOVER_PREFIX)) address.hash = '';
+    if (address.href !== window.location.href) {
+      window.history.replaceState(window.history.state, '', `${address.pathname}${address.search}${address.hash}`);
+    }
+  }, []);
+
+  const refuseHandover = () => {
+    setHandover(null);
+    setErrors({ submit: INVALID_MAGIC_LINK.message, submitTitle: INVALID_MAGIC_LINK.title, submitAction: INVALID_MAGIC_LINK.action });
+  };
+
+  const handoverRequest = async (step: 'preview' | 'complete', code: string): Promise<Record<string, unknown>> => {
+    const apiUrl = import.meta.env.VITE_API_URL || window.location.origin;
+    try {
+      const response = await fetch(`${apiUrl}/auth/session/handover/${step}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code }),
+      });
+      const data = await response.json().catch(() => ({}));
+      return response.ok && data && typeof data === 'object' ? data : {};
+    } catch {
+      return {};
+    }
+  };
+
+  useEffect(() => {
+    if (!handoverCode) return undefined;
+    let active = true;
+    handoverRequest('preview', handoverCode).then(data => {
+      if (!active) return;
+      const account = data.account;
+      if (typeof account === 'string') setHandover(current => current && { ...current, account });
+      else refuseHandover();
+    });
+    return () => { active = false; };
+  }, [handoverCode]);
+
+  const completeHandover = async () => {
+    if (!handover || handover.busy) return;
+    setHandover({ ...handover, busy: true });
+    const data = await handoverRequest('complete', handover.code);
+    if (typeof data.token === 'string') {
+      setToken(data.token, true);
+      window.location.assign('/');
+    } else {
+      refuseHandover();
+    }
+  };
 
   useEffect(() => {
     const fetchOAuthConfig = async () => {
@@ -176,11 +243,7 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
           message: 'Unable to authenticate with GitHub. This may be due to permissions or network issues.',
           action: 'Check your GitHub account settings and try again.'
         },
-        invalid_magic_link: {
-          title: 'Invalid Magic Link',
-          message: 'This magic link is not valid or has already been used.',
-          action: 'Request a new magic link below.'
-        },
+        invalid_magic_link: INVALID_MAGIC_LINK,
         expired_magic_link: {
           title: 'Expired Magic Link',
           message: 'This magic link has expired. Links are valid for 15 minutes.',
@@ -538,6 +601,10 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
         </div>
 
         {/* Login Form */}
+        {handover ? (
+          <SessionHandover account={handover.account} replacing={getToken() !== null} busy={handover.busy}
+            onContinue={completeHandover} onCancel={() => setHandover(null)} />
+        ) : (
         <form onSubmit={handleSubmit} className="signin-card border border-stone-500/20 rounded-xl p-5 sm:p-8 lg:py-6 space-y-5 lg:space-y-4">
           {/* Social Login Buttons — only when at least one provider is actually
               configured; otherwise the whole block (and its divider) is hidden so
@@ -1119,6 +1186,7 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
             </div>
           )}
         </form>
+        )}
        </div>
 
         {/* Development Mode - Default Credentials */}
