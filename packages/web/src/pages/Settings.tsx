@@ -1,6 +1,7 @@
 import {FeedbackButton} from '../components/Feedback';
 import React from 'react';
 import { HostedUsage } from '../components/HostedUsage';
+import { SignOutEverywhere } from '../components/SignOutEverywhere';
 import { LayoutRecoverySettings } from '../components/LayoutRecoverySettings';
 import { Settings as SettingsIcon } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -43,6 +44,7 @@ export function Settings() {
             
             <div className="space-y-8">
               <HostedUsage />
+              <SignOutEverywhere />
               <LayoutRecoverySettings />
               {/* Performance (ADAPT-6) */}
               <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">

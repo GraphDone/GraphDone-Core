@@ -2,6 +2,7 @@ import type { RequestHandler } from 'express';
 import { sqliteAuthStore } from './sqlite-auth.js';
 import { generateToken } from '../utils/auth.js';
 import { verifyCaptcha } from '../utils/captcha.js';
+import { redirectWithHandover } from './session-handover.js';
 
 export const verifyMagicLinkHandler: RequestHandler = async (req, res) => {
   try {
@@ -18,11 +19,9 @@ export const verifyMagicLinkHandler: RequestHandler = async (req, res) => {
     }
 
     const jwtToken = generateToken(result.userId, result.email!, result.role, result.authVersion);
-    const clientUrl = process.env.CLIENT_URL || 'http://localhost:3127';
-    const redirectUrl = `${clientUrl}/login?token=${jwtToken}`;
 
     console.log(`🔐 Magic link verified for: ${result.email}`); // eslint-disable-line no-console
-    res.redirect(redirectUrl);
+    redirectWithHandover(res, { token: jwtToken, account: result.email! });
   } catch (error) {
     console.error('❌ Magic link verification failed:', error); // eslint-disable-line no-console
     res.redirect(`${process.env.CLIENT_URL || 'http://localhost:3127'}/login?error=magic_link_failed`);

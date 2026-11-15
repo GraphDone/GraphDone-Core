@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import { getToken,getUserRaw } from '../authStorage';
 import { cloudFailure, skipBackgroundPoll } from '../hostedUsage';
+import { handleSessionRevoked, isSessionRevoked } from '../sessionRevoked';
 import { changes,dirty,makeRequest,merge,Snapshot,Row,validateBackupSnapshot,validateBackupProjects,ambiguousRetriedCreation,OFFLINE_PROJECT_LIMIT } from './model';
 import { readAccount,editAccount,channel } from './store';
 import { PROJECT_FORMAT,parseProjectDocument,projectDocument,projectMermaid,projectFilename,downloadText } from '../project-transfer/format';
@@ -35,7 +36,7 @@ async function request(owner:string,path:string,body?:any) {
   // shared exhaustion still waits for the service reset. Denied work never reaches D1.
   if(response.status===429&&data.code==='PERSONAL_LIMIT')retry=Math.min(retry,Date.now()+3600000);
   await editAccount(owner,a=>{a.retryAt=retry;a.blocked=validation?'validation':response.status===401||response.status===403?'auth':undefined;if(validation&&body?.projectId&&a.projects[body.projectId])delete a.projects[body.projectId].request;a.error=response.status===401?'Sign in again to upload. Your local work is retained.':data.message||data.error||'Sync paused. Your local work is retained.';});
-  cloudFailure(data.code);throw Error(data.message||data.error||'Sync paused');
+  cloudFailure(data.code);if(isSessionRevoked(data.code))handleSessionRevoked(token);throw Error(data.message||data.error||'Sync paused');
  }
  return {data,status:response.status};
 }

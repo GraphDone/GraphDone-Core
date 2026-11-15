@@ -1,5 +1,6 @@
 import './config/environment.js';
 import { verifyMagicLinkHandler, resetPasswordHandler } from './auth/email-link-handlers.js';
+import { previewHandoverHandler, completeHandoverHandler } from './auth/session-handover.js';
 import { operationsApi } from './operations-api.js';
 import { agentApi } from './agent-api.js';
 import { ApolloServer } from '@apollo/server';
@@ -721,6 +722,35 @@ async function startServer() {
   });
 
   app.get('/auth/magic-link/verify', verifyMagicLinkHandler);
+
+  const handoverRateLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 30,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skipSuccessfulRequests: false,
+    handler: (req, res) => {
+      const retryAfter = Math.ceil((req.rateLimit.resetTime?.getTime() || Date.now()) / 1000 - Date.now() / 1000);
+      res.status(429).json({
+        error: 'Too many requests',
+        message: `Too many sign-in attempts. Please try again in ${Math.ceil(retryAfter / 60)} minutes.`,
+        retryAfter,
+        rateLimitExceeded: true
+      });
+    }
+  });
+
+  const handoverCorsOptions = {
+    origin: process.env.CORS_ORIGIN || 'http://localhost:3127',
+    credentials: true,
+    methods: ['POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+  };
+
+  app.options('/auth/session/handover/preview', cors<cors.CorsRequest>(handoverCorsOptions));
+  app.options('/auth/session/handover/complete', cors<cors.CorsRequest>(handoverCorsOptions));
+  app.post('/auth/session/handover/preview', handoverRateLimiter, cors<cors.CorsRequest>(handoverCorsOptions), express.json(), previewHandoverHandler);
+  app.post('/auth/session/handover/complete', handoverRateLimiter, cors<cors.CorsRequest>(handoverCorsOptions), express.json(), completeHandoverHandler);
 
   const forgotPasswordCorsOptions = {
     origin: process.env.CORS_ORIGIN || 'http://localhost:3127',

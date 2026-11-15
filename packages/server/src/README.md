@@ -19,7 +19,7 @@ flowchart TD
 
 | Path | What it is |
 | --- | --- |
-| [`index.ts`](index.ts) | Builds the Express app: sessions, Passport, rate limits, `/graphql` (Apollo, HTTP and WebSocket), `/health`, `/config`, `/mcp/status`, `/auth/*` (OAuth, magic link, password reset), `/share/*`, `/api/captcha/challenge`, then mounts the two REST routers. Falls back to an auth-only schema when Neo4j fails. |
+| [`index.ts`](index.ts) | Builds the Express app: sessions, Passport, rate limits, `/graphql` (Apollo, HTTP and WebSocket), `/health`, `/config`, `/mcp/status`, `/auth/*` (OAuth, magic link, session handover, password reset), `/share/*`, `/api/captcha/challenge`, then mounts the two REST routers. Falls back to an auth-only schema when Neo4j fails. |
 | [`dev.ts`](dev.ts) | Development entry (`npm run dev`): sets `NODE_ENV=development`, then loads `index.ts`. |
 | [`db.ts`](db.ts) | The shared Neo4j driver from `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD`. |
 | [`agent-api.ts`](agent-api.ts) | `/api/agent`: REST for AI agents with project-scoped credentials (`/discovery`, `/limits`, `/usage`, `/context`, `/items`, `/notes`, `/tokens`). Agent credentials never grant account access. |
@@ -30,7 +30,6 @@ flowchart TD
 | [`middleware/`](middleware/README.md) | Bearer-token checks used by GraphQL, REST and WebSocket. |
 | [`resolvers/`](resolvers/README.md) | Hand-written GraphQL resolvers added on top of the generated Neo4j ones. |
 | [`schema/`](schema/README.md) | GraphQL type definitions (Neo4j, auth, auth-only). |
-| [`routes/`](routes/README.md) | An older Express auth router, not mounted. |
 | [`services/`](services/README.md) | Code that writes starter graphs (Welcome graph, hierarchy demo) to Neo4j. |
 | [`scripts/`](scripts/README.md) | `npm run` scripts: seed, welcome graphs, hierarchy demo, admin check. |
 | [`types/`](types/README.md) | Type declarations for untyped or augmented libraries. |

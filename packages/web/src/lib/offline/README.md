@@ -28,7 +28,7 @@ flowchart LR
 | [`engine.ts`](engine.ts) | Account and project state: `listProjects`, `getProject`, `syncNow` (one tab at a time via Web Locks), `resolveConflict`, `prepareOffline`, backup `exportOffline` / `importOffline`, `exportProject`. `useOffline` exposes status to the UI. |
 | [`model.ts`](model.ts) | Pure data model: `Snapshot` (project, nodes, edges, notes), change detection, the three-way `merge`, upload requests and backup validation, and the graph hierarchy (`graphType`, `graphPath`, `createsCycle`). |
 | [`store.ts`](store.ts) | IndexedDB `graphdone-offline` (one record per account) and a `BroadcastChannel` so open tabs see each other's writes. |
-| `link.test.ts`, `model.test.ts`, `engine.test.ts` | Vitest tests: the link answering GraphQL from a fixture account (including graphs inside projects and the whole starter workspace), merge rules (no lost edits, conflicts kept until a person chooses), and backup import keeping or rejecting a hierarchy. |
+| `link.test.ts`, `model.test.ts`, `engine.test.ts`, `engine.sessionRevoked.test.ts` | Vitest tests: the link answering GraphQL from a fixture account (including graphs inside projects and the whole starter workspace), merge rules (no lost edits, conflicts kept until a person chooses), backup import keeping or rejecting a hierarchy, and a signed-out sync answer clearing the session while keeping local work. |
 
 Each graph is a project row. A guest's row also keeps `type`, `parent_id`
 (the project it sits in), `description` and `tags` (JSON text, like an item's);

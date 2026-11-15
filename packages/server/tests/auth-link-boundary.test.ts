@@ -12,6 +12,7 @@ import { WebSocket, WebSocketServer } from 'ws';
 import jwt from 'jsonwebtoken';
 import { sqliteAuthStore } from '../src/auth/sqlite-auth';
 import { verifyMagicLinkHandler, resetPasswordHandler } from '../src/auth/email-link-handlers';
+import { sessionHandovers, previewHandoverHandler, completeHandoverHandler } from '../src/auth/session-handover';
 import { createCaptchaChallenge } from '../src/utils/captcha';
 import { authOnlyTypeDefs } from '../src/schema/auth-only-schema';
 import { sqliteAuthResolvers } from '../src/resolvers/sqlite-auth';
@@ -81,6 +82,35 @@ async function reset(token: string, password = 'ChangedPurposeFixture!2026') {
   });
 }
 
+const handoverStep = (step: 'preview' | 'complete', code: string) => fetch(`${endpoint}/auth/session/handover/${step}`, {
+  method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code }),
+});
+
+async function handoverCode(linkToken: string) {
+  const response = await fetch(`${endpoint}/auth/magic-link/verify?token=${encodeURIComponent(linkToken)}`, { redirect: 'manual' });
+  expect(response.status).toBe(302);
+  expect(response.headers.get('cache-control')).toBe('no-store');
+  expect(response.headers.get('referrer-policy')).toBe('no-referrer');
+  const location = response.headers.get('location')!;
+  expect(location).not.toContain('token=');
+  expect(location).not.toMatch(/eyJ[\w-]+\.[\w-]+\./);
+  const url = new URL(location);
+  expect(`${url.pathname}${url.search}`).toBe('/login');
+  expect(url.hash).toMatch(/^#handover=[\w-]{43}$/);
+  return url.hash.slice('#handover='.length);
+}
+
+async function handover(linkToken: string) {
+  const code = await handoverCode(linkToken);
+  expect(await (await handoverStep('preview', code)).json()).toEqual({ account: email });
+  const complete = await handoverStep('complete', code);
+  expect(complete.status).toBe(200);
+  const { token } = await complete.json() as { token: string };
+  expect(verifyToken(token)).toMatchObject({ email });
+  expect((await handoverStep('complete', code)).status).toBe(400);
+  return token;
+}
+
 async function resetProof() {
   const challenge = await createCaptchaChallenge('reset-password');
   for (let number = 0; number <= challenge.maxnumber; number++) {
@@ -121,6 +151,8 @@ beforeEach(async () => {
   await apollo.start();
   const app = express();
   app.get('/auth/magic-link/verify', verifyMagicLinkHandler);
+  app.post('/auth/session/handover/preview', express.json(), previewHandoverHandler);
+  app.post('/auth/session/handover/complete', express.json(), completeHandoverHandler);
   app.post('/auth/reset-password', express.json(), resetPasswordHandler);
   app.use('/api/agent', agentApi);
   app.use('/api/ops', createOperationsApi(() => operationsDatabase));
@@ -148,6 +180,7 @@ afterEach(async () => {
   await operationsDatabase.close();
   await new Promise<void>((resolve, reject) => database.close(error => error ? reject(error) : resolve()));
   store.db = null; store.initialized = false;
+  sessionHandovers.entries.clear();
   vi.restoreAllMocks(); vi.unstubAllEnvs();
 });
 
@@ -200,9 +233,41 @@ describe('purpose-bound email links at the real HTTP handlers', () => {
     expect(response.status).toBe(302);
     const location = new URL(response.headers.get('location')!);
     expect(location.searchParams.has('token')).toBe(false);
+    expect(location.hash).toBe('');
     expect(location.searchParams.has('error')).toBe(true);
     expect(await row('SELECT usedAt FROM magic_links WHERE id=?', [link.id])).toEqual({ usedAt: null });
     expect((await reset(link.token)).status).toBe(200);
+  });
+
+  it('hands a login link over by one-time code: preview keeps it, complete spends it, an old code is refused', async () => {
+    const first = await sqliteAuthStore.createMagicLink(email, 'login');
+    const code = await handoverCode(first.token);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const preview = await handoverStep('preview', code);
+      expect(preview.status).toBe(200);
+      expect(await preview.json()).toEqual({ account: email });
+    }
+    const complete = await handoverStep('complete', code);
+    const { token } = await complete.json() as { token: string };
+    expect((await graphRequest('{me{id}}', token)).data.me.id).toBeTruthy();
+    for (const step of ['complete', 'preview'] as const) {
+      const again = await handoverStep(step, code);
+      expect(again.status).toBe(400);
+      expect(await again.json()).toEqual({ error: 'invalid_handover' });
+    }
+    const second = await sqliteAuthStore.createMagicLink(email, 'login');
+    const late = await handoverCode(second.token);
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(Date.now() + 120_000);
+    try {
+      for (const step of ['preview', 'complete'] as const) {
+        const response = await handoverStep(step, late);
+        expect(response.status).toBe(400);
+        expect(await response.json()).toEqual({ error: 'invalid_handover' });
+      }
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('rejects a login link at password reset without changing credentials', async () => {
@@ -215,10 +280,8 @@ describe('purpose-bound email links at the real HTTP handlers', () => {
     expect(response.status).toBe(400);
     const after = await sqliteAuthStore.findUserByEmailOrUsername(email);
     expect(after!.passwordHash).toBe(before!.passwordHash);
-    const login = await fetch(`${endpoint}/auth/magic-link/verify?token=${encodeURIComponent(link.token)}`, { redirect: 'manual' });
-    const session = new URL(login.headers.get('location')!).searchParams.get('token');
-    expect(Boolean(session)).toBe(true);
-    expect((await graphRequest('{me{id}}', session!)).data.me.id).toBe(before!.id);
+    const session = await handover(link.token);
+    expect((await graphRequest('{me{id}}', session)).data.me.id).toBe(before!.id);
   });
 
   it('revokes old HTTP sessions, an open WebSocket, and all outstanding links on reset', async () => {
