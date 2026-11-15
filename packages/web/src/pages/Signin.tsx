@@ -150,7 +150,6 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
   }, []);
 
   useEffect(() => {
-    const token = searchParams.get('token');
     const error = searchParams.get('error');
 
     if (error) {
@@ -196,13 +195,6 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
       } else {
         setErrors({ submit: 'Authentication failed. Please try again.' });
       }
-    } else if (token) {
-      // Magic-link sign-in: keep them signed in on this device by default
-      // (they clicked their own link). The user is loaded by the ME query
-      // after reload.
-      setToken(token, true);
-      window.history.replaceState({}, '', '/login');
-      window.location.reload();
     }
 
     const savedUsername = localStorage.getItem('rememberedUsername');

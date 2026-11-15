@@ -66,7 +66,7 @@ for (const width of [1440, 390]) {
       await expect(page.getByRole('button', { name: 'Create User', exact: true })).toBeVisible();
     });
 
-    test('viewer route guards and a fresh-context login callback preserve authorization', async ({ page, browser }) => {
+    test('viewer route guards hold and a token in the sign-in address never signs a fresh browser in', async ({ page, browser }) => {
       await login(page, TEST_USERS.VIEWER, { retries: 1 });
       expect((await gql(page, '{ me { role } }')).me.role).toBe('VIEWER');
       for (const route of ['/admin', '/backend']) {
@@ -84,12 +84,15 @@ for (const width of [1440, 390]) {
         callback.on('pageerror', error => callbackErrors.push(error.message));
         await callback.addInitScript(() => localStorage.setItem('graphdone:viewMode', 'cards'));
         await callback.goto(`${getBaseURL()}/login?token=${encodeURIComponent(token!)}`);
-        await expect(callback).toHaveURL(new URL('/', getBaseURL()).href);
-        await expect(callback.getByTestId('workspace-content')).toBeVisible();
-        expect((await gql(callback, '{ me { role } }')).me.role).toBe('VIEWER');
-        expect(await callback.evaluate(() => !window.location.search.includes('token='))).toBe(true);
+        await callback.getByRole('tab', { name: 'Password', exact: true }).click();
+        await expect(callback.locator('input[name="emailOrUsername"]')).toBeVisible();
+        await expect(callback.getByTestId('workspace-content')).toHaveCount(0);
+        expect(await callback.evaluate(() => localStorage.getItem('authToken') ?? sessionStorage.getItem('authToken'))).toBeNull();
         await callback.goto(`${getBaseURL()}/admin`);
         await expect(callback).toHaveURL(new URL('/', getBaseURL()).href);
+        await expect(callback.getByRole('heading', { name: 'System Administration', exact: true })).toHaveCount(0);
+        await callback.getByRole('tab', { name: 'Password', exact: true }).click();
+        await expect(callback.locator('input[name="emailOrUsername"]')).toBeVisible();
         expect(callbackErrors).toEqual([]);
       } finally {
         await callbackContext.close();
