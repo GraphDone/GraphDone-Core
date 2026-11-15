@@ -11,6 +11,7 @@ import { GuestModeDialog } from '../components/GuestModeDialog';
 import { PasswordRequirements } from '../components/PasswordRequirements';
 import { isValidEmail } from '../utils/validation';
 import { AuthCaptcha } from '../components/AuthCaptcha';
+import { TurnstileChallenge } from '../components/TurnstileChallenge';
 import { magicLinkFocusTarget, hasEnteredEmail } from '../lib/loginFocus';
 import { formatLoginCodeInput, isCompleteLoginCode } from '../lib/loginCode';
 
@@ -98,6 +99,9 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
   const [captchaReset, setCaptchaReset] = useState(0);
   const [passwordCaptchaReady, setPasswordCaptchaReady] = useState(false);
   const [magicLinkCaptchaPayload, setMagicLinkCaptchaPayload] = useState<string | null>(null);
+  const [signInTurnstile, setSignInTurnstile] = useState<{ siteKey: string; action: string } | null>(null);
+  const [magicLinkTurnstileToken, setMagicLinkTurnstileToken] = useState<string | null>(null);
+  const magicLinkProof = signInTurnstile ? magicLinkTurnstileToken : magicLinkCaptchaPayload;
   const magicLinkEmailRef = useRef<HTMLInputElement>(null);
   const [loginCodeInput, setLoginCodeInput] = useState('');
   const [codeVerifying, setCodeVerifying] = useState(false);
@@ -136,6 +140,9 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
           const config = await response.json();
           if (typeof config.guest?.turnstileSiteKey === 'string') setTurnstileSiteKey(config.guest.turnstileSiteKey);
           if (typeof config.guest?.description === 'string') setGuestDescription(config.guest.description);
+          if (typeof config.signIn?.turnstileSiteKey === 'string') {
+            setSignInTurnstile({ siteKey: config.signIn.turnstileSiteKey, action: typeof config.signIn.action === 'string' ? config.signIn.action : 'signin' });
+          }
           if (config.oauth && config.oauth.providers) {
             setOauthConfig(config.oauth.providers);
           }
@@ -415,7 +422,7 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
       return;
     }
 
-    if (!magicLinkCaptchaPayload) { setErrors({ submit: 'Please finish the verification first.' }); return; }
+    if (!magicLinkProof) { setErrors({ submit: 'Please finish the verification first.' }); return; }
     setMagicLinkLoading(true);
     setErrors({});
 
@@ -425,6 +432,7 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(signInTurnstile && magicLinkTurnstileToken ? { 'X-Turnstile-Token': magicLinkTurnstileToken } : {}),
         },
         body: JSON.stringify({
           email: formData.magicLinkEmail,
@@ -447,6 +455,8 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
           rateLimitError: data.message || 'Too many requests. Please try again later.',
           rateLimitRetryAfter: data.retryAfter
         });
+      } else if (response.status === 403 && data.error === 'verification_required') {
+        setErrors({ submit: 'Please complete the verification and try again.' });
       } else {
         setErrors({ submit: data.message || 'We could not send your sign-in email. Please try again shortly.' });
       }
@@ -454,6 +464,7 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
       setErrors({ submit: 'We could not reach the sign-in service. Please try again shortly.' });
     } finally {
       setMagicLinkCaptchaPayload(null);
+      setMagicLinkTurnstileToken(null);
       setCaptchaReset(value => value + 1);
       setMagicLinkLoading(false);
     }
@@ -830,17 +841,23 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
                 {/* CAPTCHA for Magic Link — only auto-focuses when an email is
                     already entered; otherwise the email field gets focus first. */}
                 <div>
-                  <AuthCaptcha key="magic-link" action="magic-link" resetKey={captchaReset} compact
-                    onVerified={(code) => setMagicLinkCaptchaPayload(code)}
-                    className="w-full"
-                    autoFocus={hasEnteredEmail(formData.magicLinkEmail)}
-                  />
+                  {signInTurnstile ? (
+                    <TurnstileChallenge key={captchaReset} siteKey={signInTurnstile.siteKey} action={signInTurnstile.action}
+                      onToken={setMagicLinkTurnstileToken}
+                    />
+                  ) : (
+                    <AuthCaptcha key="magic-link" action="magic-link" resetKey={captchaReset} compact
+                      onVerified={(code) => setMagicLinkCaptchaPayload(code)}
+                      className="w-full"
+                      autoFocus={hasEnteredEmail(formData.magicLinkEmail)}
+                    />
+                  )}
                 </div>
 
                 <button
                   type="button"
                   onClick={handleMagicLinkRequest}
-                  disabled={magicLinkLoading || !!errors.rateLimitError || !magicLinkCaptchaPayload}
+                  disabled={magicLinkLoading || !!errors.rateLimitError || !magicLinkProof}
                   className="w-full bg-gradient-to-r from-teal-600 to-blue-600 hover:from-teal-500 hover:to-blue-500 border border-teal-400/50 hover:border-teal-300 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-teal-500/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:translate-y-0 flex items-center justify-center space-x-2"
                 >
                   {magicLinkLoading ? (
