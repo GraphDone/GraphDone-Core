@@ -416,9 +416,9 @@ main() {
     fi
 
     if [ "${RUN_VISUAL_REGRESSION:-true}" = "true" ]; then
-        VISUAL_VM_DIR=$(multipass exec "$VM_NAME" -- bash -c 'printf "%s\n" "$HOME/graphdone/test-artifacts/visual-regression/$1"' _ "$TIMESTAMP")
         VISUAL_REPORT_DIR="$REPORT_DIR/artifacts-${TIMESTAMP}/visual-regression"
-        if multipass exec "$VM_NAME" -- test -d "$VISUAL_VM_DIR"; then
+        if VISUAL_VM_DIR=$(multipass exec "$VM_NAME" -- bash -c 'printf "%s\n" "$HOME/graphdone/test-artifacts/visual-regression/$1"' _ "$TIMESTAMP") &&
+            multipass exec "$VM_NAME" -- test -d "$VISUAL_VM_DIR"; then
             if multipass transfer --recursive "$VM_NAME:$VISUAL_VM_DIR" "$VISUAL_REPORT_DIR"; then
                 SCREENSHOT_COUNT=$(find "$VISUAL_REPORT_DIR" -name '*.png' | wc -l)
                 log_success "Visual regression screenshots copied ($SCREENSHOT_COUNT images)"
