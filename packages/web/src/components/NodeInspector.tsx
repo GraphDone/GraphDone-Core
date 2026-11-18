@@ -59,21 +59,27 @@ export function NodeInspector({ node, onClose, onEdit, onConnect, compact = fals
       }`}
     >
       {/* Header */}
-      <div className="shrink-0 flex items-start gap-2 p-3 border-b border-gray-700/60">
-        <div className="flex-1 min-w-0">
-          <div className="text-xs uppercase tracking-wide" style={{ color: typeCfg.hexColor }}>{typeCfg.label}</div>
-          <div className="max-h-24 overflow-y-auto text-base font-semibold text-white [overflow-wrap:anywhere]" tabIndex={0} title={node.title}>{node.title}</div>
-          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-200">
-            <span className="inline-flex items-center gap-1.5"><span aria-hidden="true" className="h-2 w-2 rounded-full" style={{ background: statusCfg?.hexColor }} />{statusCfg?.label ?? node.status}</span>
-            {typeof node.priority === 'number' && <span>Priority {Math.round(node.priority * 100)}%</span>}
+      <div className="shrink-0 p-3 border-b border-gray-700/60">
+        <div className="flex items-start gap-2">
+          <div className="flex-1 min-w-0">
+            <div className="text-xs uppercase tracking-wide" style={{ color: typeCfg.hexColor }}>{typeCfg.label}</div>
+            <div className="max-h-24 overflow-y-auto text-base font-semibold text-white [overflow-wrap:anywhere]" tabIndex={0} title={node.title}>{node.title}</div>
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-200">
+              <span className="inline-flex items-center gap-1.5"><span aria-hidden="true" className="h-2 w-2 rounded-full" style={{ background: statusCfg?.hexColor }} />{statusCfg?.label ?? node.status}</span>
+              {typeof node.priority === 'number' && <span>Priority {Math.round(node.priority * 100)}%</span>}
+            </div>
+            <div className="mt-0.5"><CopyableId id={node.id} /></div>
           </div>
-          <div className="mt-0.5"><CopyableId id={node.id} /></div>
+          <button onClick={onClose} className="min-h-[44px] min-w-[44px] flex items-center justify-center text-gray-400 hover:text-white rounded hover:bg-gray-700/50" title="Close">
+            <X className="h-4 w-4" />
+          </button>
         </div>
-        {onConnect && <button onClick={onConnect} aria-label={`Connect ${node.title} to another item`} title="Connect to another item" className="min-h-[44px] px-3 rounded-lg text-sky-300 hover:bg-gray-800">Connect</button>}
-        {onEdit && <button onClick={onEdit} className="min-h-[44px] px-3 rounded-lg text-emerald-300 hover:bg-gray-800">Edit</button>}
-        <button onClick={onClose} className="min-h-[44px] min-w-[44px] flex items-center justify-center text-gray-400 hover:text-white rounded hover:bg-gray-700/50" title="Close">
-          <X className="h-4 w-4" />
-        </button>
+        {(onConnect || onEdit) && (
+          <div className="mt-1 flex flex-wrap justify-end gap-2">
+            {onConnect && <button onClick={onConnect} aria-label={`Connect ${node.title} to another item`} title="Connect to another item" className="min-h-[44px] px-3 rounded-lg text-sky-300 hover:bg-gray-800">Connect</button>}
+            {onEdit && <button onClick={onEdit} className="min-h-[44px] px-3 rounded-lg text-emerald-300 hover:bg-gray-800">Edit</button>}
+          </div>
+        )}
       </div>
 
       {/* Mode toggle */}
