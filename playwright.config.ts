@@ -107,7 +107,7 @@ export default defineConfig({
     /* LIVE Cloudflare user journey: drives the real production SPA as a guest on
      * desktop + phone, recording .webm video + a labelled screenshot per step.
      * Run via the unified harness:
-     *   TEST_URL=https://graphdone-cloud.pages.dev node tests/run-unified.mjs --profile live --out ...
+     *   TEST_URL=https://graphdone.com node tests/run-unified.mjs --profile live --out ...
      * Heavy + network-bound; report-only, never part of the smoke gate. */
     {
       name: 'live-journey',
