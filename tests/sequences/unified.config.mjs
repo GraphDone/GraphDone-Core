@@ -77,7 +77,7 @@ export const SEQUENCES = {
   'perf-scale': { adapter: 'playwright', title: 'Large-scale perf sweep', args: ['--project=perf-scale'], blocking: false },
   // LIVE Cloudflare site, from a guest user's point of view (desktop + phone),
   // recording .webm video + a labelled screenshot per step. Drives the real
-  // production SPA — run with TEST_URL=https://graphdone-cloud.pages.dev.
+  // production SPA — run with TEST_URL=https://graphdone.com.
   'live-journey': { adapter: 'playwright', title: 'Live site user journey (desktop + mobile)', args: ['--project=live-journey'], blocking: false },
   // BASIC JOURNEYS: every way to do each basic thing (link, relationship edit),
   // on desktop, tablet and phone, repeated so the report shows a success rate
