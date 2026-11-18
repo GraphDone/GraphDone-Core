@@ -1,5 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useId } from 'react';
+import { createPortal } from 'react-dom';
 import { useDialog } from '../hooks/useDialogManager';
+import { useModalA11y } from '../hooks/useModalA11y';
 import { X, Link2, Search, CheckCircle, ArrowRight, ExternalLink, Filter, CheckCircle2, Trash2, Unlink, ChevronDown } from 'lucide-react';
 import { useQuery, useMutation } from '@apollo/client';
 import { GET_WORK_ITEMS, CREATE_EDGE, GET_EDGES, DELETE_EDGE } from '../lib/queries';
@@ -648,6 +650,9 @@ export function DisconnectWorkItemModal({ isOpen, onClose, sourceNode, onAllConn
 }
 
 export function ConnectWorkItemModal({ isOpen, onClose, sourceNode, initialTab = 'connect', onAllConnectionsRemoved: _onAllConnectionsRemoved }: ConnectWorkItemModalProps) {
+  const titleId = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
+  useModalA11y(panelRef, { isOpen, labelledBy: titleId });
   useDialog(isOpen, onClose);
   const { currentTeam } = useAuth();
   const { currentGraph } = useGraph();
@@ -1164,25 +1169,25 @@ export function ConnectWorkItemModal({ isOpen, onClose, sourceNode, initialTab =
 
   const selectedRelation = getRelationshipConfig(selectedRelationType as RelationshipType);
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[9999] overflow-y-auto backdrop-blur-sm">
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
         <div className="fixed inset-0 bg-gradient-to-br from-gray-900/80 via-slate-900/90 to-gray-900/80 transition-all duration-300" onClick={onClose} />
 
-        <div className="relative inline-block align-bottom bg-gradient-to-br from-gray-800 via-gray-800 to-gray-900 rounded-2xl text-left overflow-hidden shadow-2xl border border-gray-700/50 transform transition-all duration-300 hover:shadow-blue-500/10 sm:my-8 sm:align-middle sm:max-w-5xl sm:w-full z-[10000]" onClick={(e) => e.stopPropagation()}>
+        <div ref={panelRef} className="relative inline-block w-full align-bottom bg-gradient-to-br from-gray-800 via-gray-800 to-gray-900 rounded-2xl text-left overflow-hidden shadow-2xl border border-gray-700/50 transform transition-all duration-300 hover:shadow-blue-500/10 sm:my-8 sm:align-middle sm:max-w-5xl z-[10000]" onClick={(e) => e.stopPropagation()}>
           {/* Header with gradient */}
-          <div className="bg-gradient-to-r from-emerald-900/30 via-green-800/25 to-teal-900/30 px-6 py-5 border-b border-emerald-600/20 backdrop-blur-sm">
+          <div className="bg-gradient-to-r from-emerald-900/30 via-green-800/25 to-teal-900/30 px-4 sm:px-6 py-5 border-b border-emerald-600/20 backdrop-blur-sm">
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <div className="p-2 rounded-xl bg-emerald-500/20 border border-emerald-400/30">
+              <div className="flex min-w-0 items-center space-x-4">
+                <div className="shrink-0 p-2 rounded-xl bg-emerald-500/20 border border-emerald-400/30">
                   {activeTab === 'connect' ? (
                     <Link2 className="h-6 w-6 text-emerald-400" />
                   ) : (
                     <Unlink className="h-6 w-6 text-red-400" />
                   )}
                 </div>
-                <div>
-                  <h3 className="text-xl font-bold bg-gradient-to-r from-emerald-200 to-green-100 bg-clip-text text-transparent">
+                <div className="min-w-0 break-words">
+                  <h3 id={titleId} className="text-xl font-bold bg-gradient-to-r from-emerald-200 to-green-100 bg-clip-text text-transparent">
                     {activeTab === 'connect' ? 'Connect Work Item' : 'Disconnect Work Item'}
                   </h3>
                   <p className="text-sm text-gray-300 mt-1">
@@ -1195,7 +1200,8 @@ export function ConnectWorkItemModal({ isOpen, onClose, sourceNode, initialTab =
               </div>
               <button
                 onClick={onClose}
-                className="p-2 rounded-xl text-gray-400 hover:text-gray-200 hover:bg-gray-700/50 transition-all duration-200"
+                aria-label="Close"
+                className="shrink-0 p-2 rounded-xl text-gray-400 hover:text-gray-200 hover:bg-gray-700/50 transition-all duration-200"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -1205,7 +1211,7 @@ export function ConnectWorkItemModal({ isOpen, onClose, sourceNode, initialTab =
             <div className="mt-4 flex space-x-1 bg-gray-700/30 rounded-xl p-1">
               <button
                 onClick={() => setActiveTab('connect')}
-                className={`flex-1 flex items-center justify-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                className={`flex-1 flex items-center justify-center space-x-2 px-2 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                   activeTab === 'connect'
                     ? 'bg-emerald-600/20 text-emerald-200 border border-emerald-400/30'
                     : 'text-gray-400 hover:text-gray-300 hover:bg-gray-600/20'
@@ -1216,7 +1222,7 @@ export function ConnectWorkItemModal({ isOpen, onClose, sourceNode, initialTab =
               </button>
               <button
                 onClick={() => setActiveTab('disconnect')}
-                className={`flex-1 flex items-center justify-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                className={`flex-1 flex items-center justify-center space-x-2 px-2 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                   activeTab === 'disconnect'
                     ? 'bg-red-600/20 text-red-200 border border-red-400/30'
                     : 'text-gray-400 hover:text-gray-300 hover:bg-gray-600/20'
@@ -1232,7 +1238,7 @@ export function ConnectWorkItemModal({ isOpen, onClose, sourceNode, initialTab =
             {activeTab === 'connect' ? (
               <>
                 {/* Left Panel - Connection Type Selection */}
-            <div className="w-1/3 bg-gradient-to-b from-gray-800/50 to-gray-900/50 border-r border-gray-600/30 p-5">
+            <div className="hidden lg:block lg:w-1/3 bg-gradient-to-b from-gray-800/50 to-gray-900/50 border-r border-gray-600/30 p-5">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center space-x-2">
                   <div className="h-2 w-2 bg-emerald-400 rounded-full"></div>
@@ -1519,7 +1525,24 @@ export function ConnectWorkItemModal({ isOpen, onClose, sourceNode, initialTab =
             </div>
 
             {/* Right Panel - Node Selection */}
-            <div className="flex-1 p-6 bg-gradient-to-br from-gray-800/30 to-gray-900/40">
+            <div className="min-w-0 flex-1 p-4 sm:p-6 bg-gradient-to-br from-gray-800/30 to-gray-900/40">
+              <div className="mb-5 lg:hidden">
+                <label className="block text-sm font-bold text-gray-100">
+                  Relationship Type
+                  <select
+                    value={selectedRelationType}
+                    onChange={(event) => setSelectedRelationType(event.target.value)}
+                    className="mt-2 block min-h-11 w-full rounded-xl border border-gray-600/50 bg-gray-800 px-3 text-base font-normal text-white focus-visible:outline-emerald-400"
+                  >
+                    {RELATIONSHIP_OPTIONS.map((relation) => (
+                      <option key={relation.type} value={relation.type} disabled={isRelationshipDisabled(relation.type)}>
+                        {relation.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <p className="mt-2 text-sm text-gray-400">{selectedRelation.description}</p>
+              </div>
               {/* Existing Connections Section */}
               {(() => {
                 // Get all connections for this node (both Edge entities and WorkItem relationships)
@@ -1763,15 +1786,15 @@ export function ConnectWorkItemModal({ isOpen, onClose, sourceNode, initialTab =
               
               {/* Search and Filters */}
               <div className="mb-6">
-                <div className="flex space-x-4 mb-4">
-                  <div className="flex-1 relative">
+                <div className="mb-4 grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
+                  <div className="relative col-span-3 min-w-0 sm:flex-1 sm:basis-40 lg:basis-full">
                     <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                     <input
                       type="text"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       placeholder="Search work items by title or type"
-                      className="w-full pl-12 pr-4 py-3 bg-gray-800 border border-gray-600/50 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-emerald-400/70 focus:ring-2 focus:ring-emerald-500/20 transition-all duration-200"
+                      className="w-full pl-10 pr-2 sm:pl-12 sm:pr-4 py-3 bg-gray-800 border border-gray-600/50 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-emerald-400/70 focus:ring-2 focus:ring-emerald-500/20 transition-all duration-200"
                     />
                   </div>
                   {/* Type Filter */}
@@ -1779,7 +1802,7 @@ export function ConnectWorkItemModal({ isOpen, onClose, sourceNode, initialTab =
                     <button
                       type="button"
                       onClick={() => setIsTypeDropdownOpen(!isTypeDropdownOpen)}
-                      className="flex items-center justify-between px-4 py-3 bg-gray-800 border border-gray-600/50 rounded-xl text-white text-sm focus:outline-none focus:border-emerald-400/70 focus:ring-2 focus:ring-emerald-500/20 transition-all duration-200 min-w-[140px]"
+                      className="flex h-full w-full items-center justify-between gap-1 px-2 sm:px-4 py-3 text-left bg-gray-800 border border-gray-600/50 rounded-xl text-white text-sm focus:outline-none focus:border-emerald-400/70 focus:ring-2 focus:ring-emerald-500/20 transition-all duration-200 sm:min-w-[140px]"
                     >
                       <div className="flex items-center space-x-2">
                         {(() => {
@@ -1802,7 +1825,7 @@ export function ConnectWorkItemModal({ isOpen, onClose, sourceNode, initialTab =
                     </button>
 
                     {isTypeDropdownOpen && (
-                      <div className="absolute top-full left-0 mt-2 w-full bg-gray-800 border border-gray-600/50 rounded-xl shadow-2xl z-50 max-h-80 overflow-y-auto">
+                      <div className="absolute top-full left-0 mt-2 w-full min-w-32 bg-gray-800 border border-gray-600/50 rounded-xl shadow-2xl z-50 max-h-80 overflow-y-auto">
                         <div className="p-2">
                           {typeOptions.map((option, index) => (
                             <button
@@ -1851,7 +1874,7 @@ export function ConnectWorkItemModal({ isOpen, onClose, sourceNode, initialTab =
                     <button
                       type="button"
                       onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
-                      className="flex items-center justify-between px-4 py-3 bg-gray-800 border border-gray-600/50 rounded-xl text-white text-sm focus:outline-none focus:border-emerald-400/70 focus:ring-2 focus:ring-emerald-500/20 transition-all duration-200 min-w-[140px]"
+                      className="flex h-full w-full items-center justify-between gap-1 px-2 sm:px-4 py-3 text-left bg-gray-800 border border-gray-600/50 rounded-xl text-white text-sm focus:outline-none focus:border-emerald-400/70 focus:ring-2 focus:ring-emerald-500/20 transition-all duration-200 sm:min-w-[140px]"
                     >
                       <div className="flex items-center space-x-2">
                         {(() => {
@@ -1874,7 +1897,7 @@ export function ConnectWorkItemModal({ isOpen, onClose, sourceNode, initialTab =
                     </button>
 
                     {isStatusDropdownOpen && (
-                      <div className="absolute top-full left-0 mt-2 w-full bg-gray-800 border border-gray-600/50 rounded-xl shadow-2xl z-50 max-h-80 overflow-y-auto">
+                      <div className="absolute top-full left-0 mt-2 w-full min-w-32 bg-gray-800 border border-gray-600/50 rounded-xl shadow-2xl z-50 max-h-80 overflow-y-auto">
                         <div className="p-2">
                           {statusOptions.map((option, index) => (
                             <button
@@ -1923,7 +1946,7 @@ export function ConnectWorkItemModal({ isOpen, onClose, sourceNode, initialTab =
                     <button
                       type="button"
                       onClick={() => setIsPriorityDropdownOpen(!isPriorityDropdownOpen)}
-                      className="flex items-center justify-between px-4 py-3 bg-gray-800 border border-gray-600/50 rounded-xl text-white text-sm focus:outline-none focus:border-emerald-400/70 focus:ring-2 focus:ring-emerald-500/20 transition-all duration-200 min-w-[140px]"
+                      className="flex h-full w-full items-center justify-between gap-1 px-2 sm:px-4 py-3 text-left bg-gray-800 border border-gray-600/50 rounded-xl text-white text-sm focus:outline-none focus:border-emerald-400/70 focus:ring-2 focus:ring-emerald-500/20 transition-all duration-200 sm:min-w-[140px]"
                     >
                       <div className="flex items-center space-x-2">
                         {(() => {
@@ -1946,7 +1969,7 @@ export function ConnectWorkItemModal({ isOpen, onClose, sourceNode, initialTab =
                     </button>
 
                     {isPriorityDropdownOpen && (
-                      <div className="absolute top-full left-0 mt-2 w-full bg-gray-800 border border-gray-600/50 rounded-xl shadow-2xl z-50 max-h-80 overflow-y-auto">
+                      <div className="absolute top-full right-0 mt-2 w-full min-w-32 bg-gray-800 border border-gray-600/50 rounded-xl shadow-2xl z-50 max-h-80 overflow-y-auto">
                         <div className="p-2">
                           {priorityOptions.map((option, index) => (
                             <button
@@ -2046,18 +2069,18 @@ export function ConnectWorkItemModal({ isOpen, onClose, sourceNode, initialTab =
                               : 'bg-gradient-to-r from-gray-700/20 to-gray-800/25 border-gray-600/30 hover:from-gray-600/30 hover:to-gray-700/35 hover:border-gray-500/50 hover:shadow-md cursor-pointer'
                         }`}
                       >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-4">
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-2 mb-1">
-                              <p className="font-semibold text-white text-sm group-hover:text-emerald-100 transition-colors">{node.title}</p>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2 mb-1">
+                              <p className="min-w-0 break-words font-semibold text-white text-sm group-hover:text-emerald-100 transition-colors">{node.title}</p>
                               {isNodeDisabled && (
                                 <span className="text-xs bg-red-900/50 text-red-300 px-2 py-0.5 rounded-full border border-red-700/50">
                                   Has relationship
                                 </span>
                               )}
                             </div>
-                            <div className="flex items-center space-x-3 text-xs">
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                               {/* Type with icon */}
                               <div className="flex items-center space-x-1">
                                 <div className={getTypeColorScheme(node.type as any).text}>
@@ -2105,7 +2128,7 @@ export function ConnectWorkItemModal({ isOpen, onClose, sourceNode, initialTab =
                           </div>
                         </div>
                         
-                        <div className="flex items-center">
+                        <div className="flex shrink-0 items-center">
                           {!isNodeDisabled && selectedNodes.has(node.id) && (
                             <div className="flex items-center justify-center w-8 h-8 rounded-full bg-emerald-500/20 border border-emerald-400/50">
                               <CheckCircle className="h-4 w-4 text-emerald-400" />
@@ -2120,7 +2143,7 @@ export function ConnectWorkItemModal({ isOpen, onClose, sourceNode, initialTab =
               </div>
 
               {/* Actions */}
-              <div className="flex justify-end space-x-4 pt-6 border-t border-gray-600/50 mt-6">
+              <div className="flex flex-wrap justify-end gap-2 sm:gap-4 pt-6 border-t border-gray-600/50 mt-6">
                 <button
                   onClick={onClose}
                   className="px-6 py-3 text-gray-300 bg-gray-700/50 border border-gray-600/50 rounded-xl hover:bg-red-600 hover:text-white hover:border-red-500/50 transition-all duration-200 font-medium hover:scale-105"
@@ -2130,7 +2153,7 @@ export function ConnectWorkItemModal({ isOpen, onClose, sourceNode, initialTab =
                 <button
                   onClick={handleCreateConnections}
                   disabled={selectedNodes.size === 0 || creatingConnection || isRelationshipDisabled(selectedRelationType) || (duplicateWarning && !duplicateWarning.isValid) || false}
-                  className={`px-8 py-3 text-white rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-3 font-semibold shadow-lg disabled:shadow-none ${
+                  className={`px-4 sm:px-8 py-3 text-white rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-3 font-semibold shadow-lg disabled:shadow-none ${
                     duplicateWarning && !duplicateWarning.isValid
                       ? 'bg-gray-600 cursor-not-allowed'
                       : duplicateWarning && duplicateWarning.isValid
@@ -2405,6 +2428,7 @@ export function ConnectWorkItemModal({ isOpen, onClose, sourceNode, initialTab =
           </div>
         </div>
       )}
-    </div>
+    </div>,
+    document.body
   );
 }
