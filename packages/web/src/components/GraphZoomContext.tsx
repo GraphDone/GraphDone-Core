@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { gql, useQuery } from '@apollo/client';
+import { fitGraphText, measureGraphText } from '../lib/graphSymbolLayout';
 import {
   fitLabel,
   fitLines,
@@ -31,6 +32,7 @@ export interface GraphZoomContextProps {
   readPositions: () => readonly { x?: number; y?: number }[];
   itemSize: (item: any) => { width: number; height: number };
   overview: boolean;
+  overviewFrame: Rect | null;
   onOpen: (graphId: string) => void;
   onLevel: (level: ZoomLevel, minScale: number) => void;
 }
@@ -160,7 +162,7 @@ function Tile({ id, openId = id, rect, k, name, detail, viewportShort, interacti
   );
 }
 
-export function GraphZoomContext({ graphs, currentGraphId, camera, readPositions, itemSize, overview, onOpen, onLevel }: GraphZoomContextProps) {
+export function GraphZoomContext({ graphs, currentGraphId, camera, readPositions, itemSize, overview, overviewFrame, onOpen, onLevel }: GraphZoomContextProps) {
   const ref = useRef<SVGGElement>(null);
   const viewport = useViewport(ref);
   const k = camera.scale || 1;
@@ -213,6 +215,10 @@ export function GraphZoomContext({ graphs, currentGraphId, camera, readPositions
     return graphs.map(graph => (live.get(graph.id) === undefined ? graph : { ...graph, nodeCount: live.get(graph.id) }));
   }, [graphs, countData]);
   const context = useMemo(() => (currentGraphId ? zoomContextOf(counted, currentGraphId) : null), [counted, currentGraphId]);
+  const projectedName = useMemo(() => context && overviewFrame
+    ? fitGraphText(context.current.name, overviewFrame.w - 32, NAME_PX,
+      (text, size) => measureGraphText(text, size, 700), 1).lines[0]
+    : '', [context, overviewFrame]);
   const portrait = viewport.h > viewport.w * 1.2;
   const layout = useMemo(() => (context && frame ? zoomLayout(context, frame, portrait) : null), [context, frame, portrait]);
 
@@ -243,7 +249,13 @@ export function GraphZoomContext({ graphs, currentGraphId, camera, readPositions
   const short = Math.max(1, Math.min(viewport.w, viewport.h));
   const content = (() => {
     if (!layout || !context || level === 0) return null;
-    const { frame: f } = layout;
+    const projectedFrame = level === 1 && overview ? overviewFrame : null;
+    const f = projectedFrame ? {
+      x: (projectedFrame.x - camera.x) / k,
+      y: (projectedFrame.y - camera.y) / k,
+      w: projectedFrame.w / k,
+      h: projectedFrame.h / k,
+    } : layout.frame;
     const radius = 18 / k;
     const items = plural(readPositions().length, 'item');
     return (
@@ -307,7 +319,15 @@ export function GraphZoomContext({ graphs, currentGraphId, camera, readPositions
           );
         })()}
         <rect className="zoom-frame" x={f.x} y={f.y} width={f.w} height={f.h} rx={radius} ry={radius} vectorEffect="non-scaling-stroke" />
-        {level <= 2 && (
+        {projectedFrame ? (
+          <g className="zoom-frame-label" data-zoom-frame={context.current.id} role="img" aria-label={`${context.current.name}, ${items}`}>
+            <title>{context.current.name}, {items}</title>
+            <text className="zoom-label" x={f.x + 16 / k} y={f.y + 6 / k}
+              style={{ fontSize: NAME_PX / k, paintOrder: 'stroke', stroke: 'var(--gd-canvas)', strokeWidth: 5 / k, strokeLinejoin: 'round' }}>
+              <tspan className="zoom-label-name">{projectedName}</tspan>
+            </text>
+          </g>
+        ) : level <= 2 && (
           <g className="zoom-frame-label" data-zoom-frame={context.current.id}>
             {/* Alone, the label sits above the frame; with neighbours around it
                 (one may be directly above), it moves inside like theirs. */}

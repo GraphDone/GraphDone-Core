@@ -80,7 +80,7 @@ import { buildNeighborhood } from '../lib/graphAdjacency';
 import { UndoStack } from '../lib/undoStack';
 import { createSerialQueue } from '../lib/serialQueue';
 import { GraphZoomContext } from './GraphZoomContext';
-import type { ZoomLevel } from '../lib/graphZoomContext';
+import type { Rect, ZoomLevel } from '../lib/graphZoomContext';
 
 // Level-of-detail zoom thresholds (single source of truth): below each scale the
 // matching per-node detail is hidden, for legibility and paint cost. (Values are
@@ -1513,6 +1513,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
   // A graph owns one simulation. Detached simulations otherwise keep mutating
   // shared node objects after a rebuild and can fight the visible simulation.
+  const [overviewFrame, setOverviewFrame] = useState<Rect | null>(null);
   const [semanticOverviewActive, setSemanticOverviewActive] = useState(false);
   // Zoom-out level (#277): 0 items, 1 graph frame, 2 neighbouring graphs, 3 projects.
   const [zoomLevel, setZoomLevel] = useState<ZoomLevel>(0);
@@ -5412,7 +5413,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       data-relationship-priority={relationshipLevel} data-relationship-total={workItemEdges.length}
       data-priority-summarized={priorityProjection.summarized.length} data-priority-represented={priorityProjection.represented.length} data-priority-pending={priorityProjection.pending.length}>
       {workItems.length < 40 && (!compactWorkspace || localItemControls) && <div data-graph-fit-obstacle="true" className="absolute left-3 right-16 top-3 md:left-16 md:right-40 z-20 flex flex-wrap gap-3">{!compactWorkspace && priorityControl}{localItemControls}</div>}
-      {!semanticOverviewActive && <GraphStatusDock>
+      {(!semanticOverviewActive || zoomLevel >= 2) && <GraphStatusDock>
       {/* Phone: the grow hint joins the bottom bar (a top banner would sit on
           the card being grown) and offers Cancel, since there is no Esc key. */}
       {isConnecting && compactWorkspace && <div role="status" data-testid="grow-hint" className="flex items-center gap-3 rounded-lg border border-emerald-500/40 bg-gray-900 px-3 py-1 text-sm text-emerald-100">
@@ -5421,13 +5422,13 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         <button type="button" onClick={() => { setIsConnecting(false); setConnectionSource(null); }} className="min-h-11 shrink-0 rounded-lg px-3 font-medium text-white hover:bg-gray-800">Cancel</button>
       </div>}
       <LayoutSaveStatus queue={positionSaveQueue} />
-      {localItemActive ? localItemFooter : workItemEdges.length > 0 && !(compactWorkspace && isConnecting) && <button
+      {zoomLevel < 2 && (localItemActive ? localItemFooter : workItemEdges.length > 0 && !(compactWorkspace && isConnecting) && <button
         ref={itemRelationshipTriggerRef}
         data-graph-fit-obstacle="true"
         className="max-w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 shadow-lg"
         onClick={() => { itemPairTriggerRef.current = null; setItemRelationshipScope({ kind: 'all' }); }}
         aria-label={`${workItemEdges.length} relationships, ${itemLabelCount} labels shown, ${priorityProjection.summarized.length} summarized by priority. Browse all relationships`}
-      ><span className="block">{workItemEdges.length} connections · Browse</span>{!compactWorkspace && <span className="block text-slate-300">{priorityProjection.summarized.length} summarized · {itemLabelCount} labels</span>}</button>}
+      ><span className="block">{workItemEdges.length} connections · Browse</span>{!compactWorkspace && <span className="block text-slate-300">{priorityProjection.summarized.length} summarized · {itemLabelCount} labels</span>}</button>)}
       </GraphStatusDock>}
       {itemRelationshipScope && !semanticOverviewActive && <SemanticRelationshipBrowser
         index={itemRelationshipIndex}
@@ -5464,6 +5465,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           readPositions={readOverviewPositions}
           itemSize={getNodeDimensions}
           overview={semanticOverviewActive}
+          overviewFrame={overviewFrame}
           onOpen={openZoomGraph}
           onLevel={handleZoomLevel}
         />
@@ -5479,6 +5481,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         camera={currentTransform}
         readPositions={readOverviewPositions}
         onActiveChange={handleOverviewActive}
+        onFrameChange={setOverviewFrame}
         layoutStatus={<LayoutSaveStatus queue={positionSaveQueue} />}
         selectedId={Array.from(selectedNodes).slice(-1)[0]}
         onBrowse={closeOverviewInspector}

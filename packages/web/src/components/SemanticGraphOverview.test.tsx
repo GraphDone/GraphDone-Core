@@ -272,3 +272,19 @@ it('returns keyboard focus to overview controls when zoom removes the entire bus
   expect(screen.getByRole('button', { name: '2 groups · 4 items' })).toHaveFocus();
   expect(screen.queryByRole('tooltip')).toBeNull();
 });
+
+it('reports a screen frame around projected group cards and clears it in Items mode', () => {
+  const onFrameChange = vi.fn();
+  render(<SemanticGraphOverview
+    items={items} edges={edges} camera={{ x: 0, y: 0, scale: 0.2 }}
+    readPositions={positions} onActiveChange={noop} onFrameChange={onFrameChange}
+    onBrowse={noop} onInspect={noop} onBack={noop}
+  />);
+  const [frame] = onFrameChange.mock.lastCall ?? [];
+  expect(frame).toBeTruthy();
+  const [group] = summaries();
+  expect(frame.x).toBeLessThan(parseFloat(group.style.left));
+  expect(frame.x + frame.w).toBeGreaterThan(parseFloat(group.style.left) + parseFloat(group.style.width));
+  fireEvent.change(screen.getByLabelText('Graph detail'), { target: { value: 'items' } });
+  expect(onFrameChange).toHaveBeenLastCalledWith(null);
+});
