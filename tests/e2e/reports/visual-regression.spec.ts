@@ -75,16 +75,19 @@ for (const { name, width, height, deviceScaleFactor } of DEVICES) {
       }
     });
 
-    for (const { screen, mode, selector } of [
-      { screen: 'workspace', mode: 'cards', selector: '[data-testid="view-content"]' },
-      { screen: 'graph-view', mode: 'graph', selector: '.graph-container svg g.node' },
-    ]) {
-      test(`capture ${screen}`, async ({ page }, info) => {
-        await page.addInitScript(value => localStorage.setItem('graphdone:viewMode', value), mode);
-        await open(page, '/workspace', page.locator(selector).first());
-        await capture(page, info, name, screen);
-      });
-    }
+    test('capture workspace', async ({ page }, info) => {
+      await page.addInitScript(() => localStorage.setItem('graphdone:viewMode', 'cards'));
+      const firstCard = page.getByTestId('task-list').getByRole('button', { name: 'Edit Visual item 1', exact: true });
+      await open(page, '/workspace', firstCard);
+      await capture(page, info, name, 'workspace');
+    });
+
+    test('capture graph-view', async ({ page }, info) => {
+      await page.addInitScript(() => localStorage.setItem('graphdone:viewMode', 'graph'));
+      const firstNode = page.locator('.graph-container svg g.node[aria-label^="Visual item 1,"]');
+      await open(page, '/workspace', firstNode);
+      await capture(page, info, name, 'graph-view');
+    });
 
     for (const { route, name: screen, heading } of PAGES) {
       test(`capture ${screen}`, async ({ page }, info) => {

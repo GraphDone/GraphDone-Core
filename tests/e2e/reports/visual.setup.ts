@@ -15,6 +15,7 @@ setup('authenticate and seed visual captures', async ({ page }, info) => {
     edgeFactor: 1.2,
     spacing: 260,
     namePrefix: 'Visual snapshots',
+    titleForIndex: index => `Visual item ${index + 1}`,
     onGraphCreated: id => writeFileSync(fixturePath, id),
   });
   await page.evaluate(id => localStorage.setItem('currentGraphId', id), graphId);
