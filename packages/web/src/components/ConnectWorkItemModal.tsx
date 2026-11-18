@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useId } from 'react';
 import { createPortal } from 'react-dom';
 import { useDialog } from '../hooks/useDialogManager';
+import { useModalA11y } from '../hooks/useModalA11y';
 import { X, Link2, Search, CheckCircle, ArrowRight, ExternalLink, Filter, CheckCircle2, Trash2, Unlink, ChevronDown } from 'lucide-react';
 import { useQuery, useMutation } from '@apollo/client';
 import { GET_WORK_ITEMS, CREATE_EDGE, GET_EDGES, DELETE_EDGE } from '../lib/queries';
@@ -650,6 +651,8 @@ export function DisconnectWorkItemModal({ isOpen, onClose, sourceNode, onAllConn
 
 export function ConnectWorkItemModal({ isOpen, onClose, sourceNode, initialTab = 'connect', onAllConnectionsRemoved: _onAllConnectionsRemoved }: ConnectWorkItemModalProps) {
   const titleId = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
+  useModalA11y(panelRef, { isOpen, labelledBy: titleId });
   useDialog(isOpen, onClose);
   const { currentTeam } = useAuth();
   const { currentGraph } = useGraph();
@@ -1171,7 +1174,7 @@ export function ConnectWorkItemModal({ isOpen, onClose, sourceNode, initialTab =
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
         <div className="fixed inset-0 bg-gradient-to-br from-gray-900/80 via-slate-900/90 to-gray-900/80 transition-all duration-300" onClick={onClose} />
 
-        <div role="dialog" aria-modal="true" aria-labelledby={titleId} className="relative inline-block w-full align-bottom bg-gradient-to-br from-gray-800 via-gray-800 to-gray-900 rounded-2xl text-left overflow-hidden shadow-2xl border border-gray-700/50 transform transition-all duration-300 hover:shadow-blue-500/10 sm:my-8 sm:align-middle sm:max-w-5xl z-[10000]" onClick={(e) => e.stopPropagation()}>
+        <div ref={panelRef} className="relative inline-block w-full align-bottom bg-gradient-to-br from-gray-800 via-gray-800 to-gray-900 rounded-2xl text-left overflow-hidden shadow-2xl border border-gray-700/50 transform transition-all duration-300 hover:shadow-blue-500/10 sm:my-8 sm:align-middle sm:max-w-5xl z-[10000]" onClick={(e) => e.stopPropagation()}>
           {/* Header with gradient */}
           <div className="bg-gradient-to-r from-emerald-900/30 via-green-800/25 to-teal-900/30 px-4 sm:px-6 py-5 border-b border-emerald-600/20 backdrop-blur-sm">
             <div className="flex items-center justify-between">

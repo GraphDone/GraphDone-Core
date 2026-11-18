@@ -222,12 +222,32 @@ export const LINK_PATHS: (LinkPath & { desktopOnly?: boolean })[] = [
     async run(page, a, b) {
       await frameAll(page);
       const from = await findOnScreen(page, a);
-      if (await isTouch(page)) await longPress(page, from.box.cx, from.box.cy);
-      else await page.mouse.click(from.box.cx, from.box.cy, { button: 'right' });
-      const connect = page.getByText('Connect to Existing Work Items', { exact: true });
-      await expect(connect, 'the item\'s menu must open').toBeVisible({ timeout: 5000 });
-      await connect.click();
+      const touch = await isTouch(page);
       const dialog = page.getByRole('dialog', { name: 'Connect Work Item' });
+      const openDialog = async () => {
+        if (touch) await longPress(page, from.box.cx, from.box.cy);
+        else await page.mouse.click(from.box.cx, from.box.cy, { button: 'right' });
+        const connect = page.getByText('Connect to Existing Work Items', { exact: true });
+        await expect(connect, "the item's menu must open").toBeVisible({ timeout: 5000 });
+        await connect.click();
+      };
+      await openDialog();
+      if (!touch) {
+        await expect(dialog.locator(':focus')).toHaveCount(1);
+        const close = dialog.getByRole('button', { name: 'Close', exact: true });
+        const cancel = dialog.getByRole('button', { name: 'Cancel', exact: true });
+        await close.focus();
+        await page.keyboard.press('Shift+Tab');
+        await expect(cancel).toBeFocused();
+        await page.keyboard.press('Tab');
+        await expect(close).toBeFocused();
+        await page.keyboard.press('Escape');
+        await expect(dialog).toBeHidden();
+        const sourceControl = page.getByRole('button', { name: `Quick edit ${a.title}`, exact: true })
+          .or(page.getByRole('button', { name: `${a.title}, Task`, exact: true }));
+        await expect(sourceControl.and(page.locator(':focus'))).toHaveCount(1);
+        await openDialog();
+      }
       const search = dialog.getByPlaceholder('Search work items by title or type');
       await expect(search, '"Connect to Existing Work Items" must open the connect dialog').toBeVisible({ timeout: 5000 });
       const viewport = page.viewportSize();
