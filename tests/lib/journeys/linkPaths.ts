@@ -1,4 +1,4 @@
-import { expect, Page } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
 import { cardBox, clickable, Item } from './workspace';
 
 /**
@@ -7,7 +7,7 @@ import { cardBox, clickable, Item } from './workspace';
  * Each path returns what it took (zoom steps, etc.) so reports can show friction.
  */
 export type PathResult = { zoomIn?: number; zoomOut?: number; pans?: number };
-export type LinkPath = { id: string; title: string; run: (page: Page, a: Item, b: Item) => Promise<PathResult> };
+export type LinkPath = { id: string; title: string; expectedType?: string; run: (page: Page, a: Item, b: Item) => Promise<PathResult> };
 
 
 const isTouch = (page: Page) => page.evaluate(() => matchMedia('(pointer: coarse)').matches);
@@ -217,6 +217,7 @@ export const LINK_PATHS: (LinkPath & { desktopOnly?: boolean })[] = [
   },
   {
     id: 'context-menu',
+    expectedType: 'BLOCKS',
     title: 'open an item\'s menu (right-click, or long-press on touch), "Connect to Existing Work Items", pick the other item',
     async run(page, a, b) {
       await frameAll(page);
@@ -226,11 +227,35 @@ export const LINK_PATHS: (LinkPath & { desktopOnly?: boolean })[] = [
       const connect = page.getByText('Connect to Existing Work Items', { exact: true });
       await expect(connect, 'the item\'s menu must open').toBeVisible({ timeout: 5000 });
       await connect.click();
-      const search = page.getByPlaceholder('Search work items by title or type');
+      const dialog = page.getByRole('dialog', { name: 'Connect Work Item' });
+      const search = dialog.getByPlaceholder('Search work items by title or type');
       await expect(search, '"Connect to Existing Work Items" must open the connect dialog').toBeVisible({ timeout: 5000 });
+      const viewport = page.viewportSize();
+      if (viewport && viewport.width < 640) {
+        const { x, width } = await search.evaluate(input => input.getBoundingClientRect().toJSON());
+        test.info().annotations.push({ type: 'connect-dialog-width', description: JSON.stringify({ viewport: viewport.width, search: width }) });
+        expect(width, 'the work-item search fills most of the phone width').toBeGreaterThan(viewport.width * 0.75);
+        expect(x, 'the search starts within the phone viewport').toBeGreaterThanOrEqual(0);
+        expect(x + width, 'the search ends within the phone viewport').toBeLessThanOrEqual(viewport.width);
+      }
+      const relationship = dialog.getByRole('combobox', { name: 'Relationship Type', exact: true });
+      if (await relationship.isVisible()) {
+        await relationship.selectOption('BLOCKS');
+      } else {
+        await dialog.getByRole('button', { name: /^Blocks\b/ }).click();
+      }
       await search.fill(b.title);
-      await page.getByText(b.title, { exact: true }).last().click();
-      await page.getByRole('button', { name: /^Connect 1 Node$/ }).click();
+      const target = dialog.getByRole('button').filter({ has: page.getByText(b.title, { exact: true }) });
+      if (viewport && viewport.width < 640) {
+        const { x, width } = await target.evaluate(button => button.getBoundingClientRect().toJSON());
+        expect(width, 'the selectable work item fills most of the phone width').toBeGreaterThan(viewport.width * 0.75);
+        expect(x, 'the work item starts within the phone viewport').toBeGreaterThanOrEqual(0);
+        expect(x + width, 'the work item ends within the phone viewport').toBeLessThanOrEqual(viewport.width);
+        await target.scrollIntoViewIfNeeded();
+        await test.info().attach('phone-connect-dialog', { body: await page.screenshot(), contentType: 'image/png' });
+      }
+      await target.click();
+      await dialog.getByRole('button', { name: /^Connect 1 Node$/ }).click();
       return { zoomOut: from.zoomOut };
     },
   },
