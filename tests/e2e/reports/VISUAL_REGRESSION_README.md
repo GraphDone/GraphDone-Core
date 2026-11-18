@@ -21,6 +21,10 @@ TEST_URL=http://localhost:3127 npm run test:e2e:visual -- --grep 'iPhone-SE.*cap
 the VM. The default E2E config and smoke gate exclude the visual suite.
 
 Each capture checks the route and expected screen before saving the image.
+Graph captures wait for the layout to settle and for at least two fixture
+cards with readable titles to paint inside the canvas. Agents and Ontology
+captures wait for their data, and Backend Status waits for its initial
+health check.
 Signed-out captures cover `/` and `/login`. Signed-in captures cover the Cards
 and Graph workspace views, Settings, Agents, Ontology, Administration, the
 Administration Users tab, and Backend Status.

@@ -37,10 +37,7 @@ const DEVICES = [
 
 const PAGES = [
   { route: '/settings', name: 'settings', heading: 'Settings' },
-  { route: '/agents', name: 'agents', heading: 'Working with AI' },
-  { route: '/ontology', name: 'ontology', heading: 'Ontology' },
   { route: '/admin', name: 'admin-panel', heading: 'System Administration' },
-  { route: '/backend', name: 'admin-system', heading: 'Backend Status' },
 ];
 
 async function open(page: Page, route: string, ready: Locator) {
@@ -54,6 +51,50 @@ async function capture(page: Page, info: TestInfo, device: string, screen: strin
   const path = join(info.config.metadata.screenshotDir, device, `${screen}.png`);
   await page.screenshot({ path, animations: 'disabled', fullPage: true });
   await info.attach(`${device}-${screen}`, { path, contentType: 'image/png' });
+}
+
+async function waitForGraphPaint(page: Page) {
+  await expect.poll(() => page.evaluate(() => {
+    const perf = (window as Window & { __graphPerf?: { settled: boolean; graphId: string } }).__graphPerf;
+    const canvas = document.querySelector('.graph-container svg');
+    if (!canvas || !perf?.settled || perf.graphId !== localStorage.getItem('currentGraphId')) {
+      return { settled: false, readableCards: 0, usable: false };
+    }
+
+    const viewport = canvas.getBoundingClientRect();
+    const visibleFraction = (bounds: DOMRect) => {
+      const width = Math.max(0, Math.min(innerWidth, viewport.right, bounds.right) - Math.max(0, viewport.left, bounds.left));
+      const height = Math.max(0, Math.min(innerHeight, viewport.bottom, bounds.bottom) - Math.max(0, viewport.top, bounds.top));
+      return bounds.width && bounds.height ? (width * height) / (bounds.width * bounds.height) : 0;
+    };
+    const hasPaint = (element: Element) => {
+      const paint = getComputedStyle(element);
+      if (paint.fill === 'none') return false;
+
+      let opacity = Number(paint.fillOpacity);
+      for (let ancestor: Element | null = element; ancestor; ancestor = ancestor.parentElement) {
+        const style = getComputedStyle(ancestor);
+        if (style.display === 'none' || style.visibility !== 'visible') return false;
+        opacity *= Number(style.opacity);
+      }
+      return opacity >= 0.5;
+    };
+
+    const cards = [...canvas.querySelectorAll('g.node[aria-label^="Visual item "]')];
+    const readableCards = cards.filter(node => {
+      const background = node.querySelector('.node-bg');
+      if (!background || !hasPaint(background) || visibleFraction(background.getBoundingClientRect()) < 0.5) return false;
+
+      const titleLines = [...node.querySelectorAll('.node-title-text')];
+      return titleLines.length > 0 && titleLines.every(line => {
+        const bounds = line.getBoundingClientRect();
+        return Boolean(line.textContent?.trim()) && hasPaint(line) && bounds.height >= 8 && visibleFraction(bounds) >= 0.9;
+      });
+    }).length;
+    return { settled: true, readableCards, usable: readableCards >= 2 };
+  }), { message: 'settled graph paints at least two readable fixture cards', timeout: 25_000 })
+    .toEqual(expect.objectContaining({ settled: true, usable: true }));
+  await expect(page.getByTestId('mini-map-status')).toBeHidden();
 }
 
 for (const { name, width, height, deviceScaleFactor } of DEVICES) {
@@ -86,6 +127,7 @@ for (const { name, width, height, deviceScaleFactor } of DEVICES) {
       await page.addInitScript(() => localStorage.setItem('graphdone:viewMode', 'graph'));
       const firstNode = page.locator('.graph-container svg g.node[aria-label^="Visual item 1,"]');
       await open(page, '/workspace', firstNode);
+      await waitForGraphPaint(page);
       await capture(page, info, name, 'graph-view');
     });
 
@@ -95,6 +137,31 @@ for (const { name, width, height, deviceScaleFactor } of DEVICES) {
         await capture(page, info, name, screen);
       });
     }
+
+    test('capture agents', async ({ page }, info) => {
+      await open(page, '/agents', page.getByRole('heading', { name: 'Working with AI', exact: true }));
+      await expect(page.getByRole('button', { name: 'Refresh agent work' })).toBeEnabled();
+      const activity = page.getByRole('region', { name: 'Recorded agent activity' });
+      const empty = activity.getByRole('heading', { name: 'No AI contributions recorded here yet' });
+      const populated = activity.getByRole('status').filter({ hasText: /recorded AI contributors/ });
+      await expect(empty.or(populated)).toBeVisible();
+      const setup = page.getByRole('region', { name: 'Agent setup' });
+      await expect(setup.getByRole('button', { name: 'Create agent token' })).toBeEnabled();
+      await capture(page, info, name, 'agents');
+    });
+
+    test('capture ontology', async ({ page }, info) => {
+      await open(page, '/ontology', page.getByRole('heading', { name: 'Ontology', exact: true }));
+      await expect(page.getByText(/^[1-9]\d* in this graph$/).first()).toBeVisible();
+      await expect(page.getByText('Loading usage…', { exact: true })).toHaveCount(0);
+      await capture(page, info, name, 'ontology');
+    });
+
+    test('capture admin-system', async ({ page }, info) => {
+      await open(page, '/backend', page.getByRole('heading', { name: 'Backend Status', exact: true }));
+      await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled();
+      await capture(page, info, name, 'admin-system');
+    });
 
     test('capture admin-users', async ({ page }, info) => {
       const usersTab = page.getByRole('button', { name: 'Users', exact: true });
