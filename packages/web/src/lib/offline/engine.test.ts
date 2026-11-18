@@ -104,3 +104,22 @@ it('fetches a fresh project when manual refresh overlaps a cache read', async ()
     vi.unstubAllGlobals();
   }
 });
+
+it('retains the cached project and retry deadline when an explicit download is rate limited', async () => {
+  fixture.token = signedIn;
+  fixture.account = emptyAccount();
+  const cached = snapshot('paused');
+  fixture.account.projects.paused = { base: cached, local: cached, checkedAt: Date.now() };
+  const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ message: 'Please wait' }), {
+    status: 429, headers: { 'Retry-After': '180' },
+  }));
+  vi.stubGlobal('fetch', fetch);
+  try {
+    await expect(getProject('paused', true)).rejects.toThrow('Please wait');
+    expect(fixture.account.retryAt).toBeGreaterThan(Date.now() + 120000);
+    expect(await getProject('paused', true)).toEqual(cached);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});

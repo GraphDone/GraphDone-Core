@@ -68,7 +68,7 @@ export async function getProject(id:string,force=false):Promise<Snapshot> {
   let p=(await readAccount(owner)).projects[id];
   if((!p||force)&&await canConnect(owner)) {
    try {const {data}=await request(owner,`/project?id=${encodeURIComponent(id)}`);await acceptRemote(owner,id,data.snapshot);p=(await readAccount(owner)).projects[id];}
-   catch(e){if(!p?.local)throw e;}
+   catch(e){if(force || !p?.local)throw e;}
   }
   if(!p?.local)throw Error('This project is not available on this device yet. Reconnect and open it to download an offline copy.');
   return p.local;
