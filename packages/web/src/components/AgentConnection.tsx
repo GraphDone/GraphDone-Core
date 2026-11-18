@@ -11,8 +11,8 @@ import { useDialog } from '../hooks/useDialogManager';
 import { useModalA11y } from '../hooks/useModalA11y';
 
 export const agentBase = `${import.meta.env.VITE_API_URL || window.location.origin}/api/agent`;
-async function localAgentContext(graphId: string, force = false) {
-  const snapshot = await getProject(graphId, force);
+async function localAgentContext(graphId: string) {
+  const snapshot = await getProject(graphId);
   return {
     items: snapshot.nodes,
     project: { id: graphId, name: snapshot.project.name },
@@ -75,11 +75,10 @@ export function AgentConnection({ graphId, graphName, onClose, embedded=false }:
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   const noteRead = useRef(0);
-  const refreshNotes = useCallback(async (force = false) => {
+  const refreshNotes = useCallback(async (manual = false) => {
     const read = ++noteRead.current;
-    const context = offlineEnabled && ownerId()
-      ? await localAgentContext(graphId, force)
-      : await agentRequest(graphId, '/context');
+    if (manual && offlineEnabled) await syncNow(true, false, graphId);
+    const context = await agentRequest(graphId, '/context');
     if (read === noteRead.current) {
       setNotes(context.notes);
       setItems(context.items);
@@ -101,6 +100,12 @@ export function AgentConnection({ graphId, graphName, onClose, embedded=false }:
   }, [refreshNotes]);
   useEffect(() => { let alive = true; refresh().catch(e => { if (alive) setError(e.message); }); const timer = window.setInterval(() => { if (!skipBackgroundPoll()) void refresh().catch(() => {}); }, 60000); return () => { alive = false; clearInterval(timer); }; }, [graphId]);
   const act = async (work: () => Promise<void>) => { setBusy(true); setError(''); try { await work(); } catch (e) { setError(e instanceof Error ? e.message : 'Something went wrong'); } finally { setBusy(false); } };
+  const submitNote = async () => {
+    await agentRequest(graphId, '/notes', 'POST', { body: note, ...(itemId ? { workItemId: itemId } : {}) });
+    setNote('');
+    await refreshNotes();
+    if (offlineEnabled && !tokenUnavailable) await syncNow(false, false, graphId);
+  };
   const instructions = buildAgentPrompt({api:agentBase,projectId:graphId,token:secret,scope:secretAccess.scope,canShare:secretAccess.canShare});
   const field = 'block w-full min-w-0 min-h-[44px] rounded-xl border border-gray-600 bg-gray-950 px-3 py-2 text-base font-medium text-gray-100 focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-400/30';
   // A two-option choice must not stretch across a wide panel; text fields keep
@@ -151,7 +156,7 @@ export function AgentConnection({ graphId, graphName, onClose, embedded=false }:
         <section aria-label="Agent handoff" className="min-w-0 rounded-2xl border border-gray-700 bg-gray-800/40 p-4 sm:p-5">
           <div className="flex items-start justify-between gap-2"><h3 id={`${sectionId}-notes`} className="flex items-center gap-2 text-lg font-semibold"><MessageSquare className="shrink-0 text-sky-200" aria-hidden="true" />Shared notes</h3><button aria-label="Refresh shared notes" disabled={busy} className={`${button} shrink-0 !px-3 hover:bg-gray-700`} onClick={() => void act(() => refreshNotes(true))}><RefreshCw size={20} aria-hidden="true" /></button></div>
           <p className="mb-5 mt-2 text-sm leading-relaxed text-gray-300">Leave a priority, question or handoff. Your agent’s updates appear here too.</p>
-          <form className="space-y-4" onSubmit={e => { e.preventDefault(); void act(async () => { await agentRequest(graphId, '/notes', 'POST', { body: note, ...(itemId ? {workItemId: itemId} : {}) }); setNote(''); await refreshNotes(); if (offlineEnabled && !tokenUnavailable) await syncNow(false, false, graphId); }); }}>
+          <form className="space-y-4" onSubmit={e => { e.preventDefault(); void act(submitNote); }}>
             <label className="block space-y-2 font-semibold"><span>About</span><select aria-label="About" className={select} value={itemId} onChange={e => setItemId(e.target.value)}><option value="">Whole project</option>{items.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label>
             <label className="block space-y-2 font-semibold"><span>Note</span><textarea aria-label="Note for your agent" placeholder="What should your agent know?" className={`${field} min-h-[112px] resize-y`} maxLength={4000} required value={note} onChange={e => setNote(e.target.value)}/></label>
             <button disabled={busy || !note.trim()} className={`${button} bg-violet-600 hover:bg-violet-500`}>Leave note</button>

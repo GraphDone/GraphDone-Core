@@ -58,7 +58,13 @@ export async function listProjects(force=false):Promise<Row[]> {
 }
 export async function getProject(id:string,force=false):Promise<Snapshot> {
  const owner=ownerId();if(!owner)throw Error('Sign in first.');
- return once(`project:${owner}:${id}`,async()=>{
+ const key=`project:${owner}:${id}`;
+ const refreshKey=`${key}:refresh`;
+ const refreshing=loading.get(refreshKey);
+ if(refreshing)return refreshing;
+ const earlierRead=loading.get(key);
+ return once(force?refreshKey:key,async()=>{
+  if(force && earlierRead)await earlierRead.catch(()=>{});
   let p=(await readAccount(owner)).projects[id];
   if((!p||force)&&await canConnect(owner)) {
    try {const {data}=await request(owner,`/project?id=${encodeURIComponent(id)}`);await acceptRemote(owner,id,data.snapshot);p=(await readAccount(owner)).projects[id];}
@@ -83,7 +89,7 @@ async function acceptRemote(owner:string,id:string,remote:Snapshot|null,ack?:str
 export async function syncNow(manual=false,scheduled=false,projectId?:string) {
  const owner=ownerId();if(!offlineEnabled||!owner||localGuest()||(!navigator.onLine&&!scheduled))return;
  if(!navigator.locks) {await editAccount(owner,a=>{a.error='This browser cannot coordinate safe sync between tabs. Export a backup and use a current browser.';});return;}
- await navigator.locks.request(`graphdone-sync:${owner}`,{ifAvailable:true},async lock=>{
+ await navigator.locks.request(`graphdone-sync:${owner}`,{ifAvailable:!projectId},async lock=>{
   if(!lock)return;
   const a=await readAccount(owner);
   // Manual retry can retry expired authentication after a fresh sign-in, but

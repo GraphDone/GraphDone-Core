@@ -46,8 +46,8 @@ describe('agent connection availability', () => {
     mode.offline = true;
     mode.connected = true;
     let latest = '';
-    getProject.mockImplementation(async (_id: string, force?: boolean) => {
-      if (force) latest = 'Updated after owner review';
+    syncNow.mockImplementation(async () => { latest = 'Updated after owner review'; });
+    getProject.mockImplementation(async () => {
       return {
         project: { name: 'Owned project' }, nodes: [],
         notes: latest ? [{ id: 'note', body: latest, actor: 'Agent', actor_type: 'agent', created_at: '2026-11-18' }] : [],
@@ -65,7 +65,7 @@ describe('agent connection availability', () => {
     await screen.findByText('Ready for review');
     fireEvent.click(screen.getByRole('button', { name: 'Refresh shared notes' }));
     await screen.findByText('Updated after owner review');
-    expect(getProject).toHaveBeenCalledWith('owned-project', true);
+    expect(syncNow).toHaveBeenCalledWith(true, false, 'owned-project');
     expect(fetch).not.toHaveBeenCalled();
   });
 
