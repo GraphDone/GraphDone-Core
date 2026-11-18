@@ -58,11 +58,17 @@ export async function listProjects(force=false):Promise<Row[]> {
 }
 export async function getProject(id:string,force=false):Promise<Snapshot> {
  const owner=ownerId();if(!owner)throw Error('Sign in first.');
- return once(`project:${owner}:${id}`,async()=>{
+ const key=`project:${owner}:${id}`;
+ const refreshKey=`${key}:refresh`;
+ const refreshing=loading.get(refreshKey);
+ if(refreshing)return refreshing;
+ const earlierRead=loading.get(key);
+ return once(force?refreshKey:key,async()=>{
+  if(force && earlierRead)await earlierRead.catch(()=>{});
   let p=(await readAccount(owner)).projects[id];
   if((!p||force)&&await canConnect(owner)) {
    try {const {data}=await request(owner,`/project?id=${encodeURIComponent(id)}`);await acceptRemote(owner,id,data.snapshot);p=(await readAccount(owner)).projects[id];}
-   catch(e){if(!p?.local)throw e;}
+   catch(e){if(force || !p?.local)throw e;}
   }
   if(!p?.local)throw Error('This project is not available on this device yet. Reconnect and open it to download an offline copy.');
   return p.local;
@@ -80,24 +86,25 @@ async function acceptRemote(owner:string,id:string,remote:Snapshot|null,ack?:str
   a.projects[id]={base:remote,local:result.local,conflicts:result.conflicts,remote:result.conflicts.length?remote:undefined,checkedAt:Date.now()};
  });
 }
-export async function syncNow(manual=false,scheduled=false) {
+export async function syncNow(manual=false,scheduled=false,projectId?:string) {
  const owner=ownerId();if(!offlineEnabled||!owner||localGuest()||(!navigator.onLine&&!scheduled))return;
  if(!navigator.locks) {await editAccount(owner,a=>{a.error='This browser cannot coordinate safe sync between tabs. Export a backup and use a current browser.';});return;}
- await navigator.locks.request(`graphdone-sync:${owner}`,{ifAvailable:true},async lock=>{
+ await navigator.locks.request(`graphdone-sync:${owner}`,{ifAvailable:!projectId},async lock=>{
   if(!lock)return;
   const a=await readAccount(owner);
   // Manual retry can retry expired authentication after a fresh sign-in, but
   // cannot bypass a quota recheck deadline by repeatedly pressing a button.
   if(a.retryAt>Date.now())return;
-  const hasDirty=Object.values(a.projects).some(dirty);
+  const projects=Object.entries(a.projects).filter(([id])=>!projectId || id===projectId);
+  const hasDirty=projects.some(([,project])=>dirty(project));
   // A scheduled dirty upload is also the bounded connectivity probe. Browser
   // online hints can be stale; the request result is authoritative. Never use
   // this exception for clean background reads.
   if(!navigator.onLine&&!hasDirty)return;
-  if(!hasDirty && !manual && (skipBackgroundPoll() || !Object.entries(a.projects).some(([id,p])=>localStorage.getItem('currentGraphId')===id && Date.now()-p.checkedAt>60000)))return;
+  if(!hasDirty && !manual && (skipBackgroundPoll() || !projects.some(([id,p])=>localStorage.getItem('currentGraphId')===id && Date.now()-p.checkedAt>60000)))return;
   view={...view,syncing:true};listeners.forEach(f=>f());
   try {
-   for(const [id] of Object.entries(a.projects).sort(([,a],[,b])=>Number(!!a.local)-Number(!!b.local))) {
+   for(const [id] of projects.sort(([,a],[,b])=>Number(!!a.local)-Number(!!b.local))) {
     if(owner!==ownerId()||(!navigator.onLine&&!scheduled))break;
     const p=(await readAccount(owner)).projects[id];if(p.conflicts?.length)continue;
     if(!dirty(p)) {

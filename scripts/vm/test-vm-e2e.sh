@@ -272,14 +272,12 @@ main() {
         add_to_report "## 📸 Visual Regression Screenshots"
 
         log_info "Capturing screenshots across all device resolutions..."
-        if multipass exec "$VM_NAME" -- bash -c 'cd ~/graphdone && npm run test:e2e:visual' 2>&1 | tee "$REPORT_DIR/visual-regression.log"; then
+        if (
+            set -o pipefail
+            multipass exec "$VM_NAME" -- env "VISUAL_RUN_ID=$TIMESTAMP" bash -c 'cd ~/graphdone && npm run test:e2e:visual' 2>&1 | tee "$REPORT_DIR/visual-regression.log"
+        ); then
             log_success "Visual regression screenshots captured"
             add_to_report "✅ Visual regression screenshots captured successfully"
-
-            # Count screenshots captured
-            SCREENSHOT_COUNT=$(multipass exec "$VM_NAME" -- bash -c 'find ~/graphdone/test-artifacts/visual-regression -name "*.png" 2>/dev/null | wc -l' || echo "unknown")
-            log_info "Total screenshots captured: $SCREENSHOT_COUNT"
-            add_to_report "📊 Total screenshots: $SCREENSHOT_COUNT"
         else
             log_warning "Visual regression screenshot capture had issues (continuing)"
             add_to_report "⚠️ Visual regression screenshot capture incomplete"
@@ -417,32 +415,18 @@ main() {
         add_to_report "✅ Test results copied to artifacts-${TIMESTAMP}/test-results"
     fi
 
-    # Copy visual regression screenshots if they exist
-    if multipass exec "$VM_NAME" -- bash -c 'test -d ~/graphdone/test-artifacts/visual-regression' > /dev/null 2>&1; then
-        log_info "Copying visual regression screenshots..."
-
-        # Get the latest timestamp directory
-        LATEST_VR_DIR=$(multipass exec "$VM_NAME" -- bash -c 'ls -td ~/graphdone/test-artifacts/visual-regression/* 2>/dev/null | head -1' || echo "")
-
-        if [ -n "$LATEST_VR_DIR" ]; then
-            multipass transfer "$VM_NAME:$LATEST_VR_DIR" "$REPORT_DIR/artifacts-${TIMESTAMP}/visual-regression" || true
-
-            # Count total screenshots copied
-            SCREENSHOT_COUNT=$(find "$REPORT_DIR/artifacts-${TIMESTAMP}/visual-regression" -name "*.png" 2>/dev/null | wc -l || echo "0")
-
-            log_success "Visual regression screenshots copied ($SCREENSHOT_COUNT images)"
-            add_to_report "✅ Visual regression screenshots copied to artifacts-${TIMESTAMP}/visual-regression ($SCREENSHOT_COUNT images)"
-
-            # Copy the summary report if it exists
-            if [ -f "$REPORT_DIR/artifacts-${TIMESTAMP}/visual-regression/SUMMARY.md" ]; then
-                add_to_report ""
-                add_to_report "### Visual Regression Summary"
-                add_to_report "\`\`\`"
-                cat "$REPORT_DIR/artifacts-${TIMESTAMP}/visual-regression/SUMMARY.md" | head -n 20 >> "$REPORT_FILE" || true
-                add_to_report "\`\`\`"
+    if [ "${RUN_VISUAL_REGRESSION:-true}" = "true" ]; then
+        VISUAL_REPORT_DIR="$REPORT_DIR/artifacts-${TIMESTAMP}/visual-regression"
+        if VISUAL_VM_DIR=$(multipass exec "$VM_NAME" -- bash -c 'printf "%s\n" "$HOME/graphdone/test-artifacts/visual-regression/$1"' _ "$TIMESTAMP") &&
+            multipass exec "$VM_NAME" -- test -d "$VISUAL_VM_DIR"; then
+            if multipass transfer --recursive "$VM_NAME:$VISUAL_VM_DIR" "$VISUAL_REPORT_DIR"; then
+                SCREENSHOT_COUNT=$(find "$VISUAL_REPORT_DIR" -name '*.png' | wc -l)
+                log_success "Visual regression screenshots copied ($SCREENSHOT_COUNT images)"
+                add_to_report "✅ Visual regression screenshots copied to artifacts-${TIMESTAMP}/visual-regression ($SCREENSHOT_COUNT images)"
+            else
+                log_warning "Visual regression screenshots could not be copied"
+                add_to_report "⚠️ Visual regression screenshots could not be copied"
             fi
-        else
-            log_warning "Visual regression directory exists but is empty"
         fi
     fi
 

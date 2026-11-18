@@ -1,10 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { emptyAccount, type Account, type Snapshot } from './model';
 
-const fixture = vi.hoisted(() => ({ account: null as Account | null, token: 'local-guest' }));
+const fixture = vi.hoisted(() => ({ account: null as Account | null, token: 'local-guest', readBarrier: undefined as Promise<void> | undefined }));
 vi.mock('./store', () => ({
   channel: null,
-  readAccount: async () => structuredClone(fixture.account),
+  readAccount: async () => {
+    await fixture.readBarrier;
+    return structuredClone(fixture.account);
+  },
   editAccount: async (_owner: string, edit: (account: Account) => unknown) => {
     const account = structuredClone(fixture.account!);
     const result = edit(account);
@@ -17,7 +20,7 @@ vi.mock('../authStorage', () => ({
   getUserRaw: () => JSON.stringify({ id: 'owner', role: 'USER' }),
 }));
 
-import { importOffline } from './engine';
+import { getProject, importOffline } from './engine';
 
 const signedIn = `x.${btoa(JSON.stringify({ uid: 'owner' }))}.y`;
 const snapshot = (id: string, project: Record<string, unknown> = {}): Snapshot => ({
@@ -73,4 +76,50 @@ describe('importing a backup with projects and their graphs', () => {
       expect(row).not.toHaveProperty('type');
     }
   });
+});
+
+it('fetches a fresh project when manual refresh overlaps a cache read', async () => {
+  fixture.token = signedIn;
+  fixture.account = emptyAccount();
+  const cached = snapshot('project');
+  fixture.account.projects.project = { base: cached, local: cached, checkedAt: Date.now() };
+  const remote = snapshot('project', { name: 'Reviewed by owner' });
+  const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ snapshot: remote })));
+  vi.stubGlobal('fetch', fetch);
+  let release!: () => void;
+  fixture.readBarrier = new Promise(resolve => { release = resolve; });
+  try {
+    const reading = getProject('project');
+    const refreshing = getProject('project', true);
+    const alsoRefreshing = getProject('project', true);
+    release();
+    await reading;
+    for (const project of await Promise.all([refreshing, alsoRefreshing])) {
+      expect(project.project.name).toBe('Reviewed by owner');
+    }
+    expect(fetch).toHaveBeenCalledTimes(1);
+  } finally {
+    release();
+    fixture.readBarrier = undefined;
+    vi.unstubAllGlobals();
+  }
+});
+
+it('retains the cached project and retry deadline when an explicit download is rate limited', async () => {
+  fixture.token = signedIn;
+  fixture.account = emptyAccount();
+  const cached = snapshot('paused');
+  fixture.account.projects.paused = { base: cached, local: cached, checkedAt: Date.now() };
+  const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ message: 'Please wait' }), {
+    status: 429, headers: { 'Retry-After': '180' },
+  }));
+  vi.stubGlobal('fetch', fetch);
+  try {
+    await expect(getProject('paused', true)).rejects.toThrow('Please wait');
+    expect(fixture.account.retryAt).toBeGreaterThan(Date.now() + 120000);
+    expect(await getProject('paused', true)).toEqual(cached);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });

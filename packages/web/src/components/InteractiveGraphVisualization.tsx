@@ -5348,7 +5348,15 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       setOpenedFromDeleteModal(false);
       setShowDeleteModal(true);
     } else {
+      const sourceId = selectedNode?.id;
       setSelectedNode(null);
+      if (sourceId) {
+        requestAnimationFrame(() => {
+          if (document.activeElement === document.body) {
+            focusNodeControl(sourceId, '.node-edit-icon');
+          }
+        });
+      }
     }
   };
 
