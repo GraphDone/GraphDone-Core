@@ -169,6 +169,8 @@ describe('permissions on saved graphs', () => {
     const backend = fakeBackend();
     const cases = [
       { id: 'creator', createdBy: 'me', permissions: null, edit: true, remove: true },
+      { id: 'empty', createdBy: 'me', permissions: '', edit: true, remove: true },
+      { id: 'spaces', createdBy: 'me', permissions: ' ', edit: false, remove: false },
       { id: 'owner', permissions: '{"owner":"me"}', edit: true, remove: true },
       { id: 'admin', permissions: '{"admins":["me"]}', edit: true, remove: true },
       { id: 'editor', permissions: '{"editors":["me"]}', edit: true, remove: false },

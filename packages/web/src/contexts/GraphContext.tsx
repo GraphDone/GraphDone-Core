@@ -54,7 +54,7 @@ const starterJournal = (userId: string, marker: StarterMarker): StarterJournal =
 };
 
 function parseGraphPermissions(raw: string | null | undefined, creator?: string): GraphPermissions {
-  if (raw == null) {
+  if (raw == null || raw === '') {
     return { owner: creator || '', admins: creator ? [creator] : [], editors: [], viewers: [], teamPermission: 'VIEW' };
   }
 
