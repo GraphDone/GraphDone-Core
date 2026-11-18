@@ -63,7 +63,7 @@ async function enterAsGuest(page: Page, shot: (l: string) => Promise<void>) {
   await expect(confirm).toBeVisible();
   await shot('guest-dialog');
   await confirm.click();
-  await expect(page.getByText('Guest workspace · saved on this device', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'New work item', exact: true })).toBeVisible();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
