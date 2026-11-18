@@ -53,6 +53,30 @@ const starterJournal = (userId: string, marker: StarterMarker): StarterJournal =
   };
 };
 
+function parseGraphPermissions(raw: string | null | undefined, creator?: string): GraphPermissions {
+  if (raw == null) {
+    return { owner: creator || '', admins: creator ? [creator] : [], editors: [], viewers: [], teamPermission: 'VIEW' };
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    parsed = null;
+  }
+  const acl = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
+  const users = (value: unknown): string[] => Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : [];
+  const team = acl.teamPermission;
+  return {
+    ...acl,
+    owner: typeof acl.owner === 'string' ? acl.owner : '',
+    admins: users(acl.admins),
+    editors: users(acl.editors),
+    viewers: users(acl.viewers),
+    teamPermission: team === 'ADMIN' || team === 'EDIT' || team === 'VIEW' ? team : 'NONE',
+  };
+}
+
 function parseGraph(g: any): Graph {
   return {
     ...g,
@@ -64,13 +88,7 @@ function parseGraph(g: any): Graph {
       autoLayout: true,
       zoomLevel: 1.0
     },
-    permissions: g.permissions ? JSON.parse(g.permissions) : {
-      owner: g.createdBy || 'unknown',
-      admins: g.createdBy ? [g.createdBy] : [],
-      editors: [],
-      viewers: [],
-      teamPermission: 'VIEW'
-    },
+    permissions: parseGraphPermissions(g.permissions, g.createdBy),
     shareSettings: g.shareSettings ? JSON.parse(g.shareSettings) : {
       isPublic: false,
       allowTeamAccess: true,
@@ -567,7 +585,7 @@ export function GraphProvider({ children }: GraphProviderProps) {
         const newGraph = {
           ...data.createGraphs.graphs[0],
           settings: JSON.parse(data.createGraphs.graphs[0].settings || '{}'),
-          permissions: JSON.parse(data.createGraphs.graphs[0].permissions || '{}'),
+          permissions: parseGraphPermissions(data.createGraphs.graphs[0].permissions, data.createGraphs.graphs[0].createdBy),
           shareSettings: JSON.parse(data.createGraphs.graphs[0].shareSettings || '{}')
         };
         
@@ -617,7 +635,7 @@ export function GraphProvider({ children }: GraphProviderProps) {
         const updatedGraph = {
           ...data.updateGraphs.graphs[0],
           settings: data.updateGraphs.graphs[0].settings ? JSON.parse(data.updateGraphs.graphs[0].settings) : undefined,
-          permissions: data.updateGraphs.graphs[0].permissions ? JSON.parse(data.updateGraphs.graphs[0].permissions) : undefined,
+          permissions: parseGraphPermissions(data.updateGraphs.graphs[0].permissions, data.updateGraphs.graphs[0].createdBy),
           shareSettings: data.updateGraphs.graphs[0].shareSettings ? JSON.parse(data.updateGraphs.graphs[0].shareSettings) : undefined,
         };
         
@@ -839,19 +857,19 @@ export function GraphProvider({ children }: GraphProviderProps) {
 
   const canEditGraph = (graphId: string): boolean => {
     const graph = availableGraphs.find(g => g.id === graphId);
-    if (!graph || !currentUser) return false;
+    if (!graph || !currentUser?.id) return false;
 
     return (
       graph.permissions.owner === currentUser.id ||
       graph.permissions.admins.includes(currentUser.id) ||
       graph.permissions.editors.includes(currentUser.id) ||
-      (graph.permissions.teamPermission === 'EDIT' && graph.teamId === currentTeam?.id)
+      (graph.permissions.teamPermission === 'EDIT' && !!currentTeam?.id && graph.teamId === currentTeam.id)
     );
   };
 
   const canDeleteGraph = (graphId: string): boolean => {
     const graph = availableGraphs.find(g => g.id === graphId);
-    if (!graph || !currentUser) return false;
+    if (!graph || !currentUser?.id) return false;
 
     return (
       graph.permissions.owner === currentUser.id ||

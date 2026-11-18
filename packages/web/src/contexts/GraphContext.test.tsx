@@ -151,6 +151,45 @@ const named = (backend: ReturnType<typeof fakeBackend>, name: string) => backend
 beforeEach(() => localStorage.clear());
 afterEach(() => cleanup());
 
+describe('permissions on saved graphs', () => {
+  it('opens the hierarchy demo as read-only for a signed-in user', async () => {
+    const backend = fakeBackend();
+    backend.graphs.push({
+      __typename: 'Graph', id: 'overview-graph-shared', name: 'System Overview', type: 'PROJECT',
+      isShared: true, createdBy: 'system', defaultRole: 'VIEWER', teamId: null,
+      permissions: '{"public":"read","authenticated":"read"}',
+    });
+    await start(backend);
+    await waitFor(() => expect(graph.currentGraph?.name).toBe('System Overview'));
+    expect(graph.canEditGraph('overview-graph-shared')).toBe(false);
+    expect(graph.canDeleteGraph('overview-graph-shared')).toBe(false);
+  });
+
+  it('preserves explicit grants and treats malformed grants as read-only', async () => {
+    const backend = fakeBackend();
+    const cases = [
+      { id: 'creator', createdBy: 'me', permissions: null, edit: true, remove: true },
+      { id: 'owner', permissions: '{"owner":"me"}', edit: true, remove: true },
+      { id: 'admin', permissions: '{"admins":["me"]}', edit: true, remove: true },
+      { id: 'editor', permissions: '{"editors":["me"]}', edit: true, remove: false },
+      { id: 'team', permissions: '{"teamPermission":"EDIT"}', edit: true, remove: false },
+      { id: 'other-team', teamId: 'other', permissions: '{"teamPermission":"EDIT"}', edit: false, remove: false },
+      { id: 'viewer', permissions: '{"viewers":["me"]}', edit: false, remove: false },
+      { id: 'bad-list', permissions: '{"admins":"someone"}', edit: false, remove: false },
+      { id: 'bad-json', createdBy: 'me', permissions: 'invalid', edit: false, remove: false },
+    ];
+    for (const entry of cases) {
+      backend.graphs.push({ __typename: 'Graph', name: entry.id, type: 'PROJECT', isShared: true, createdBy: 'other', teamId: 'team-1', ...entry });
+    }
+    await start(backend);
+    await waitFor(() => expect(graph.availableGraphs).toHaveLength(cases.length));
+    for (const { id, edit, remove } of cases) {
+      expect(graph.canEditGraph(id), id).toBe(edit);
+      expect(graph.canDeleteGraph(id), id).toBe(remove);
+    }
+  });
+});
+
 describe('a new user while the example project is still being written', () => {
   it('keeps a graph they create meanwhile open, instead of switching to Welcome', async () => {
     const backend = fakeBackend();
