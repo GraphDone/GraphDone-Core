@@ -1,8 +1,8 @@
 import {buildAgentPrompt} from '@graphdone/core';
-import { offlineEnabled, ownerId, getProject, localGuest, useOffline } from '../lib/offline/engine';
+import { offlineEnabled, ownerId, getProject, localGuest, syncNow, useOffline } from '../lib/offline/engine';
 import { editAccount } from '../lib/offline/store';
 import { cloudFailure, preserveCloudDraft, skipBackgroundPoll, hostedUsageEnabled, useHostedUsage, refreshHostedUsage } from '../lib/hostedUsage';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Bot, Check, Copy, KeyRound, MessageSquare, Plus, RefreshCw, ShieldCheck, X } from 'lucide-react';
 import { getToken } from '../lib/authStorage';
@@ -11,13 +11,24 @@ import { useDialog } from '../hooks/useDialogManager';
 import { useModalA11y } from '../hooks/useModalA11y';
 
 export const agentBase = `${import.meta.env.VITE_API_URL || window.location.origin}/api/agent`;
+async function localAgentContext(graphId: string, force = false) {
+  const snapshot = await getProject(graphId, force);
+  return {
+    items: snapshot.nodes,
+    project: { id: graphId, name: snapshot.project.name },
+    notes: [...snapshot.notes].sort((a, b) => b.created_at.localeCompare(a.created_at)).map(n => ({
+      id: n.id, body: n.body, actor: n.actor, actorType: n.actor_type, createdAt: n.created_at, workItemId: n.work_item_id,
+    })),
+  };
+}
+
 export async function agentRequest(graphId: string, path: string, method = 'GET', body?: object) {
   if (offlineEnabled && ownerId() && (path === '/context' || path === '/notes')) {
-    const s=await getProject(graphId);
-    if(path==='/context')return {project:{id:graphId,name:s.project.name},items:s.nodes,notes:[...s.notes].sort((a,b)=>b.created_at.localeCompare(a.created_at)).map(n=>({id:n.id,body:n.body,actor:n.actor,actorType:n.actor_type,createdAt:n.created_at,workItemId:n.work_item_id}))};
+    if (path === '/context') return localAgentContext(graphId);
     if(method==='POST') {
       const input=body as {body:string;workItemId?:string};
       if(!input.body?.trim()||input.body.length>4000)throw Error('Use a note of 1–4000 characters.');
+      await getProject(graphId);
       await editAccount(ownerId()!,a=>{if(a.projects[graphId].local!.notes.length>=2000)throw Error('This project has 2000 shared notes. Export a backup and start another project to continue.');a.projects[graphId].local!.notes.push({id:crypto.randomUUID(),body:input.body.trim(),work_item_id:input.workItemId||null,actor:'You',actor_id:ownerId(),actor_type:'human',created_at:new Date().toISOString()});});
       return {created:true};
     }
@@ -63,11 +74,31 @@ export function AgentConnection({ graphId, graphName, onClose, embedded=false }:
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
+  const noteRead = useRef(0);
+  const refreshNotes = useCallback(async (force = false) => {
+    const read = ++noteRead.current;
+    const context = offlineEnabled && ownerId()
+      ? await localAgentContext(graphId, force)
+      : await agentRequest(graphId, '/context');
+    if (read === noteRead.current) {
+      setNotes(context.notes);
+      setItems(context.items);
+    }
+  }, [graphId]);
   const refresh = async () => {
-    if(offlineEnabled){const context=await agentRequest(graphId,'/context');setNotes(context.notes);setItems(context.items);setReady(true);}
-    const [access, context] = await Promise.all([agentRequest(graphId, '/tokens').catch(e=>{if(!offlineEnabled)throw e;setError('Agent token management requires cloud access. You can still leave notes locally.');return {tokens:[],unavailable:true};}), agentRequest(graphId, '/context')]);
-    setTokens(access.tokens); setAccessReady(!access.unavailable); if(hostedUsageEnabled&&!tokenUnavailable){const sharing=await agentRequest(graphId,'/shares').catch(()=>{setError('Sharing links could not be loaded. Reconnect to review or revoke access.');return {shares:[]};});setShares(sharing.shares||[]);} setNotes(context.notes); setItems(context.items); setReady(true);
+    const context = refreshNotes().then(() => { if (offlineEnabled) setReady(true); });
+    const [access] = await Promise.all([agentRequest(graphId, '/tokens').catch(e=>{if(!offlineEnabled)throw e;setError('Agent token management requires cloud access. You can still leave notes locally.');return {tokens:[],unavailable:true};}), context]);
+    setTokens(access.tokens); setAccessReady(!access.unavailable); if(hostedUsageEnabled&&!tokenUnavailable){const sharing=await agentRequest(graphId,'/shares').catch(()=>{setError('Sharing links could not be loaded. Reconnect to review or revoke access.');return {shares:[]};});setShares(sharing.shares||[]);} setReady(true);
   };
+  useEffect(() => {
+    if (!offlineEnabled) return;
+    const afterSync = () => { void refreshNotes().catch(() => {}); };
+    window.addEventListener('graphdone-sync-refresh', afterSync);
+    return () => {
+      window.removeEventListener('graphdone-sync-refresh', afterSync);
+      noteRead.current++;
+    };
+  }, [refreshNotes]);
   useEffect(() => { let alive = true; refresh().catch(e => { if (alive) setError(e.message); }); const timer = window.setInterval(() => { if (!skipBackgroundPoll()) void refresh().catch(() => {}); }, 60000); return () => { alive = false; clearInterval(timer); }; }, [graphId]);
   const act = async (work: () => Promise<void>) => { setBusy(true); setError(''); try { await work(); } catch (e) { setError(e instanceof Error ? e.message : 'Something went wrong'); } finally { setBusy(false); } };
   const instructions = buildAgentPrompt({api:agentBase,projectId:graphId,token:secret,scope:secretAccess.scope,canShare:secretAccess.canShare});
@@ -118,9 +149,9 @@ export function AgentConnection({ graphId, graphName, onClose, embedded=false }:
           </section>
         </div>
         <section aria-label="Agent handoff" className="min-w-0 rounded-2xl border border-gray-700 bg-gray-800/40 p-4 sm:p-5">
-          <div className="flex items-start justify-between gap-2"><h3 id={`${sectionId}-notes`} className="flex items-center gap-2 text-lg font-semibold"><MessageSquare className="shrink-0 text-sky-200" aria-hidden="true" />Shared notes</h3><button aria-label="Refresh shared notes" disabled={busy} className={`${button} shrink-0 !px-3 hover:bg-gray-700`} onClick={() => void act(refresh)}><RefreshCw size={20} aria-hidden="true" /></button></div>
+          <div className="flex items-start justify-between gap-2"><h3 id={`${sectionId}-notes`} className="flex items-center gap-2 text-lg font-semibold"><MessageSquare className="shrink-0 text-sky-200" aria-hidden="true" />Shared notes</h3><button aria-label="Refresh shared notes" disabled={busy} className={`${button} shrink-0 !px-3 hover:bg-gray-700`} onClick={() => void act(() => refreshNotes(true))}><RefreshCw size={20} aria-hidden="true" /></button></div>
           <p className="mb-5 mt-2 text-sm leading-relaxed text-gray-300">Leave a priority, question or handoff. Your agent’s updates appear here too.</p>
-          <form className="space-y-4" onSubmit={e => { e.preventDefault(); void act(async () => { await agentRequest(graphId, '/notes', 'POST', { body: note, ...(itemId ? {workItemId: itemId} : {}) }); setNote(''); await refresh(); }); }}>
+          <form className="space-y-4" onSubmit={e => { e.preventDefault(); void act(async () => { await agentRequest(graphId, '/notes', 'POST', { body: note, ...(itemId ? {workItemId: itemId} : {}) }); setNote(''); await refreshNotes(); if (offlineEnabled && !tokenUnavailable) await syncNow(false, false, graphId); }); }}>
             <label className="block space-y-2 font-semibold"><span>About</span><select aria-label="About" className={select} value={itemId} onChange={e => setItemId(e.target.value)}><option value="">Whole project</option>{items.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label>
             <label className="block space-y-2 font-semibold"><span>Note</span><textarea aria-label="Note for your agent" placeholder="What should your agent know?" className={`${field} min-h-[112px] resize-y`} maxLength={4000} required value={note} onChange={e => setNote(e.target.value)}/></label>
             <button disabled={busy || !note.trim()} className={`${button} bg-violet-600 hover:bg-violet-500`}>Leave note</button>
