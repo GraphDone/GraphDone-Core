@@ -386,13 +386,12 @@ function overviewSlots(
   const rows = Math.max(0, Math.floor((height - 100 + 64) / (cardHeight + 64)));
   const span = columns * (cardWidth + 64) - 64;
   const step = cardHeight + 64;
-  const spaceBelowControls = 30;
   const phase = (y: number) => 20 + ((((y - 20) % step) + step) % step);
   const phases = [
     ...new Set([
       64,
       ...obstacles.flatMap(obstacle => [
-        phase(obstacle.bottom + spaceBelowControls),
+        phase(obstacle.bottom + 20),
         phase(obstacle.top - 20 - cardHeight),
       ]),
     ]),
@@ -414,7 +413,7 @@ function overviewSlots(
             obstacle =>
               slot.x < obstacle.right + 20 &&
               slot.x + cardWidth > obstacle.left - 20 &&
-              slot.y < obstacle.bottom + spaceBelowControls &&
+              slot.y < obstacle.bottom + 20 &&
               slot.y + cardHeight > obstacle.top - 20
           )
         )

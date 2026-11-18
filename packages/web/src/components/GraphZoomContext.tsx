@@ -215,10 +215,11 @@ export function GraphZoomContext({ graphs, currentGraphId, camera, readPositions
     return graphs.map(graph => (live.get(graph.id) === undefined ? graph : { ...graph, nodeCount: live.get(graph.id) }));
   }, [graphs, countData]);
   const context = useMemo(() => (currentGraphId ? zoomContextOf(counted, currentGraphId) : null), [counted, currentGraphId]);
+  const frameTitleSize = viewport.w < 768 ? 13 : NAME_PX;
   const projectedName = useMemo(() => context && overviewFrame
-    ? fitGraphText(context.current.name, overviewFrame.w - 32, NAME_PX,
+    ? fitGraphText(context.current.name, overviewFrame.w - 32, frameTitleSize,
       (text, size) => measureGraphText(text, size, 700), 1).lines[0]
-    : '', [context, overviewFrame]);
+    : '', [context, overviewFrame, frameTitleSize]);
   const portrait = viewport.h > viewport.w * 1.2;
   const layout = useMemo(() => (context && frame ? zoomLayout(context, frame, portrait) : null), [context, frame, portrait]);
 
@@ -322,8 +323,8 @@ export function GraphZoomContext({ graphs, currentGraphId, camera, readPositions
         {projectedFrame ? (
           <g className="zoom-frame-label" data-zoom-frame={context.current.id} role="img" aria-label={`${context.current.name}, ${items}`}>
             <title>{context.current.name}, {items}</title>
-            <text className="zoom-label" x={f.x + 16 / k} y={f.y + 6 / k}
-              style={{ fontSize: NAME_PX / k, paintOrder: 'stroke', stroke: 'var(--gd-canvas)', strokeWidth: 5 / k, strokeLinejoin: 'round' }}>
+            <text className="zoom-label" x={f.x + 16 / k} y={f.y + 7 / k}
+              style={{ fontSize: frameTitleSize / k, paintOrder: 'stroke', stroke: 'var(--gd-canvas)', strokeWidth: 5 / k, strokeLinejoin: 'round' }}>
               <tspan className="zoom-label-name">{projectedName}</tspan>
             </text>
           </g>
