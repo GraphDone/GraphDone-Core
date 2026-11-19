@@ -164,7 +164,7 @@ for (const [width, height] of [
           allowedEdit &&
           body.operationName === 'UpdateWorkItems' &&
           JSON.stringify(variables?.where) ===
-            JSON.stringify({ id: allowedEdit.id }) &&
+            JSON.stringify({ id: allowedEdit.id, graph: { id: graphId } }) &&
           JSON.stringify(variables?.update) ===
             JSON.stringify({ title: allowedEdit.title }) &&
           allowedWrites.length === 0

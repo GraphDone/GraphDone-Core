@@ -104,3 +104,36 @@ test('an obstructed sibling can be reached by panning the visible mobile canvas 
   ), center);
   expect(hits).toEqual(['sibling', 'sibling', 'sibling']);
 });
+
+test('two graph contacts hit their painted targets when the phone page is already magnified @mobile', async ({ page }) => {
+  await page.setContent(`
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <style>body { margin: 0; width: 100vw; height: 100vh; }</style>
+  `);
+  const nativePinch = Array.from({ length: 14 }, (_, i) => [
+    { x: 195 - 20 - i * 7, y: 350 }, { x: 195 + 20 + i * 7, y: 350 },
+  ]);
+  await touchGesture(page, nativePinch);
+  const center = await page.evaluate(() => {
+    const view = visualViewport!;
+    const x = Math.round(view.offsetLeft + view.width / 2), y = Math.round(view.offsetTop + view.height / 2);
+    for (const offset of [-20, 20]) {
+      const item = document.createElement('button');
+      item.id = offset < 0 ? 'left-contact' : 'right-contact';
+      item.style.cssText = `position:absolute;left:${x + offset - 5}px;top:${y - 5}px;width:10px;height:10px;padding:0;touch-action:none;`;
+      document.body.appendChild(item);
+    }
+    document.addEventListener('touchstart', event => {
+      document.body.dataset.actualHits = Array.from(event.touches).map(t => (t.target as Element).id).join(',');
+    }, true);
+    return { x, y, scale: view.scale, left: view.offsetLeft, top: view.offsetTop };
+  });
+  expect(center.scale).toBeGreaterThan(1);
+  expect(center.left + center.top).toBeGreaterThan(15);
+  await touchGesture(page, [
+    [{ x: center.x - 20, y: center.y }, { x: center.x + 20, y: center.y }],
+    [{ x: center.x - 25, y: center.y }, { x: center.x + 26, y: center.y }],
+  ], async () => {
+    await expect(page.locator('body')).toHaveAttribute('data-actual-hits', 'left-contact,right-contact');
+  });
+});
