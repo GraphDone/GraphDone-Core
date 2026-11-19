@@ -553,6 +553,8 @@ test('pending layout keeps semantic overview labels fixed during pan and zoom @l
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 900 });
     await expect.poll(() => page.evaluate(() => (window as any).__layoutMetrics?.()?.cameraReady)).toBe(true);
+    await zoom(1.2);
+    await expect(page.locator('.graph-container')).toHaveAttribute('data-zoom-level', '1');
     const status = page.getByTestId('layout-save-status');
     const connections = page.locator('.semantic-overview').getByRole('button', { name: /relationships, .*not drawn:/ });
     const statusBox = (await status.boundingBox())!;
@@ -568,7 +570,10 @@ test('pending layout keeps semantic overview labels fixed during pan and zoom @l
   }
   await page.setViewportSize({ width: 390, height: 500 });
   await expect.poll(() => page.evaluate(() => (window as any).__layoutMetrics?.()?.cameraReady)).toBe(true);
+  await zoom(1.2);
+  await expect(page.locator('.graph-container')).toHaveAttribute('data-zoom-level', '1');
   const dock = page.locator('.semantic-overview [data-graph-status-dock]');
+  await expect(dock).toBeVisible();
   expect(await dock.evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true);
   const dockBox = (await dock.boundingBox())!;
   const cameraBeforeScroll = await camera();

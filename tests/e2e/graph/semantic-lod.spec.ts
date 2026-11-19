@@ -603,3 +603,143 @@ for (const width of [1440, 390])
       expect(attemptedWrites).toEqual([]);
     });
   });
+
+const containmentTest = test.extend<{ containedGraphId: string }>({
+  containedGraphId: [async ({ page, ownedGraphIds }, use) => {
+    await login(page, TEST_USERS.ADMIN);
+    const parent = await ownedGraphIds.seed({ size: 1, namePrefix: 'Containment parent' });
+    const sibling = await ownedGraphIds.seed({ size: 1, namePrefix: 'Containment sibling' });
+    const current = await ownedGraphIds.seed({
+      size: 48, spacing: 240, batchSize: 12, namePrefix: 'Containment graph',
+      metadataForIndex: index => ({ lod: { groupPath: [`Area ${index % 4}`] } }),
+    });
+    const update = 'mutation($id:ID!,$input:GraphUpdateInput!){updateGraphs(where:{id:$id},update:$input){graphs{id}}}';
+    try {
+      const child = { type: 'SUBGRAPH', parentGraphId: parent.graphId, path: [parent.graphId], depth: 1 };
+      await gql(page, update, { id: current.graphId, input: { ...child, name: 'Area map' } });
+      await gql(page, update, { id: sibling.graphId, input: child });
+      await use(current.graphId);
+    } finally {
+      for (const id of [current.graphId, sibling.graphId]) {
+        await gql(page, update, { id, input: { parentGraphId: null } });
+      }
+    }
+  }, { timeout: 180000 }],
+});
+
+containmentTest('wheel zoom contains semantic cards and buses within their graph before showing siblings and projects', async ({
+  page, containedGraphId,
+}, info) => {
+  containmentTest.setTimeout(60000);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.evaluate(id => {
+    localStorage.setItem('currentGraphId', id);
+    localStorage.setItem('graphdone:viewMode', 'graph');
+  }, containedGraphId);
+  await page.goto('/');
+  const canvas = page.locator('.graph-container');
+  await expect(canvas.locator('g.node')).toHaveCount(48, { timeout: 30000 });
+  const rect = await canvas.boundingBox();
+  if (!rect) throw Error('No visible graph canvas');
+  await page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2);
+
+  const inspect = () => canvas.evaluate(container => {
+    const frame = container.querySelector('.zoom-frame')?.getBoundingClientRect();
+    const shapes = [...container.querySelectorAll('[data-lod-group], [data-lod-bundle], [data-lod-bus-hit]')];
+    const painted = shapes.filter(shape => !shape.hasAttribute('data-lod-bus-hit') &&
+      shape.checkVisibility({ opacityProperty: true, visibilityProperty: true }) &&
+      (!shape.hasAttribute('data-lod-bundle') || (getComputedStyle(shape).stroke !== 'none' && Number(getComputedStyle(shape).strokeOpacity) > 0)));
+    const outside = painted.filter(shape => {
+      const b = shape.getBoundingClientRect();
+      return !frame || b.left < frame.left - 1 || b.top < frame.top - 1 || b.right > frame.right + 1 || b.bottom > frame.bottom + 1;
+    }).map(shape => shape.getAttribute('data-lod-group') || shape.getAttribute('data-lod-bus-id'));
+    const interactive = shapes.filter(shape => shape.checkVisibility({ visibilityProperty: true }) && getComputedStyle(shape).pointerEvents !== 'none');
+    return {
+      level: Number(container.getAttribute('data-zoom-level')),
+      groups: painted.filter(shape => shape.hasAttribute('data-lod-group')).length,
+      buses: painted.filter(shape => shape.hasAttribute('data-lod-bundle')).length,
+      outside, interactive: interactive.length,
+    };
+  });
+  const wheelTo = async (level: number, delta: number) => {
+    const samples = [];
+    for (let step = 0; step < 60; step++) {
+      const state = await inspect();
+      if (state.level === level) return samples;
+      samples.push(state);
+      await page.mouse.wheel(0, delta);
+      await page.waitForTimeout(200);
+    }
+    throw Error(`Wheel did not reach zoom level ${level}: ${JSON.stringify(await inspect())}`);
+  };
+
+  await wheelTo(1, 120);
+  const frame = canvas.locator(`[data-zoom-frame="${containedGraphId}"]`);
+  await expect(frame).toBeVisible();
+  await expect(frame).toContainText('Area map');
+  await expect.poll(async () => (await inspect()).groups).toBeGreaterThan(1);
+  await expect.poll(async () => (await inspect()).buses).toBeGreaterThan(0);
+  const insideGraph = await wheelTo(2, 120);
+  await info.attach('graph-frame-samples', { body: JSON.stringify(insideGraph), contentType: 'application/json' });
+  expect.soft(insideGraph.flatMap(step => step.outside), 'every painted card and bus stays within its named graph frame').toEqual([]);
+
+  for (const level of [2, 3]) {
+    await wheelTo(level, 120);
+    await expect.soft.poll(inspect, { message: `zoom level ${level} hides group cards, buses and their hit targets`, timeout: 2500 })
+      .toMatchObject({ level, groups: 0, buses: 0, interactive: 0 });
+    await info.attach(`zoom-level-${level}`, { body: await page.screenshot(), contentType: 'image/png' });
+  }
+  await wheelTo(1, -120);
+  await expect(frame).toBeVisible();
+  await expect.poll(async () => (await inspect()).groups).toBeGreaterThan(1);
+  await expect.poll(async () => (await inspect()).buses).toBeGreaterThan(0);
+});
+
+containmentTest.describe('phone overview title', () => {
+  containmentTest.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+  containmentTest('the frame title clears visible controls and summary cards', async ({ page, containedGraphId }, info) => {
+    await page.evaluate(id => {
+      localStorage.setItem('currentGraphId', id);
+      localStorage.setItem('graphdone:viewMode', 'graph');
+    }, containedGraphId);
+    await page.goto('/');
+    const canvas = page.locator('.graph-container');
+    await expect(canvas.locator('g.node')).toHaveCount(48, { timeout: 30000 });
+    await expect(page.getByTestId('graph-breadcrumb')).toContainText('Area map');
+    await expect(canvas).toHaveAttribute('data-zoom-level', '1');
+    await expect(canvas.getByText(/\d+ more in group list/)).toBeVisible();
+    await expect(canvas.locator('[data-lod-group]').first()).toBeVisible();
+
+    const title = canvas.locator(`[data-zoom-frame="${containedGraphId}"] .zoom-label-name`).first();
+    await expect(title).toBeVisible();
+    await expect(title).toHaveText('Area map');
+    const measure = () => title.evaluate(element => {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      const glyphs = range.getBoundingClientRect();
+      const scene = element.closest('.graph-container')!;
+      const viewport = scene.getBoundingClientRect();
+      const obstacles = scene.querySelectorAll('[data-lod-controls] > *, [data-lod-group], button, select, [data-graph-fit-obstacle]:not([data-lod-controls])');
+      const collisions = [...obstacles].filter(obstacle => {
+        if (!obstacle.checkVisibility({ opacityProperty: true, visibilityProperty: true })) return false;
+        const b = obstacle.getBoundingClientRect();
+        return b.width > 0 && b.height > 0 && glyphs.left < b.right && glyphs.right > b.left &&
+          glyphs.top < b.bottom && glyphs.bottom > b.top;
+      }).map(obstacle => obstacle.getAttribute('aria-label') || obstacle.textContent?.trim() || obstacle.tagName);
+      return {
+        readable: element.checkVisibility({ opacityProperty: true, visibilityProperty: true }) && getComputedStyle(element).fill !== 'none' &&
+          glyphs.width > 0 && glyphs.height > 0 && glyphs.left >= viewport.left && glyphs.right <= viewport.right &&
+          glyphs.top >= viewport.top && glyphs.bottom <= viewport.bottom,
+        collisions,
+      };
+    });
+    await page.evaluate(() => document.fonts.ready);
+    await page.waitForTimeout(650);
+    const screenshot = info.outputPath('phone-overview-title.png');
+    await page.screenshot({ path: screenshot });
+    await info.attach('phone-overview-title', { path: screenshot, contentType: 'image/png' });
+    expect(await measure(), 'phone overview title glyphs remain on canvas and clear its controls, hints and cards')
+      .toEqual({ readable: true, collisions: [] });
+  });
+});

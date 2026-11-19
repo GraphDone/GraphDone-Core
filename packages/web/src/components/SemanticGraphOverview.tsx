@@ -34,6 +34,7 @@ import {
 } from '../lib/semanticRelationships';
 import { SemanticRelationshipBrowser } from './SemanticRelationshipBrowser';
 import { routeSchematicConnections } from '../lib/schematicRouting';
+import { boundsOf, type Rect } from '../lib/graphZoomContext';
 import { organizeOverview } from '../lib/overviewOrganization';
 import {
   projectSemanticTrace,
@@ -47,6 +48,7 @@ interface Props {
   camera: { x: number; y: number; scale: number };
   readPositions: () => readonly { id: string; x: number; y: number }[];
   onActiveChange: (active: boolean) => void;
+  onFrameChange?: (frame: Rect | null) => void;
   onInspect: (id: string, beginSession: boolean) => void;
   selectedId?: string;
   onBrowse: () => void;
@@ -67,6 +69,7 @@ export function SemanticGraphOverview({
   camera,
   readPositions,
   onActiveChange,
+  onFrameChange,
   onInspect,
   onBack,
   selectedId,
@@ -384,6 +387,15 @@ export function SemanticGraphOverview({
       obstacleKey,
     ]
   );
+  useLayoutEffect(() => {
+    if (!onFrameChange) return;
+    const cards = placed.map(({ x, y, width, height }) => ({ x, y, w: width, h: height }));
+    const bends = wiring?.routes.flatMap(route =>
+      route.points.map(({ x, y }) => ({ x, y, w: 0, h: 0 }))
+    ) ?? [];
+    onFrameChange(boundsOf([...cards, ...bends], 12));
+  }, [placed, wiring, onFrameChange]);
+  useLayoutEffect(() => () => onFrameChange?.(null), [onFrameChange]);
   const emphasized = wiring?.routes.find(route => route.id === highlightedBus);
   const drawnConnections = (wiring?.routes ?? []).reduce(
     (count, bus) => count + bus.edgeIds.length,
