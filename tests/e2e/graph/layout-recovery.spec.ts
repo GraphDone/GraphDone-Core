@@ -40,6 +40,8 @@ async function readSaved(page: Page, graphId: string, nodeId: string) {
 async function readReceipt(page: Page, graphId: string, nodeId: string) {
   const owner = (await gql(page, '{me{id}}')).me.id as string;
   return page.evaluate(async ({ owner, graphId, nodeId }) => {
+    const databases = await indexedDB.databases();
+    if (!databases.some(db => db.name === 'graphdone-offline')) return { receipt: undefined, credentialFound: false };
     const account = await new Promise<any>((resolve, reject) => {
       const open = indexedDB.open('graphdone-offline', 1);
       open.onerror = () => reject(open.error);
@@ -579,4 +581,39 @@ test('pending layout keeps semantic overview labels fixed during pan and zoom @l
   await page.getByRole('button', { name: 'Discard unsent layout' }).click();
   await expect(page.getByTestId('layout-save-status')).toHaveCount(0);
   expect((await readReceipt(page, graph.graphId, nodeId)).receipt).toBeUndefined();
+});
+
+test('viewing an unplaced read-only graph never queues or sends positions @layout-recovery', async ({ page, ownedGraphIds }) => {
+  test.setTimeout(90000);
+  await login(page, TEST_USERS.ADMIN);
+  const graph = await ownedGraphIds.seed({ size: 4, spacing: 0, namePrefix: 'Read-only layout' });
+  const viewer = (await gql(page, '{me{id}}')).me.id;
+  await gql(page, 'mutation($id:ID!,$acl:String!){updateGraphs(where:{id:$id},update:{permissions:$acl}){graphs{id}}}', {
+    id: graph.graphId, acl: JSON.stringify({ owner: 'fixture-owner', admins: [], editors: [], viewers: [viewer], teamPermission: 'VIEW' }),
+  });
+  const writes: string[] = [];
+  page.on('request', request => {
+    if (request.method() !== 'POST' || !request.url().endsWith('/api/graphql')) return;
+    const body = request.postDataJSON();
+    if (body?.operationName === 'UpdateWorkItems' && body.variables?.where?.graph?.id === graph.graphId) writes.push(body.operationName);
+  });
+  await openGraph(page, graph.graphId, 4);
+  await expect.poll(async () => {
+    const position = await readPosition(page, graph.nodeIds[0]);
+    return !!position && Math.hypot(position.x, position.y) > 1;
+  }).toBe(true);
+  await page.mouse.move(700, 450);
+  await page.mouse.wheel(0, 350);
+  await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pagehide')));
+  await expect.poll(() => page.evaluate(() => (window as any).__layoutMetrics?.()?.cameraReady)).toBe(true);
+  for (const id of graph.nodeIds) expect(await readSaved(page, graph.graphId, id)).toEqual({ x: 0, y: 0 });
+  expect(writes).toEqual([]);
+  await page.reload();
+  await expect(page.locator('.graph-container svg .node')).toHaveCount(4, { timeout: 30000 });
+  for (const id of graph.nodeIds) {
+    expect(await readSaved(page, graph.graphId, id)).toEqual({ x: 0, y: 0 });
+    expect((await readReceipt(page, graph.graphId, id)).receipt).toBeUndefined();
+  }
+  expect(writes).toEqual([]);
+  await expect(page.getByText('Layout needs attention', { exact: true })).toHaveCount(0);
 });

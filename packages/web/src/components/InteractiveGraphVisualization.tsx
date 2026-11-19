@@ -248,7 +248,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   // Live-readable lock flag for d3 drag filters (avoids re-binding handlers on toggle).
   const interactionLockedRef = useRef<boolean>(!!interactionLocked);
   useEffect(() => { interactionLockedRef.current = !!interactionLocked; }, [interactionLocked]);
-  const { currentGraph, availableGraphs, descendInto } = useGraph();
+  const { currentGraph, availableGraphs, descendInto, canEditGraph } = useGraph();
   // descendInto from context isn't memoized; hold the latest in a ref so the
   // D3-bound node click handler can call it without re-binding every render.
   const descendIntoRef = useRef(descendInto);
@@ -862,6 +862,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // Window will be controlled manually by user interactions
   }, [selectedNodes.size, editingEdge]);
   
+  const canSaveLayout = !!currentGraph && canEditGraph(currentGraph.id);
+  const canSaveLayoutRef = useRef(canSaveLayout);
+  canSaveLayoutRef.current = canSaveLayout;
+
   // Function to save node position to database
   const saveNodePosition = useCallback(async (nodeId: string, x: number, y: number) => {
     if (!currentUser || !currentGraph) throw new Error('A signed-in owner and graph are required.');
@@ -883,7 +887,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const positionSaveQueue = usePositionSaveQueue(
     position => saveNodePosition(position.id, position.x, position.y),
     message => showError('Layout needs attention', message || 'Check the layout save status before closing this tab. Return to this graph after reconnecting to retry pending positions.'),
-    currentUser && currentGraph ? { ownerId: currentUser.id, graphId: currentGraph.id } : null,
+    canSaveLayout && currentUser && currentGraph ? { ownerId: currentUser.id, graphId: currentGraph.id } : null,
   );
   const layoutScope = currentUser && currentGraph ? JSON.stringify([currentUser.id, currentGraph.id]) : null;
   const activeLayoutScopeRef = useRef(layoutScope);
@@ -900,7 +904,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   // pin to. Called debounced when the sim settles and on page hide.
   const persistAllPositions = useCallback(() => {
     const sim = simulationRef.current;
-    if (!sim || simulationLayoutScopeRef.current !== activeLayoutScopeRef.current) return;
+    if (!canSaveLayoutRef.current || !sim || simulationLayoutScopeRef.current !== activeLayoutScopeRef.current) return;
     const moved = (sim.nodes() as any[]).filter((n: any) =>
       typeof n.x === 'number' && typeof n.y === 'number' &&
       (Math.abs((n.positionX ?? 0) - n.x) > 1 || Math.abs((n.positionY ?? 0) - n.y) > 1)
@@ -1207,7 +1211,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
   // Remove unused handleEdgeClick to fix TypeScript warning
 
-  const layoutRecoveryReady = !currentUser || !currentGraph || !!positionSaveQueue.state?.recovered || !!positionSaveQueue.error;
+  const layoutRecoveryReady = !canSaveLayout || !!positionSaveQueue.state?.recovered || !!positionSaveQueue.error;
   const pendingPositions = positionSaveQueue.state?.positions;
   const workItems = useMemo<WorkItem[]>(() => {
     if (!layoutRecoveryReady) return [];
@@ -2428,7 +2432,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .style('cursor', 'pointer')
       .call(d3.drag<any, any>()
         // Locked (phone) → reject the drag so the gesture pans the canvas instead.
-        .filter((event: any) => !interactionLockedRef.current && !event.ctrlKey && !event.button)
+        .filter((event: any) => canSaveLayoutRef.current && !interactionLockedRef.current && !event.ctrlKey && !event.button)
         .on('start', (event, d: any) => {
           d._dragging = false;
           delete d._dragStart;
@@ -2548,7 +2552,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           
           // Save the new position via the coalescing queue (#95) so a drag during
           // a reflow doesn't add another parallel write.
-          if ((d.fx !== d.positionX || d.fy !== d.positionY) && positionSaveQueueRef.current.queue(d.id, d.fx, d.fy)) {
+          if (canSaveLayoutRef.current && (d.fx !== d.positionX || d.fy !== d.positionY) && positionSaveQueueRef.current.queue(d.id, d.fx, d.fy)) {
             d.positionX = d.fx;
             d.positionY = d.fy;
             positionSaveQueueRef.current.flush();
