@@ -22,7 +22,7 @@ const UNSPACED_SCRIPT = /[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff]/;
 const isToken = (word: string) => /[^\p{L}'’]|\p{Ll}\p{Lu}/u.test(word.replace(/^\p{P}+|\p{P}+$/gu, ''));
 /** Where a token breaks best: after a separator, or before a capital in camelCase. */
 const tokenBreak = (chars: string[], at: number) =>
-  /[\/\\._:?=&#,;+~|@-]/.test(chars[at - 1]) || (/[\p{Ll}\p{N}]/u.test(chars[at - 1]) && /\p{Lu}/u.test(chars[at]));
+  /[/\\._:?=&#,;+~|@-]/.test(chars[at - 1]) || (/[\p{Ll}\p{N}]/u.test(chars[at - 1]) && /\p{Lu}/u.test(chars[at]));
 
 /**
  * `text` in at most `maxLines` lines no wider than `width`, broken at spaces.
