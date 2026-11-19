@@ -1,7 +1,7 @@
 import { test, expect, Page, TestInfo } from '@playwright/test';
 import { writeFile } from 'node:fs/promises';
 import { backend, openGraphView, SetupError } from '../../lib/journeys/workspace';
-import { cancelledThreeFingerPinch, touchGesture, type TouchPoint } from '../../lib/journeys/touchContacts';
+import { cancelledThreeFingerPinch, touchGesture, visibleTileCenter, type TouchPoint } from '../../lib/journeys/touchContacts';
 import { readableLabels } from '../../lib/journeys/readableLabels';
 
 async function evidence(info: TestInfo, name: string, body: string | Buffer, contentType: string) {
@@ -107,7 +107,7 @@ test('JOURNEY zoom-out: pinching into a sibling opens that graph on a phone', as
   await welcomeStaysSelected();
 
   await resetOverview('jitter');
-  let center = await tileCenter(fixTile());
+  let center = await visibleTileCenter(page, fixTile(), 20);
   const around = (distances: number[]) => distances.map(distance => [
     { x: center.x - distance, y: center.y }, { x: center.x + distance, y: center.y },
   ] as [TouchPoint, TouchPoint]);
@@ -115,17 +115,17 @@ test('JOURNEY zoom-out: pinching into a sibling opens that graph on a phone', as
   await welcomeStaysSelected();
 
   await resetOverview('inward');
-  center = await tileCenter(fixTile());
+  center = await visibleTileCenter(page, fixTile(), 40);
   await touchGesture(page, around([40, 32, 24, 16])); // inward pinch
   await welcomeStaysSelected();
 
   await resetOverview('reversal');
-  center = await tileCenter(fixTile());
+  center = await visibleTileCenter(page, fixTile(), 20);
   await touchGesture(page, around([20, 24, 16, 65])); // outward, then reversed: cancelled
   await welcomeStaysSelected();
 
   await resetOverview('third contact');
-  center = await tileCenter(fixTile());
+  center = await visibleTileCenter(page, fixTile(), 20);
   await cancelledThreeFingerPinch(page, center);
   await welcomeStaysSelected();
 
@@ -144,9 +144,9 @@ test('JOURNEY zoom-out: pinching into a sibling opens that graph on a phone', as
   const targetId = await tile.getAttribute('data-zoom-tile');
   const cameraBefore = await camera(page);
   const sourcePositions = await localSourcePositions(page);
+  center = await visibleTileCenter(page, tile, 20);
   const readyBox = (await tile.boundingBox())!;
   expect(Math.max(readyBox.width, readyBox.height) * 51 / 40).toBeGreaterThan(0.5 * shortSide);
-  center = { x: Math.round(readyBox.x + readyBox.width / 2), y: Math.round(readyBox.y + readyBox.height / 2) };
   expect(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest('[data-zoom-tile]')?.getAttribute('data-zoom-tile'), center))
     .toBe(targetId);
 
