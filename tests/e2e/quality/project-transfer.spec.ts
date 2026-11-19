@@ -47,6 +47,7 @@ test('student / engineer: portable project round trip, offline, safe Mermaid and
  expect(copy.local.project.id).not.toBe(doc.project.id);expect(copy.local.nodes.map((n:any)=>n.id)).not.toEqual(doc.nodes.map((n:any)=>n.id));
  const byTitle=new Map(copy.local.nodes.map((n:any)=>[n.title,n]));
  for(const n of original.local.nodes){const c:any=byTitle.get(n.title);if(n.title===portableExample.nodes[0].title){const before=JSON.parse(n.metadata),afterMetadata=JSON.parse(c.metadata);expect(afterMetadata.graphdone.portable.nodeRefs.sourceItem).toBe((byTitle.get(portableExample.nodes[1].title) as any).id);expect(afterMetadata.unrelated.literal).toBe('launch');delete before.graphdone;delete afterMetadata.graphdone;expect({...c,id:n.id,metadata:JSON.stringify(before)}).toEqual({...n,metadata:JSON.stringify(afterMetadata)});}else expect({...c,id:n.id}).toEqual(n);}
+ expect(edgeSignatures(copy.local)).toEqual(edgeSignatures(original.local));
  expect(copy.local.edges[0].source_id).toBe((byTitle.get(portableExample.nodes[0].title) as any).id);
  expect(copy.local.notes[0].work_item_id).toBe(copy.local.edges[0].source_id);expect(copy.local.notes[0].body).toBe(example.notes[0].body);
  // Invalid files cannot create partial projects, including a mixed valid/invalid backup.

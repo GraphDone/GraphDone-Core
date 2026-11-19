@@ -1,4 +1,4 @@
-import { Driver, Session, int } from 'neo4j-driver';
+import { Driver, Session, Transaction, int } from 'neo4j-driver';
 import {
   NodeType,
   NodeStatus,
@@ -224,9 +224,24 @@ export interface CloneGraphArgs {
 export class GraphService {
   constructor(private driver: Driver) {}
 
-  private async refreshGraphCounts(session: Session, graphIds: string[]): Promise<void> {
+  private async lockGraphs(tx: Transaction, graphIds: string[]): Promise<string[]> {
+    const ordered = [...new Set(graphIds)].sort();
+    if (!ordered.length) return ordered;
+    const result = await tx.run(`
+      UNWIND $graphIds AS graphId
+      MATCH (g:Graph {id: graphId})
+      WITH g ORDER BY g.id
+      SET g.updatedAt = g.updatedAt
+      RETURN collect(g.id) AS graphIds
+    `, { graphIds: ordered });
+    const locked = result.records[0]?.get('graphIds') as string[] || [];
+    if (locked.length !== ordered.length) throw new Error('One or more affected graphs no longer exist. Nothing was changed.');
+    return ordered;
+  }
+
+  private async refreshGraphCounts(tx: Transaction, graphIds: string[]): Promise<void> {
     if (!graphIds.length) return;
-    await session.run(`
+    await tx.run(`
       MATCH (g:Graph) WHERE g.id IN $graphIds
       OPTIONAL MATCH (g)<-[:BELONGS_TO]-(w:WorkItem)
       WITH g, count(DISTINCT w) AS nodeCount
@@ -533,38 +548,31 @@ export class GraphService {
       };
       if (graphId) params.graphId = graphId;
 
-      const result = await session.run(query, params);
-
-      // A graph_id that matches no graph yields zero rows (the MATCH fails) —
-      // surface that instead of silently creating nothing.
-      if (graphId && result.records.length === 0) {
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify({ error: `Graph with id '${graphId}' not found`, graph_id: graphId }, null, 2)
-          }],
-          isError: true
-        };
-      }
-      if (graphId) await this.refreshGraphCounts(session, [graphId]);
-      const rawNode = result.records[0].get('n').properties;
-      
-      // Parse metadata back from JSON string for data integrity
-      const node = {
-        ...rawNode,
-        metadata: rawNode.metadata ? JSON.parse(rawNode.metadata) : {}
-      };
-
-      // Create relationships to contributors if specified
-      if (contributor_ids.length > 0) {
+      const tx = session.beginTransaction();
+      let rawNode: Record<string, unknown>;
+      try {
+        if (graphId) await this.lockGraphs(tx, [graphId]);
+        const result = await tx.run(query, params);
+        if (graphId && result.records.length === 0) throw new Error(`Graph with id '${graphId}' not found. Nothing was changed.`);
+        rawNode = result.records[0].get('n').properties;
         for (const contributorId of contributor_ids) {
-          await session.run(`
+          await tx.run(`
             MATCH (n:WorkItem {id: $nodeId})
             MERGE (c:Contributor {id: $contributorId})
             MERGE (n)-[:WORKED_ON_BY]->(c)
           `, { nodeId: id, contributorId });
         }
+        if (graphId) await this.refreshGraphCounts(tx, [graphId]);
+        await tx.commit();
+      } catch (error) {
+        await tx.rollback();
+        if (graphId && error instanceof Error && /affected graphs|Graph with id/.test(error.message)) return {
+          content: [{ type: 'text', text: JSON.stringify({ error: `Graph with id '${graphId}' not found`, graph_id: graphId }, null, 2) }],
+          isError: true
+        };
+        throw error;
       }
+      const node = { ...rawNode, metadata: rawNode.metadata ? JSON.parse(rawNode.metadata as string) : {} };
 
         return {
           content: [{
@@ -871,22 +879,6 @@ export class GraphService {
         RETURN n, COUNT(DISTINCT r) as relationshipCount, collect(DISTINCT g.id) AS graphIds
       `;
 
-      const checkResult = await session.run(checkQuery, { node_id });
-      
-      if (checkResult.records.length === 0) {
-        return {
-          content: [{
-            type: 'text',
-            text: 'Node not found'
-          }],
-          isError: true
-        };
-      }
-
-      const relationshipCount = checkResult.records[0]?.get('relationshipCount')?.toNumber?.() || 0;
-      const graphIds = checkResult.records[0]?.get('graphIds') as string[];
-
-      // Delete the node and all its relationships
       const deleteQuery = `
         MATCH (n:WorkItem {id: $node_id})
         OPTIONAL MATCH (n)<-[:EDGE_SOURCE|EDGE_TARGET]-(e:Edge)
@@ -896,8 +888,24 @@ export class GraphService {
         RETURN $node_id as deletedId
       `;
 
-      await session.run(deleteQuery, { node_id });
-      await this.refreshGraphCounts(session, graphIds);
+      const tx = session.beginTransaction();
+      let relationshipCount = 0;
+      try {
+        const checkResult = await tx.run(checkQuery, { node_id });
+        if (checkResult.records.length === 0) {
+          await tx.rollback();
+          return { content: [{ type: 'text', text: 'Node not found' }], isError: true };
+        }
+        relationshipCount = checkResult.records[0]?.get('relationshipCount')?.toNumber?.() || 0;
+        const graphIds = checkResult.records[0]?.get('graphIds') as string[];
+        await this.lockGraphs(tx, graphIds);
+        await tx.run(deleteQuery, { node_id });
+        await this.refreshGraphCounts(tx, graphIds);
+        await tx.commit();
+      } catch (error) {
+        await tx.rollback();
+        throw error;
+      }
 
       return {
         content: [{
@@ -922,18 +930,6 @@ export class GraphService {
         MATCH (target:WorkItem {id: $target_id})
         RETURN source, target
       `;
-
-      const checkResult = await session.run(checkQuery, { source_id, target_id });
-      
-      if (checkResult.records.length === 0) {
-        return {
-          content: [{
-            type: 'text',
-            text: 'One or both nodes not found'
-          }],
-          isError: true
-        };
-      }
 
       // Edges are first-class Edge NODES (e)-[:EDGE_SOURCE]->(source),
       // (e)-[:EDGE_TARGET]->(target) — the SAME model the GraphQL server and
@@ -962,15 +958,29 @@ export class GraphService {
         metadata: JSON.stringify(metadata)
       };
 
-      const result = await session.run(createQuery, params);
-      const graphResult = await session.run(`
-        MATCH (source:WorkItem {id: $source_id})-[:BELONGS_TO]->(g:Graph)<-[:BELONGS_TO]-(target:WorkItem {id: $target_id})
-        RETURN collect(DISTINCT g.id) AS graphIds
-      `, { source_id, target_id });
-      await this.refreshGraphCounts(session, graphResult.records[0]?.get('graphIds') || []);
-      const relationship = result.records[0].get('r').properties;
-      const source = result.records[0].get('source').properties;
-      const target = result.records[0].get('target').properties;
+      const tx = session.beginTransaction();
+      let relationship: Record<string, unknown>, source: Record<string, unknown>, target: Record<string, unknown>;
+      try {
+        const checkResult = await tx.run(checkQuery, { source_id, target_id });
+        if (checkResult.records.length === 0) {
+          await tx.rollback();
+          return { content: [{ type: 'text', text: 'One or both nodes not found' }], isError: true };
+        }
+        const graphResult = await tx.run(`
+          MATCH (source:WorkItem {id: $source_id})-[:BELONGS_TO]->(g:Graph)<-[:BELONGS_TO]-(target:WorkItem {id: $target_id})
+          RETURN collect(DISTINCT g.id) AS graphIds
+        `, { source_id, target_id });
+        const graphIds = await this.lockGraphs(tx, graphResult.records[0]?.get('graphIds') || []);
+        const result = await tx.run(createQuery, params);
+        relationship = result.records[0].get('r').properties;
+        source = result.records[0].get('source').properties;
+        target = result.records[0].get('target').properties;
+        await this.refreshGraphCounts(tx, graphIds);
+        await tx.commit();
+      } catch (error) {
+        await tx.rollback();
+        throw error;
+      }
 
       return {
         content: [{
@@ -1000,26 +1010,27 @@ export class GraphService {
         RETURN source, target
       `;
 
-      const result = await session.run(deleteQuery, { source_id, target_id, type });
-
-      if (result.records.length === 0) {
-        return {
-          content: [{
-            type: 'text',
-            text: 'Edge not found'
-          }],
-          isError: true
-        };
+      const tx = session.beginTransaction();
+      let source: Record<string, unknown>, target: Record<string, unknown>;
+      try {
+        const graphResult = await tx.run(`
+          MATCH (source:WorkItem {id: $source_id})-[:BELONGS_TO]->(g:Graph)<-[:BELONGS_TO]-(target:WorkItem {id: $target_id})
+          RETURN collect(DISTINCT g.id) AS graphIds
+        `, { source_id, target_id });
+        const graphIds = await this.lockGraphs(tx, graphResult.records[0]?.get('graphIds') || []);
+        const result = await tx.run(deleteQuery, { source_id, target_id, type });
+        if (result.records.length === 0) {
+          await tx.rollback();
+          return { content: [{ type: 'text', text: 'Edge not found' }], isError: true };
+        }
+        source = result.records[0].get('source').properties;
+        target = result.records[0].get('target').properties;
+        await this.refreshGraphCounts(tx, graphIds);
+        await tx.commit();
+      } catch (error) {
+        await tx.rollback();
+        throw error;
       }
-
-      const graphResult = await session.run(`
-        MATCH (source:WorkItem {id: $source_id})-[:BELONGS_TO]->(g:Graph)<-[:BELONGS_TO]-(target:WorkItem {id: $target_id})
-        RETURN collect(DISTINCT g.id) AS graphIds
-      `, { source_id, target_id });
-      await this.refreshGraphCounts(session, graphResult.records[0]?.get('graphIds') || []);
-
-      const source = result.records[0].get('source').properties;
-      const target = result.records[0].get('target').properties;
 
       return {
         content: [{
@@ -2167,7 +2178,17 @@ export class GraphService {
         // Execute operations individually
         for (const operation of operations) {
           try {
-            const result = await this.executeBulkOperation(session, operation as { type: string; params: Record<string, Neo4jValue> });
+            let result;
+            if (operation.type === 'create_edge' || operation.type === 'delete_edge') {
+              const tx = session.beginTransaction();
+              try {
+                result = await this.executeBulkOperation(tx, operation as { type: string; params: Record<string, Neo4jValue> });
+                await tx.commit();
+              } catch (error) {
+                await tx.rollback();
+                throw error;
+              }
+            } else result = await this.executeBulkOperation(session, operation as { type: string; params: Record<string, Neo4jValue> });
             results.push({
               operation_type: operation.type,
               success: true,
@@ -2297,7 +2318,7 @@ export class GraphService {
     return { node_id };
   }
 
-  private async executeBulkCreateEdge(sessionOrTx: Session, params: Record<string, Neo4jValue>) {
+  private async executeBulkCreateEdge(sessionOrTx: Session | Transaction, params: Record<string, Neo4jValue>) {
     const { source_id, target_id, type = 'DEPENDS_ON', weight = 1.0, metadata = {} } = params;
 
     const query = `
@@ -2313,6 +2334,11 @@ export class GraphService {
       RETURN r
     `;
 
+    const graphResult = await sessionOrTx.run(`
+      MATCH (source:WorkItem {id: $source_id})-[:BELONGS_TO]->(g:Graph)<-[:BELONGS_TO]-(target:WorkItem {id: $target_id})
+      RETURN collect(DISTINCT g.id) AS graphIds
+    `, { source_id, target_id });
+    const graphIds = await this.lockGraphs(sessionOrTx as Transaction, graphResult.records[0]?.get('graphIds') || []);
     const result = await sessionOrTx.run(query, {
       source_id,
       target_id,
@@ -2325,10 +2351,12 @@ export class GraphService {
       throw new Error("Failed to create edge - nodes may not exist");
     }
 
+    await this.refreshGraphCounts(sessionOrTx as Transaction, graphIds);
+
     return { source_id, target_id, type };
   }
 
-  private async executeBulkDeleteEdge(sessionOrTx: Session, params: Record<string, Neo4jValue>) {
+  private async executeBulkDeleteEdge(sessionOrTx: Session | Transaction, params: Record<string, Neo4jValue>) {
     const { source_id, target_id, type } = params;
 
     const query = `
@@ -2337,12 +2365,19 @@ export class GraphService {
       RETURN count(r) as deleted_count
     `;
 
+    const graphResult = await sessionOrTx.run(`
+      MATCH (source:WorkItem {id: $source_id})-[:BELONGS_TO]->(g:Graph)<-[:BELONGS_TO]-(target:WorkItem {id: $target_id})
+      RETURN collect(DISTINCT g.id) AS graphIds
+    `, { source_id, target_id });
+    const graphIds = await this.lockGraphs(sessionOrTx as Transaction, graphResult.records[0]?.get('graphIds') || []);
     const result = await sessionOrTx.run(query, { source_id, target_id, type });
     const deletedCount = result.records[0]?.get('deleted_count').toNumber() || 0;
 
     if (deletedCount === 0) {
       throw new Error(`Edge not found: ${source_id} -[${type}]-> ${target_id}`);
     }
+
+    await this.refreshGraphCounts(sessionOrTx as Transaction, graphIds);
 
     return { source_id, target_id, type, deleted: true };
   }
@@ -3182,12 +3217,15 @@ export class GraphService {
           status: $status,
           teamId: $teamId,
           parentGraphId: $parentGraphId,
+          depth: 0,
+          path: [],
           isShared: $isShared,
           settings: $settings,
           createdAt: datetime(),
           updatedAt: datetime(),
           nodeCount: 0,
-          edgeCount: 0
+          edgeCount: 0,
+          contributorCount: 0
         })
         RETURN g
       `;

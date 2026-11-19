@@ -333,6 +333,14 @@ export function createMockDriver(): Driver {
     
     beginTransaction: () => ({
       run: async (query: string, params?: any) => {
+        if (query.includes('RETURN collect(g.id) AS graphIds')) {
+          return { records: [createMockRecord({ graphIds: params?.graphIds || [] })] };
+        }
+
+        if (query.includes('CREATE (n:WorkItem')) {
+          return { records: [createMockRecord({ n: { properties: { id: params?.id || 'test-node-id', title: params?.title || 'Test Node', type: params?.type || 'TASK', status: params?.status || 'PROPOSED', metadata: params?.metadata || '{}' } } })] };
+        }
+
         // Handle clone operations within transaction
         if (query.includes('count(newW)') || query.includes('count(newR)') || query.includes('count(newE)')) {
           return {

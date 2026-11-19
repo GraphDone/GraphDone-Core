@@ -308,10 +308,52 @@ describe.skipIf(!configured)('MCP GraphService — real Neo4j contract', () => {
     expect(await stored()).toEqual({ nodes: 2, edges: 1 });
     await svc.deleteEdge({ source_id: a, target_id: b, type: 'DEPENDS_ON' } as any);
     expect(await stored()).toEqual({ nodes: 2, edges: 0 });
+    await svc.bulkOperations({ operations: [{ type: 'create_edge', params: { source_id: a, target_id: b, type: 'BLOCKS' } }] } as any);
+    expect(await stored(), 'bulk edge creation refreshes the same graph counter').toEqual({ nodes: 2, edges: 1 });
+    await svc.bulkOperations({ operations: [{ type: 'delete_edge', params: { source_id: a, target_id: b, type: 'BLOCKS' } }] } as any);
+    expect(await stored(), 'bulk edge deletion refreshes the same graph counter').toEqual({ nodes: 2, edges: 0 });
     await svc.createEdge({ source_id: a, target_id: b, type: 'RELATES_TO' } as any);
     await svc.deleteNode({ node_id: b } as any);
     createdNodes.splice(createdNodes.indexOf(b), 1);
     expect(await stored()).toEqual({ nodes: 1, edges: 0 });
+  });
+
+  it('rolls back the MCP mutation when count recomputation fails', async () => {
+    const g = parse(await svc.createGraph({ name: `Contract Atomic ${Date.now()}`, type: 'SUBGRAPH' } as any));
+    const graphId = g.graph.id;
+    createdGraphs.push(graphId);
+    const title = `Must roll back ${Date.now()}`;
+    const internals = svc as unknown as { refreshGraphCounts: (...args: unknown[]) => Promise<void> };
+    const refresh = internals.refreshGraphCounts.bind(svc);
+    internals.refreshGraphCounts = async () => { throw new Error('forced count refresh failure'); };
+    try {
+      await expect(svc.createNode({ title, type: 'TASK', graph_id: graphId } as any)).rejects.toThrow('forced count refresh failure');
+    } finally {
+      internals.refreshGraphCounts = refresh;
+    }
+    const session = driver.session();
+    try {
+      const result = await session.run('MATCH (w:WorkItem {title: $title}) RETURN count(w) AS count', { title });
+      expect(result.records[0].get('count').toNumber(), 'the failed call cannot leave a retry-duplicating node').toBe(0);
+    } finally { await session.close(); }
+  });
+
+  it('serializes concurrent graph count updates under the graph lock', async () => {
+    const g = parse(await svc.createGraph({ name: `Contract Concurrent ${Date.now()}`, type: 'SUBGRAPH' } as any));
+    const graphId = g.graph.id;
+    createdGraphs.push(graphId);
+    const nodes = await Promise.all(Array.from({ length: 8 }, (_, index) =>
+      svc.createNode({ title: `Concurrent ${index}`, type: 'TASK', graph_id: graphId } as any).then(parse)
+    ));
+    const ids = nodes.map(value => value.node.id as string);
+    createdNodes.push(...ids);
+    await Promise.all(ids.slice(1).map((id, index) => svc.createEdge({ source_id: ids[index], target_id: id, type: index % 2 ? 'BLOCKS' : 'RELATES_TO' } as any)));
+    const session = driver.session();
+    try {
+      const result = await session.run('MATCH (g:Graph {id: $graphId}) RETURN g.nodeCount AS nodes, g.edgeCount AS edges', { graphId });
+      expect(result.records[0].get('nodes').toNumber()).toBe(8);
+      expect(result.records[0].get('edges').toNumber()).toBe(7);
+    } finally { await session.close(); }
   });
 
   it('browseGraph returns well-formed data over a real DB', async () => {
