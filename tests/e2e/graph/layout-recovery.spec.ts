@@ -718,3 +718,28 @@ test('permission loss cancels an active drag and leaves earlier edits recoverabl
   expect(await readSaved(page, graph.graphId, draggedId)).toEqual(canonical);
   expect((await readReceipt(page, graph.graphId, draggedId)).receipt).toBeUndefined();
 });
+
+test('opening an overlapping saved layout preserves its coordinates and still places a new item @layout-recovery', async ({ page, ownedGraphIds }) => {
+  test.setTimeout(90000);
+  await login(page, TEST_USERS.ADMIN);
+  const graph = await ownedGraphIds.seed({ size: 3, spacing: 20, edgeFactor: 0, namePrefix: 'Saved layout navigation' });
+  const [first, second, unplaced] = graph.nodeIds;
+  await gql(page, 'mutation($id:ID!,$graph:ID!){updateWorkItems(where:{id:$id,graph:{id:$graph}},update:{positionX:0,positionY:0}){workItems{id}}}', { id: unplaced, graph: graph.graphId });
+  const original = await Promise.all([first, second].map(id => readSaved(page, graph.graphId, id)));
+  const writes: string[] = [];
+  page.on('request', request => {
+    if (request.method() !== 'POST' || !request.url().endsWith('/api/graphql')) return;
+    const body = request.postDataJSON();
+    if (body?.variables?.where?.graph?.id === graph.graphId && typeof body.variables.update?.positionX === 'number') writes.push(body.variables.where.id);
+  });
+  await openGraph(page, graph.graphId, 3);
+  await expect.poll(() => page.evaluate(() => (window as any).__layoutMetrics?.()?.cameraReady)).toBe(true);
+  await expect.poll(() => readSaved(page, graph.graphId, unplaced), { timeout: 30000 }).not.toEqual({ x: 0, y: 0 });
+  await page.reload();
+  await expect(page.locator('.graph-container svg .node')).toHaveCount(3);
+  await expect.poll(() => page.evaluate(() => (window as any).__layoutMetrics?.()?.cameraReady)).toBe(true);
+  expect(await Promise.all([first, second].map(id => readSaved(page, graph.graphId, id)))).toEqual(original);
+  expect(writes.filter(id => id !== unplaced)).toEqual([]);
+  await page.getByRole('button', { name: 'Organize around connections', exact: true }).click();
+  await expect.poll(() => Promise.all([first, second].map(id => readSaved(page, graph.graphId, id)))).not.toEqual(original);
+});

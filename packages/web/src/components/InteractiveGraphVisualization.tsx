@@ -938,15 +938,14 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const positionSaveQueueRef = useRef(positionSaveQueue);
   positionSaveQueueRef.current = positionSaveQueue;
 
-  // Durable layout: persist the current position of every node whose live
-  // position has moved away from its last-saved position by more than a pixel.
-  // This makes a physics-laid-out arrangement (and grown/new nodes) survive a
-  // reload, so the snapshot-authoritative load above has accurate positions to
-  // pin to. Called debounced when the sim settles and on page hide.
-  const persistAllPositions = useCallback(() => {
+  // Automatic placement may save new items. A presentation adjustment on open,
+  // zoom, or reload must never replace coordinates the owner has already saved.
+  // Dragging queues its dropped item directly; Organize commits the whole layout.
+  const persistPositions = useCallback((reason: 'automatic' | 'organize') => {
     const sim = simulationRef.current;
     if (!canSaveLayoutRef.current || !sim || simulationLayoutScopeRef.current !== activeLayoutScopeRef.current) return;
     const moved = (sim.nodes() as any[]).filter((n: any) =>
+      (reason === 'organize' || ((n.positionX ?? 0) === 0 && (n.positionY ?? 0) === 0)) &&
       typeof n.x === 'number' && typeof n.y === 'number' &&
       (Math.abs((n.positionX ?? 0) - n.x) > 1 || Math.abs((n.positionY ?? 0) - n.y) > 1)
     );
@@ -965,17 +964,17 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   // Save the settled layout on page hide so a tidy arrangement is never lost
   // even if the user never dragged a node.
   useEffect(() => {
-    const handler = () => persistAllPositions();
+    const handler = () => persistPositions('automatic');
     window.addEventListener('pagehide', handler);
     const onVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') persistAllPositions();
+      if (document.visibilityState === 'hidden') persistPositions('automatic');
     };
     document.addEventListener('visibilitychange', onVisibilityChange);
     return () => {
       window.removeEventListener('pagehide', handler);
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
-  }, [persistAllPositions]);
+  }, [persistPositions]);
 
   // Function to get SVG path for priority icons (using correct Lucide icon paths)
   const getPriorityIconSvgPath = (priorityValue: number): string => {
@@ -2194,9 +2193,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       }
     });
 
-    // Imported or previously saved coordinates can already intersect. Pins
-    // prevent any collision force from fixing that. Repair once before paint,
-    // then persist the repaired snapshot through the normal settle queue.
+    // Saved cards may intersect at their rendered sizes. Separate their display
+    // positions before paint, keeping the owner's stored coordinates intact.
     const repairedCards = separateCards(nodes, node => graphItemLayout(node, measureGraphText));
     nodes.forEach((node: any) => {
       if (repairedCards.has(node.id) && node.fx != null) {
@@ -4184,7 +4182,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       if (layoutStartRef.current != null && lastSettleMsRef.current == null) {
         lastSettleMsRef.current = Math.round(performance.now() - layoutStartRef.current);
       }
-      persistAllPositions();
+      persistPositions('automatic');
       runLabelAvoidanceRef.current?.();
     });
     
@@ -4693,13 +4691,13 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     if (currentGraphIdRef.current) fittedGraphsRef.current.add(currentGraphIdRef.current);
     simulation.alpha(0).restart();
     window.dispatchEvent(new CustomEvent('graphdone:layout-organized'));
-    persistAllPositions();
+    persistPositions('organize');
     requestAnimationFrame(() => {
       if (simulationRef.current !== simulation) return;
       runLabelAvoidanceRef.current?.();
       fitViewToNodes();
     });
-  }, [validatedEdges, fitViewToNodes, persistAllPositions, labelRoom]);
+  }, [validatedEdges, fitViewToNodes, persistPositions, labelRoom]);
 
   // Hierarchical mode packs actual card sizes into compact dependency rows.
   // Pin both axes so repulsion cannot spread a finished row across the viewport.
