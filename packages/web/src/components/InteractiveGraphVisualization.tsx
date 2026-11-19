@@ -935,6 +935,12 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   activeLayoutScopeRef.current = layoutScope;
   useLayoutEffect(() => setLocalFocusRequest(undefined), [layoutScope]);
   const simulationLayoutScopeRef = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    const label = canEditCurrentGraph ? 'Quick edit' : 'Inspect';
+    const icons = d3.select(containerRef.current).selectAll<SVGGElement, WorkItem>('.node-edit-icon');
+    icons.attr('aria-label', node => `${label} ${node.title}`);
+    icons.select('title').text(canEditCurrentGraph ? 'Quick edit' : 'Inspect item');
+  }, [canEditCurrentGraph]);
   const positionSaveQueueRef = useRef(positionSaveQueue);
   positionSaveQueueRef.current = positionSaveQueue;
 
@@ -2879,7 +2885,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .attr('class', 'node-edit-icon')
       .attr('role', 'button')
       .attr('tabindex', 0)
-      .attr('aria-label', (d: WorkItem) => `Quick edit ${d.title}`)
+      .attr('aria-label', (d: WorkItem) => `${canEditCurrentGraphRef.current ? 'Quick edit' : 'Inspect'} ${d.title}`)
       .attr('data-node-id', (d: WorkItem) => d.id)
       .attr('transform', (d: WorkItem) => {
         const x = -getNodeDimensions(d).width / 2 + iconSize / 2 + 12;
@@ -2889,7 +2895,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .style('cursor', 'pointer')
       .style('opacity', (currentTransform?.k || 1) >= LOD_THRESHOLDS.FAR ? 0.85 : 0)
       .style('pointer-events', 'all');
-    editIcons.append('title').text('Quick edit'); // native hover tooltip
+    editIcons.append('title').text(canEditCurrentGraphRef.current ? 'Quick edit' : 'Inspect item'); // native hover tooltip
 
     // Edit icon background - scales with icon
     const editBg = editIcons.append('rect')
@@ -5172,7 +5178,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   useEffect(() => {
     quickEditReturnFocusIdRef.current = null;
     setQuickEditNode(null);
-  }, [currentGraphId]);
+  }, [layoutScope]);
 
   // Expose reset function to parent component
   useEffect(() => {
@@ -5866,7 +5872,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       })()}
 
       {/* #87: quick in-context node editor — anchored to the node, edits every
-          field with immediate optimistic saves + undo, no heavy modal. */}
+          field with immediate saves + undo, no heavy modal. */}
       {quickEditNode && (() => {
         const simNode = (simulationRef.current?.nodes() as any[])?.find((n: any) => n.id === quickEditNode.id);
         // Position from the live sim node, but field DATA (incl. freshly-saved
@@ -5881,23 +5887,43 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         const top = projected ? projected.top + projected.height / 2 - (frame?.top ?? 0) : gy * currentTransform.scale + currentTransform.y;
         // One item's saves go out in order, so a quick second change is not
         // overwritten by the first one landing late (createSerialQueue).
-        const save = (update: QuickEditCommit['update']) => quickEditWrites(quickEditNode.id, () =>
-          updateWorkItemMutation({ variables: { where: { id: quickEditNode.id }, update } }));
-        const onCommit = (c: QuickEditCommit) => {
-          save(c.update)
-            .then(() => {
-              undoStack.push({
-                label: c.label,
-                undo: async () => {
-                  await save(c.prev);
-                },
-              });
-            })
-            .catch(() => showError(`Could not ${c.label.toLowerCase()}`));
+        const save = (update: QuickEditCommit['update']) => quickEditWrites(quickEditNode.id, async () => {
+          if (!currentUser || !currentGraph || activeLayoutScopeRef.current !== layoutScope || !canEditCurrentGraphRef.current) {
+            throw new Error('This work item can no longer be edited.');
+          }
+          const result = await updateWorkItemMutation({
+            context: { expectedOwnerId: currentUser.id },
+            variables: { where: { id: quickEditNode.id, graph: { id: currentGraph.id } }, update },
+          });
+          const saved = result.data?.updateWorkItems?.workItems?.find((item: { id: string }) => item.id === quickEditNode.id);
+          if (result.errors?.length || !saved
+            || (update.type !== undefined && saved.type !== update.type)
+            || (update.status !== undefined && saved.status !== update.status)) {
+            throw new Error('The work item change was not saved.');
+          }
+          return { updatedAt: saved.updatedAt };
+        });
+        const onCommit = async (c: QuickEditCommit) => {
+          const generation = undoStack.generation;
+          try {
+            const saved = await save(c.update);
+            if (undoStack.generation === generation && activeLayoutScopeRef.current === layoutScope && canEditCurrentGraphRef.current) {
+              undoStack.push({ label: c.label, undo: async () => { await save(c.prev); } });
+            }
+            return saved;
+          } catch {
+            if (activeLayoutScopeRef.current === layoutScope) showError(`Could not ${c.label.toLowerCase()}`);
+            return null;
+          }
         };
         return (
-          <QuickEditSurface x={left + (containerRef.current?.getBoundingClientRect().left ?? 0)} y={top + (containerRef.current?.getBoundingClientRect().top ?? 0)} onClose={closeQuickEdit}>
-            <NodeQuickEdit key={quickEditNode.id} node={dataNode} onCommit={onCommit} onClose={closeQuickEdit} onOpenDetails={() => { quickEditReturnFocusIdRef.current = null; setQuickEditNode(null); handleEditNode(dataNode); }} />
+          <QuickEditSurface
+            x={left + (frame?.left ?? 0)} y={top + (frame?.top ?? 0)}
+            onClose={closeQuickEdit} label={canEditCurrentGraph ? 'Edit work item' : 'Inspect work item'}
+          >
+            {canEditCurrentGraph
+              ? <NodeQuickEdit key={JSON.stringify([layoutScope, quickEditNode.id])} node={dataNode} onCommit={onCommit} onClose={closeQuickEdit} onOpenDetails={() => { quickEditReturnFocusIdRef.current = null; setQuickEditNode(null); handleEditNode(dataNode); }} />
+              : <NodeInspector key={quickEditNode.id} node={dataNode} compact onClose={closeQuickEdit} />}
           </QuickEditSurface>
         );
       })()}
@@ -5920,7 +5946,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
             compact
             rootTestId="node-expand-inspector"
             onClose={closeExpandedNode}
-            onEdit={() => { expandedReturnFocusIdRef.current = null; setQuickEditNode(expandedNode); setExpandedNode(null); }}
+            onEdit={canEditCurrentGraph ? () => { expandedReturnFocusIdRef.current = null; setQuickEditNode(expandedNode); setExpandedNode(null); } : undefined}
             onConnect={canEditCurrentGraph ? () => { expandedReturnFocusIdRef.current = null; const from = expandedNode; setExpandedNode(null); setConnectionSource(from.id); setIsConnecting(true); } : undefined}
           />
         </div>,
