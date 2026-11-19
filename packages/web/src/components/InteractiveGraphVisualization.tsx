@@ -927,7 +927,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const positionSaveQueue = usePositionSaveQueue(
     position => saveNodePosition(position.id, position.x, position.y),
     message => showError('Layout needs attention', message || 'Check the layout save status before closing this tab. Return to this graph after reconnecting to retry pending positions.'),
-    canSaveLayout && currentUser && currentGraph ? { ownerId: currentUser.id, graphId: currentGraph.id } : null,
+    currentUser && currentGraph ? { ownerId: currentUser.id, graphId: currentGraph.id } : null,
+    canSaveLayout,
   );
   const layoutScope = currentUser && currentGraph ? JSON.stringify([currentUser.id, currentGraph.id]) : null;
   const activeLayoutScopeRef = useRef(layoutScope);
@@ -1252,7 +1253,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   // Remove unused handleEdgeClick to fix TypeScript warning
 
   const layoutRecoveryReady = !canSaveLayout || !!positionSaveQueue.state?.recovered || !!positionSaveQueue.error;
-  const pendingPositions = positionSaveQueue.state?.positions;
+  const pendingPositions = canSaveLayout ? positionSaveQueue.state?.positions : undefined;
   const workItems = useMemo<WorkItem[]>(() => {
     if (!layoutRecoveryReady) return [];
     const saved: WorkItem[] = workItemsData?.workItems || [];
