@@ -46,4 +46,40 @@ describe('live graph delete permissions', () => {
     await act(async () => { finishFirst(); await Promise.resolve(); });
     expect(state.deleteEdge).toHaveBeenCalledTimes(1);
   });
+
+  it.each([
+    ['all graph connections', 'unmount'],
+    ['one item’s connections', 'different graph'],
+    ['all graph connections', 'close and reopen'],
+  ])('stops deleting %s after %s while a request is pending', async (action, change) => {
+    let finishFirst!: () => void;
+    state.deleteEdge.mockImplementationOnce(() => new Promise<void>(resolve => { finishFirst = resolve; }));
+    const onClose = vi.fn();
+    const dialog = (isOpen: boolean, target = graph) => <DeleteGraphModal isOpen={isOpen} graph={target} onClose={onClose} />;
+    const view = render(dialog(true));
+    const button = action === 'all graph connections'
+      ? screen.getByRole('button', { name: 'Disconnect All Connections' })
+      : screen.getAllByRole('button', { name: /Disconnect First/ })[0];
+    fireEvent.click(button);
+    expect(state.deleteEdge).toHaveBeenCalledTimes(1);
+
+    if (change === 'unmount') view.unmount();
+    if (change === 'different graph') view.rerender(dialog(true, { ...graph, id: 'other' }));
+    if (change === 'close and reopen') {
+      view.rerender(dialog(false));
+      view.rerender(dialog(true));
+    }
+    await act(async () => { finishFirst(); });
+    expect(state.deleteEdge).toHaveBeenCalledTimes(1);
+  });
+
+  it('finishes disconnecting both edges when the same graph remains open', async () => {
+    const view = render(<DeleteGraphModal isOpen graph={graph} onClose={vi.fn()} />);
+    let finishFirst!: () => void;
+    state.deleteEdge.mockImplementationOnce(() => new Promise<void>(resolve => { finishFirst = resolve; }));
+    fireEvent.click(screen.getByRole('button', { name: 'Disconnect All Connections' }));
+    view.rerender(<DeleteGraphModal isOpen graph={{ ...graph }} onClose={vi.fn()} />);
+    await act(async () => { finishFirst(); });
+    expect(state.deleteEdge.mock.calls.map(([request]) => request.variables.where.id)).toEqual(['e1', 'e2']);
+  });
 });

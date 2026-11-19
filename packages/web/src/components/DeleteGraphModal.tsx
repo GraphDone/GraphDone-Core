@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import { X, Trash2, GitBranch, Shield } from 'lucide-react';
 import { AlertTriangle, CheckCircle, WORK_ITEM_TYPES } from '../constants/workItemConstants';
@@ -24,8 +24,11 @@ export function DeleteGraphModal({ isOpen, onClose, graph }: DeleteGraphModalPro
   const { currentGraph, deleteGraph, canDeleteGraph } = useGraph();
   const targetGraph = graph ?? currentGraph;
   const deleteAllowed = !!targetGraph && canDeleteGraph(targetGraph.id);
-  const deleteAllowedRef = useRef(deleteAllowed);
-  deleteAllowedRef.current = deleteAllowed;
+  const activeDeleteDialog = useRef<symbol | null>(null);
+  useLayoutEffect(() => {
+    if (isOpen && deleteAllowed) activeDeleteDialog.current = Symbol();
+    return () => { activeDeleteDialog.current = null; };
+  }, [isOpen, targetGraph?.id, deleteAllowed]);
   // Asked of the backend each time: another tab may have added a graph inside since this tab's list was read.
   const { data: insideData, loading: loadingInside } = useQuery(GET_CHILD_GRAPHS, {
     variables: targetGraph ? { id: targetGraph.id } : undefined,
@@ -149,7 +152,7 @@ export function DeleteGraphModal({ isOpen, onClose, graph }: DeleteGraphModalPro
   }, [deleteAllowed, isOpen, onClose, targetGraph]);
 
   const handleDeleteNode = async (nodeId: string, nodeTitle: string) => {
-    if (!deleteAllowedRef.current || !inspectionReady || nodeConnections[nodeId]?.length) return;
+    if (!activeDeleteDialog.current || !inspectionReady || nodeConnections[nodeId]?.length) return;
     try {
       await deleteWorkItem({
         variables: { 
@@ -170,22 +173,25 @@ export function DeleteGraphModal({ isOpen, onClose, graph }: DeleteGraphModalPro
     }
   };
 
+  // A completed request may resume after the dialog was closed or switched graphs.
+  const disconnectEdges = async (edgeIds: Iterable<string>) => {
+    const dialog = activeDeleteDialog.current;
+    if (!dialog) return false;
+    for (const id of edgeIds) {
+      if (activeDeleteDialog.current !== dialog) return false;
+      await deleteEdge({ variables: { where: { id } } });
+    }
+    return activeDeleteDialog.current === dialog;
+  };
+
   const handleDisconnectAllNodeConnections = async (nodeId: string, nodeTitle: string) => {
-    if (!deleteAllowedRef.current || !inspectionReady) return;
+    if (!activeDeleteDialog.current || !inspectionReady) return;
     const connections = nodeConnections[nodeId] || [];
     if (connections.length === 0) return;
 
     try {
-      // Disconnect all edges for this node
-      for (const conn of connections) {
-        if (!deleteAllowedRef.current) return;
-        await deleteEdge({
-          variables: { 
-            where: { id: conn.id }
-          }
-        });
-      }
-      
+      if (!(await disconnectEdges(connections.map(connection => connection.id)))) return;
+
       showSuccess(
         'All Connections Removed!',
         `Disconnected all ${connections.length} connection${connections.length !== 1 ? 's' : ''} from "${nodeTitle}".`
@@ -200,7 +206,7 @@ export function DeleteGraphModal({ isOpen, onClose, graph }: DeleteGraphModalPro
   };
 
   const handleDisconnectEdge = async (edgeId: string, sourceTitle: string, targetTitle: string) => {
-    if (!deleteAllowedRef.current || !inspectionReady) return;
+    if (!activeDeleteDialog.current || !inspectionReady) return;
     try {
       await deleteEdge({
         variables: { 
@@ -226,7 +232,7 @@ export function DeleteGraphModal({ isOpen, onClose, graph }: DeleteGraphModalPro
   const isConfirmValid = confirmText === targetGraph.name;
 
   const handleDelete = async () => {
-    if (!deleteAllowedRef.current || !inspectionReady || !isConfirmValid) return;
+    if (!activeDeleteDialog.current || !inspectionReady || !isConfirmValid) return;
     
     setLoading(true);
     const graphName = targetGraph.name; // Store name before deletion
@@ -360,7 +366,7 @@ export function DeleteGraphModal({ isOpen, onClose, graph }: DeleteGraphModalPro
                       <div className="mb-4">
                         <button
                           onClick={async () => {
-                            if (!deleteAllowedRef.current || !inspectionReady) return;
+                            if (!activeDeleteDialog.current || !inspectionReady) return;
                             try {
                               // Get all unique edge IDs
                               const allEdgeIds = new Set<string>();
@@ -368,14 +374,8 @@ export function DeleteGraphModal({ isOpen, onClose, graph }: DeleteGraphModalPro
                                 connections.forEach(conn => allEdgeIds.add(conn.id));
                               });
                               
-                              // Disconnect all edges at once
-                              for (const edgeId of allEdgeIds) {
-                                if (!deleteAllowedRef.current) return;
-                                await deleteEdge({
-                                  variables: { where: { id: edgeId } }
-                                });
-                              }
-                              
+                              if (!(await disconnectEdges(allEdgeIds))) return;
+
                               showSuccess(
                                 'All Connections Removed!',
                                 `Disconnected all ${allEdgeIds.size} connection${allEdgeIds.size !== 1 ? 's' : ''} in the graph.`
@@ -418,14 +418,14 @@ export function DeleteGraphModal({ isOpen, onClose, graph }: DeleteGraphModalPro
                             <div className="flex gap-2">
                               <button
                                 onClick={async () => {
-                                  if (!deleteAllowedRef.current || !inspectionReady) return;
+                                  if (!activeDeleteDialog.current || !inspectionReady) return;
                                   const unconnectedNodes = nodes.filter(node => !(nodeConnections[node.id]?.length > 0));
                                   const unconnectedNodeCount = unconnectedNodes.length;
                                   
                                   try {
                                     // Bulk delete all unconnected nodes in single operation
                                     const nodeIds = unconnectedNodes.map(node => node.id);
-                                    if (!deleteAllowedRef.current) return;
+                                    if (!activeDeleteDialog.current) return;
                                     const result = await deleteWorkItem({
                                       variables: { 
                                         where: { 
