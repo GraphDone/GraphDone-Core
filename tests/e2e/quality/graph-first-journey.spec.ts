@@ -1,4 +1,4 @@
-import {test,expect} from '@playwright/test';
+import {test,expect,type Route} from '@playwright/test';
 import {login,TEST_USERS} from '../../lib/auth';
 import {gql} from '../../lib/graphRequest';
 
@@ -21,8 +21,52 @@ test('build, arrange and update a graph entirely through its UI @graphfirst',asy
   await node.locator('.node-relationship-icon').click();await expect(page.getByText('Click empty space to grow',{exact:false})).toBeVisible();
   const spot=await page.evaluate(()=>[[400,350],[600,600],[1000,350]].find(([x,y])=>document.elementFromPoint(x,y)?.classList.contains('background')));
   expect(spot,'a reachable empty canvas point is required').toBeTruthy();await page.mouse.click(spot![0],spot![1]);
-  await page.getByTestId('inline-rename').fill('Review the demo together');await page.getByTestId('inline-rename').press('Enter');
-  await expect.poll(async()=>(await read()).workItems.length).toBe(2);await expect.poll(async()=>(await read()).edges.length).toBe(1);
+  const rename = page.getByTestId('inline-rename');
+  const original = await rename.inputValue();
+  const renamed = 'Review the demo together';
+  const grown = await read();
+  expect(grown.workItems).toHaveLength(2);
+  const child = grown.workItems.find((item: { id: string }) => item.id !== before.id);
+  expect(grown.edges).toEqual([{ id: expect.any(String), source: { id: child.id }, target: { id: before.id } }]);
+  const readChild = async () => {
+    const state = await read();
+    return { title: state.workItems.find((item: { id: string }) => item.id === child.id)?.title, edges: state.edges };
+  };
+
+  let releaseRefetch!: () => void;
+  const pending = new Promise<void>(resolve => { releaseRefetch = resolve; });
+  let sawRename = false;
+  let continueRefetch: Promise<void> | undefined;
+  const holdRenameRefetch = async (route: Route) => {
+    const body = route.request().method() === 'POST' ? route.request().postDataJSON() : undefined;
+    if (body?.operationName === 'UpdateWorkItems' && body.variables?.where?.id === child.id && body.variables?.update?.title === renamed) sawRename = true;
+    const scope = body?.variables?.where?.OR;
+    if (sawRename && !continueRefetch && body?.operationName === 'GetEdges' && scope?.some((end: { source?: { graph?: { id: string } } }) => end.source?.graph?.id === graph)) {
+      continueRefetch = pending.then(() => route.continue());
+      return continueRefetch;
+    }
+    return route.continue();
+  };
+  await page.route('**/api/graphql', holdRenameRefetch);
+  try {
+    await rename.fill(renamed);
+    await rename.press('Enter');
+    await expect.poll(readChild).toEqual({ title: renamed, edges: grown.edges });
+    await expect(page.getByRole('button', { name: `Quick edit ${renamed}`, exact: true })).toBeVisible();
+    await expect.poll(() => Boolean(continueRefetch)).toBe(true);
+    await page.keyboard.press('Control+z');
+    await expect.poll(readChild).toEqual({ title: original, edges: grown.edges });
+  } finally {
+    releaseRefetch();
+    await continueRefetch;
+    await page.unroute('**/api/graphql', holdRenameRefetch);
+  }
+
+  await page.getByRole('button', { name: `Quick edit ${original}`, exact: true }).click();
+  await page.getByTestId('quick-title').fill(renamed);
+  await page.getByTestId('quick-title').press('Enter');
+  await expect.poll(readChild).toEqual({ title: renamed, edges: grown.edges });
+  await page.getByRole('button', { name: 'Close quick edit', exact: true }).click();
   await page.locator('.graph-container .node').filter({hasText:'Prepare'}).locator('.node-edit-icon').click();await page.getByTestId('quick-note-input').fill('Ready for a teammate to review.');await page.getByTestId('quick-note-add').click();await page.getByTestId('quick-status').getByRole('button',{name:'In Review',exact:true}).click();
   await expect.poll(async()=>(await read()).workItems.find((n:any)=>n.id===before.id).status).toBe('IN_REVIEW');await page.keyboard.press('Escape');
   await page.reload();await expect(page.locator('.graph-container .node')).toHaveCount(2);
