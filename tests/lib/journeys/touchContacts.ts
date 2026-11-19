@@ -66,7 +66,7 @@ export async function visibleTileCenter(page: Page, tile: Locator, halfSpan = 0)
         const start = { x: canvas.x + fx * canvas.width, y: canvas.y + fy * canvas.height };
         const end = { x: start.x + dx, y: start.y + dy };
         const target = hit(start.x, start.y);
-        if (target?.closest('svg') !== svg || target.closest('[data-zoom-tile], [role="button"], .node, .edge, [data-lod-controls]')) continue;
+        if (target !== svg && !(target?.matches('rect.background') && svg.contains(target))) continue;
         if (inside(end.x, end.y) && hit(end.x, end.y)?.closest('svg') === svg) return { start, end };
       }
       throw new Error('No visible canvas background is available to pan toward the sibling graph.');

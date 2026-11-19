@@ -77,17 +77,31 @@ test('JOURNEY zoom-out: pinching into a sibling opens that graph on a phone', as
   };
   await resetOverview('cross-tile contacts');
   const fixTile = () => page.getByRole('button', { name: /^Fix bugs graph, \d+ items?$/ });
-  const tileCenter = async (tile: ReturnType<typeof fixTile>) => {
-    const box = (await tile.boundingBox())!;
-    return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
-  };
-
-  // Contacts split across sibling tiles have a background centroid and must
-  // remain a canvas pinch, never whichever per-tile listener happens to fire.
-  const fixCenter = await tileCenter(fixTile());
-  const ideasCenter = await tileCenter(page.getByRole('button', { name: /^Ideas graph, \d+ items?$/ }));
-  const splitCenter = { x: (fixCenter.x + ideasCenter.x) / 2, y: (fixCenter.y + ideasCenter.y) / 2 };
-  expect(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest('[data-zoom-tile]'), splitCenter)).toBeNull();
+  // Start on two distinct sibling tiles whose midpoint is actual empty canvas.
+  const ids = await Promise.all([
+    fixTile().getAttribute('data-zoom-tile'),
+    page.getByRole('button', { name: /^Ideas graph, \d+ items?$/ }).getAttribute('data-zoom-tile'),
+  ]);
+  const [fixCenter, ideasCenter, splitCenter] = await page.evaluate(([fixId, ideasId]) => {
+    const svg = document.querySelector('.graph-container svg:has(g.main-graph-group)')!;
+    const points = (id: string | null) => {
+      const tile = svg.querySelector(`[data-zoom-tile="${id}"]`)!;
+      const box = tile.querySelector('.zoom-tile-bg')!.getBoundingClientRect();
+      const visible = [];
+      for (const fy of [0.5, 0.25, 0.75]) for (const fx of [0.5, 0.25, 0.75]) {
+        const x = Math.round(box.x + box.width * fx), y = Math.round(box.y + box.height * fy);
+        if (document.elementFromPoint(x, y)?.closest('[data-zoom-tile]') === tile) visible.push({ x, y });
+      }
+      return visible;
+    };
+    const first = points(fixId), second = points(ideasId);
+    for (const a of first) for (const b of second) {
+      const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      const hit = document.elementFromPoint(mid.x, mid.y);
+      if (hit === svg || hit?.matches('rect.background') && svg.contains(hit)) return [a, b, mid];
+    }
+    throw new Error('No visible Fix bugs and Ideas contacts with a blank canvas midpoint.');
+  }, ids);
   await touchGesture(page, [[fixCenter, ideasCenter], [
     { x: splitCenter.x + (fixCenter.x - splitCenter.x) * 1.25, y: splitCenter.y + (fixCenter.y - splitCenter.y) * 1.25 },
     { x: splitCenter.x + (ideasCenter.x - splitCenter.x) * 1.25, y: splitCenter.y + (ideasCenter.y - splitCenter.y) * 1.25 },
@@ -96,10 +110,15 @@ test('JOURNEY zoom-out: pinching into a sibling opens that graph on a phone', as
 
   await resetOverview('background');
   const background = await page.evaluate(() => {
-    const box = document.querySelector('.graph-container')!.getBoundingClientRect();
-    for (const fy of [0.2, 0.5, 0.8]) for (const fx of [0.2, 0.5, 0.8]) {
-      const x = box.x + box.width * fx, y = box.y + box.height * fy;
-      if (!document.elementFromPoint(x, y)?.closest('[data-zoom-tile]')) return { x, y };
+    const svg = document.querySelector('.graph-container svg:has(g.main-graph-group)')!;
+    const box = svg.getBoundingClientRect();
+    for (const fy of [0.2, 0.5, 0.8, 0.1, 0.35, 0.65, 0.9]) for (const fx of [0.2, 0.5, 0.8]) {
+      const x = Math.round(box.x + box.width * fx), y = Math.round(box.y + box.height * fy);
+      const blank = [-20, 0, 20].every(offset => {
+        const hit = document.elementFromPoint(x + offset, y);
+        return hit === svg || hit?.matches('rect.background') && svg.contains(hit);
+      });
+      if (blank) return { x, y };
     }
     throw new Error('no overview background point');
   });
