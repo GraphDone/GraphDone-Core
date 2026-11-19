@@ -743,3 +743,58 @@ test('opening an overlapping saved layout preserves its coordinates and still pl
   await page.getByRole('button', { name: 'Organize around connections', exact: true }).click();
   await expect.poll(() => Promise.all([first, second].map(id => readSaved(page, graph.graphId, id)))).not.toEqual(original);
 });
+
+test('remote position-only edits repaint a repaired card and its wire across refetches @layout-recovery', async ({ page, ownedGraphIds }) => {
+  await login(page, TEST_USERS.ADMIN);
+  const graph = await ownedGraphIds.seed({ size: 2, spacing: 20, edgeFactor: 0.5, namePrefix: 'Remote layout refresh' });
+  await openGraph(page, graph.graphId);
+  await expect.poll(() => page.evaluate(() => (window as any).__layoutMetrics?.()?.cameraReady)).toBe(true);
+  const cards = page.locator('.graph-container svg .node');
+  const positions = await cards.evaluateAll(elements => elements.map(element => {
+    const node = (element as any).__data__;
+    const matrix = (element as SVGGraphicsElement).transform.baseVal.consolidate()!.matrix;
+    return { id: node.id as string, savedX: node.positionX, savedY: node.positionY, x: matrix.e, y: matrix.f };
+  }));
+  const repaired = positions.find(card => Math.abs(card.x - card.savedX) > 1 || Math.abs(card.y - card.savedY) > 1);
+  expect(repaired, 'Fixture must exercise a saved card visually moved to avoid overlap').toBeDefined();
+  const card = cards.filter({ has: page.locator(`[data-node-id="${repaired!.id}"]`) });
+  const wire = page.locator('.graph-container .edges-group path.edge');
+  await expect(wire).toHaveCount(1);
+  const originalRoute = await wire.getAttribute('d');
+  expect(originalRoute).toBeTruthy();
+
+  const remote = { x: 563, y: 324 };
+  await gql(page, 'mutation($id:ID!,$graph:ID!,$x:Float!,$y:Float!){updateWorkItems(where:{id:$id,graph:{id:$graph}},update:{positionX:$x,positionY:$y}){workItems{id}}}', { id: repaired!.id, graph: graph.graphId, ...remote });
+  expect(await readSaved(page, graph.graphId, repaired!.id)).toEqual(remote);
+
+  for (let refresh = 0; refresh < 2; refresh++) {
+    const fetched = page.waitForResponse(response => {
+      if (response.request().method() !== 'POST' || !response.url().endsWith('/api/graphql')) return false;
+      const body = response.request().postDataJSON();
+      return body?.operationName === 'GetWorkItems' && body.variables?.where?.graph?.id === graph.graphId;
+    });
+    await page.evaluate(() => window.dispatchEvent(new Event('graphdone-sync-refresh')));
+    const reply = await (await fetched).json();
+    expect(reply.data.workItems.find((item: { id: string }) => item.id === repaired!.id))
+      .toMatchObject({ positionX: remote.x, positionY: remote.y });
+    await expect.poll(() => card.evaluate(element => {
+      const matrix = (element as SVGGraphicsElement).transform.baseVal.consolidate()!.matrix;
+      return { x: matrix.e, y: matrix.f };
+    })).toEqual(remote);
+    await expect(wire).not.toHaveAttribute('d', originalRoute!);
+    await expect.poll(() => page.evaluate(id => {
+      const group = Array.from(document.querySelectorAll<SVGGElement>('.graph-container g.node'))
+        .find(element => (element as any).__data__.id === id)!;
+      const cardBounds = group.querySelector<SVGGraphicsElement>('.node-bg')!.getBoundingClientRect();
+      const path = document.querySelector<SVGPathElement>('.graph-container .edges-group path.edge')!;
+      return [0, path.getTotalLength()].some(distance => {
+        const point = path.getPointAtLength(distance).matrixTransform(path.getScreenCTM()!);
+        const dx = Math.max(cardBounds.left - point.x, 0, point.x - cardBounds.right);
+        const dy = Math.max(cardBounds.top - point.y, 0, point.y - cardBounds.bottom);
+        const border = Math.min(Math.abs(point.x - cardBounds.left), Math.abs(point.x - cardBounds.right),
+          Math.abs(point.y - cardBounds.top), Math.abs(point.y - cardBounds.bottom));
+        return Math.hypot(dx, dy) <= 2 && border <= 2;
+      });
+    }, repaired!.id)).toBe(true);
+  }
+});
