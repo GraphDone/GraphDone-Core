@@ -114,16 +114,47 @@ function Tile({ id, openId = id, rect, k, name, detail, viewportShort, interacti
     const el = ref.current;
     if (!el || !interactive || kind !== 'graph') return;
     // Zooming in over a tile that already fills much of the screen opens it:
-    // the person is diving into that graph. (d3's zoom stops wheel events at
-    // the SVG, so this listens on the tile itself.)
+    // the person is diving into that graph. D3 owns the wheel/touch gesture on
+    // the SVG, so observe it here without preventing the camera movement.
     let opened = false; // one gesture opens the graph once
-    const wheel = (event: WheelEvent) => {
-      if (opened || event.deltaY >= 0 || sizeRef.current < 0.42 * viewportShort) return;
+    const openWhenLarge = () => {
+      if (opened || sizeRef.current < 0.42 * viewportShort) return;
       opened = true;
       openRef.current(openId);
     };
+    const wheel = (event: WheelEvent) => {
+      if (event.deltaY < 0) openWhenLarge();
+    };
+    let previousTouchDistance = 0;
+    let initialTouchDistance = 0;
+    let initialTouchSize = 0;
+    const touchDistance = (event: TouchEvent) => event.touches.length > 1
+      ? Math.hypot(event.touches[0].clientX - event.touches[1].clientX, event.touches[0].clientY - event.touches[1].clientY)
+      : 0;
+    const touchstart = (event: TouchEvent) => {
+      previousTouchDistance = touchDistance(event);
+      if (previousTouchDistance) {
+        initialTouchDistance = previousTouchDistance;
+        initialTouchSize = sizeRef.current;
+      }
+    };
+    const touchmove = (event: TouchEvent) => {
+      const distance = touchDistance(event);
+      if (!opened && distance > previousTouchDistance && initialTouchDistance &&
+          initialTouchSize * distance / initialTouchDistance >= 0.42 * viewportShort) {
+        opened = true;
+        openRef.current(openId);
+      }
+      previousTouchDistance = distance;
+    };
     el.addEventListener('wheel', wheel, { passive: true });
-    return () => el.removeEventListener('wheel', wheel);
+    el.addEventListener('touchstart', touchstart, { passive: true });
+    el.addEventListener('touchmove', touchmove, { passive: true });
+    return () => {
+      el.removeEventListener('wheel', wheel);
+      el.removeEventListener('touchstart', touchstart);
+      el.removeEventListener('touchmove', touchmove);
+    };
   }, [openId, interactive, kind, viewportShort]);
   const radius = 14 / k;
   // A top-level graph with no graphs inside is shown beside the projects but is

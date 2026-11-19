@@ -92,6 +92,76 @@ async function settle(page: Page) {
   return { level, scale: await camera(page), labels: await readableLabels(page) };
 }
 
+async function pinch(page: Page, center: { x: number; y: number }, from: number, to: number) {
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+  const points = (distance: number) => [
+    { x: Math.round(center.x - distance), y: Math.round(center.y), id: 1, radiusX: 2, radiusY: 2, force: 1 },
+    { x: Math.round(center.x + distance), y: Math.round(center.y), id: 2, radiusX: 2, radiusY: 2, force: 1 },
+  ];
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: points(from) });
+  for (let step = 1; step <= 8; step++) {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: points(from + (to - from) * step / 8) });
+    await page.waitForTimeout(30);
+  }
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await cdp.detach();
+  await page.waitForTimeout(400);
+}
+
+async function localSourcePositions(page: Page) {
+  return page.evaluate(() => new Promise<Record<string, { x?: number; y?: number }>>((resolve, reject) => {
+    const open = indexedDB.open('graphdone-offline', 1);
+    open.onerror = () => reject(open.error);
+    open.onsuccess = () => {
+      const request = open.result.transaction('accounts').objectStore('accounts').getAll();
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(Object.fromEntries(request.result.flatMap((account: any) =>
+        Object.values(account.projects || {}).flatMap((project: any) =>
+          (project.local?.nodes || []).map((node: any) => [node.id, { x: node.position_x, y: node.position_y }])))));
+    };
+  }));
+}
+
+test('JOURNEY zoom-out: pinching into a sibling opens that graph on a phone', async ({ page }, info) => {
+  test.skip(info.project.name !== 'journeys-iphone' || backend !== 'hosted-guest', 'real Chromium phone touch and browser-local starter workspace');
+  test.setTimeout(120_000);
+  await enterWelcome(page);
+  const sourcePositions = await localSourcePositions(page);
+  const originalGraphId = await page.evaluate(() => localStorage.getItem('currentGraphId'));
+  const area = (await page.locator('.graph-container').boundingBox())!;
+
+  // A two-finger pinch inward reaches the sibling overview without a mouse.
+  await pinch(page, { x: area.x + area.width / 2, y: area.y + area.height / 2 }, 120, 40);
+  await expect(page.locator('.graph-container')).toHaveAttribute('data-zoom-level', '2');
+
+  const tile = page.getByRole('button', { name: /^Fix bugs graph, \d+ items?$/ });
+  const target = (await tile.boundingBox())!;
+  const center = { x: target.x + target.width / 2, y: target.y + target.height / 2 };
+  expect(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest('[data-zoom-tile]')?.getAttribute('data-zoom-tile'), center))
+    .toBe(await tile.getAttribute('data-zoom-tile'));
+  const targetId = await tile.getAttribute('data-zoom-tile');
+  const cameraBefore = await camera(page);
+
+  // The reverse gesture dives into the tile under its fixed centroid, just as
+  // a wheel zoom or tap does. It is navigation only: source coordinates stay put.
+  await pinch(page, center, 20, 65);
+  await expect(selector(page)).toContainText('Fix bugs', { timeout: 15_000 });
+  expect(await page.evaluate(() => localStorage.getItem('currentGraphId'))).toBe(targetId);
+  const afterPositions = await localSourcePositions(page);
+  for (const [id, position] of Object.entries(sourcePositions)) expect(afterPositions[id], `source position changed for ${id}`).toEqual(position);
+  await evidence(info, 'pinch-sibling-receipt.json', JSON.stringify({
+    viewport: await page.evaluate(() => ({ width: innerWidth, height: innerHeight, touchPoints: navigator.maxTouchPoints })),
+    inputCenter: center,
+    hitGraphId: targetId,
+    originalGraphId,
+    selectedGraphId: await page.evaluate(() => localStorage.getItem('currentGraphId')),
+    camera: { before: cameraBefore, after: await camera(page) },
+    preservedSourcePositions: Object.keys(sourcePositions).length,
+  }, null, 2), 'application/json');
+  await evidence(info, 'pinch-sibling-opened.png', await page.screenshot(), 'image/png');
+});
+
 test('JOURNEY zoom-out: every level is labelled, from items to projects', async ({ page }, info) => {
   test.setTimeout(240_000);
   const writes: string[] = [];
