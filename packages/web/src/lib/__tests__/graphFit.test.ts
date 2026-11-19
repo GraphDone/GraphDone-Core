@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeGraphFit, fitRegions } from '../graphFit';
+import { collectMiniMapPositions, computeGraphFit, fitRegions } from '../graphFit';
 import { graphItemLayout, type TextMeasure } from '../graphSymbolLayout';
 
 const measure: TextMeasure = (text, size) => Array.from(text).length * size * 0.55;
@@ -85,7 +85,34 @@ describe('graph camera fit', () => {
     expect(fitRegions(100, 100, [{ left: 0, top: 0, right: 0, bottom: 10 }])).toEqual([{ x: 0, y: 0, width: 100, height: 100 }]);
   });
 
+  it('keeps fitted cards out of a bottom-right minimap obstacle', () => {
+    const cards = [card('Top-left task', 0, 0), card('Bottom-right task', 1200, 800)];
+    const obstacle = { left: 1100, top: 530, right: 1440, bottom: 900 };
+    const fit = computeGraphFit({ width: 1440, height: 900, obstacles: [obstacle], cards, dimensionsAt })!;
+    for (const item of cards) {
+      const size = dimensionsAt(item, fit.scale);
+      const rect = {
+        left: fit.translateX + (item.x - size.width / 2) * fit.scale,
+        right: fit.translateX + (item.x + size.width / 2) * fit.scale,
+        top: fit.translateY + (item.y - size.height / 2) * fit.scale,
+        bottom: fit.translateY + (item.y + size.height / 2) * fit.scale,
+      };
+      expect(rect.right <= obstacle.left || rect.left >= obstacle.right || rect.bottom <= obstacle.top || rect.top >= obstacle.bottom).toBe(true);
+    }
+  });
+
   it('returns null until a card has a position', () => {
     expect(computeGraphFit({ width: 390, height: 844, obstacles: [], cards: [{ ...card('x'), x: Number.NaN }], dimensionsAt })).toBeNull();
+  });
+
+  it('publishes late frozen-simulation nodes without requiring a tick', () => {
+    const first = collectMiniMapPositions([{ id: 'old', x: 10, y: 20, type: 'TASK' }]);
+    expect(first.positions).toEqual({ old: { x: 10, y: 20 } });
+    const late = collectMiniMapPositions([
+      { id: 'old', x: 10, y: 20, type: 'TASK' },
+      { id: 'late', x: 90, y: 110, type: 'NOTE' },
+    ]);
+    expect(late.positions.late).toEqual({ x: 90, y: 110 });
+    expect(late.types.late).toBe('NOTE');
   });
 });

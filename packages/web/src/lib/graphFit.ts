@@ -25,7 +25,6 @@ export interface FitObstacle {
   right: number;
   bottom: number;
 }
-
 export interface GraphFitInput<T extends FitPoint> {
   /** Size of the camera viewport in screen pixels. */
   width: number;
@@ -174,4 +173,18 @@ export function computeGraphFit<T extends FitPoint>({
     translateY: region.y + region.height / 2 - ((bounds.minY + bounds.maxY) / 2) * scale,
     region,
   };
+}
+export type MiniMapSimulationNode = { id: string; x?: number; y?: number; type?: string };
+
+/** Build a complete Mini-Map payload even when the simulation is no longer ticking. */
+export function collectMiniMapPositions(nodes: readonly MiniMapSimulationNode[]) {
+  const positions: Record<string, { x: number; y: number }> = {};
+  const types: Record<string, string> = {};
+  for (const node of nodes) {
+    if (node.x !== undefined && node.y !== undefined) {
+      positions[node.id] = { x: node.x, y: node.y };
+      if (node.type !== undefined) types[node.id] = node.type;
+    }
+  }
+  return { positions, types };
 }

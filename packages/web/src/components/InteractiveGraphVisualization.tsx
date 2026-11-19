@@ -60,7 +60,7 @@ import { mergeSimulationNodes, mergeSimulationEdges } from '../lib/graphDataMerg
 import type { ObstacleBox } from '../lib/edgeLabelLayout';
 import { createParallelEdgeRoute, edgeRouteLabel, edgeRouteArrowBounds, edgeSegmentHitsBox, projectEdgeRoutePointer, type EdgeRouteGeometry, type EdgeRouteLabel } from '../lib/edgeRouteGeometry';
 import { PerfMeter, DriftMeter } from '../lib/perfMeter';
-import { computeGraphFit } from '../lib/graphFit';
+import { computeGraphFit, collectMiniMapPositions, type MiniMapSimulationNode } from '../lib/graphFit';
 import { appendNodeControlGlyph, nodeControlGlyphTransform } from '../lib/nodeControlIcons';
 import { graphItemLayout, itemTitleScale, measureGraphText, edgeLabelDimensions, GRAPH_FONT_FAMILY, ITEM_TITLE_SIZE, ITEM_TITLE_LINE, ITEM_HEADER_HEIGHT, EDGE_LABEL_SIZE, ITEM_WIRE_WIDTH } from '../lib/graphSymbolLayout';
 import { placeItemLabels } from '../lib/edgeLabelPlacement';
@@ -258,7 +258,12 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const fittedGraphsRef = useRef<Set<string>>(new Set());
   const cameraSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cameraManuallyPositionedRef = useRef(false);
-  useEffect(() => { cameraManuallyPositionedRef.current = false; }, [currentGraph?.id]);
+  const cameraInteractionEpochRef = useRef(0);
+  const markCameraManual = useCallback(() => {
+    cameraManuallyPositionedRef.current = true;
+    cameraInteractionEpochRef.current += 1;
+  }, []);
+  useEffect(() => { cameraManuallyPositionedRef.current = false; cameraInteractionEpochRef.current += 1; }, [currentGraph?.id]);
   // Mirrors isSimplified for the d3 tick closure (which captures stale render
   // values otherwise). Lets updateEdgePositions skip hidden arrow/label work.
   const simplifiedRef = useRef(false);
@@ -541,7 +546,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     const item = simulationRef.current?.nodes().find(node => node.id === id);
     const svg = svgRef.current, container = containerRef.current, zoom = zoomBehaviorRef.current;
     if (!item || !svg || !container || !zoom) return;
-    cameraManuallyPositionedRef.current = true;
+    markCameraManual();
     if (currentGraphIdRef.current) fittedGraphsRef.current.add(currentGraphIdRef.current);
     const k = saved?.scale ?? Math.max(0.65, d3.zoomTransform(svg).k);
     const transform = d3.zoomIdentity.translate(saved?.x ?? container.clientWidth / 2 - item.x * k, saved?.y ?? container.clientHeight / 2 - item.y * k).scale(k);
@@ -1805,6 +1810,18 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     return layout;
   }, [getNodeDimensions]);
 
+  // Publish only after the live simulation has received the current dataset.
+  // This is also used by the frozen-data update path, where no later tick is
+  // guaranteed to refresh Mini-Map dots.
+  const publishMiniMapPositions = useCallback(() => {
+    const sim = simulationRef.current;
+    const upd = (window as { updateMiniMapPositions?: (p: Record<string, { x: number; y: number }>) => void }).updateMiniMapPositions;
+    if (!sim || !upd) return;
+    const { positions, types } = collectMiniMapPositions(sim.nodes() as MiniMapSimulationNode[]);
+    upd(positions);
+    (window as { updateMiniMapTypes?: (t: Record<string, string>) => void }).updateMiniMapTypes?.(types);
+  }, []);
+
   // Smart data update function - only reinitializes when necessary, preserves camera position
   const updateVisualizationData = useCallback(() => {
     if (!simulationRef.current || !svgRef.current) return;
@@ -1860,6 +1877,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         }
     });
     simulation.nodes(nodeMerge.nodes as any);
+    publishMiniMapPositions();
     const linkForce = simulation.force('link') as d3.ForceLink<any, any>;
     if (linkForce) {
       const edgeMerge = mergeSimulationEdges(
@@ -1905,7 +1923,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       simulation.alpha(0.1).restart();
     }
 
-  }, [nodes, validatedEdges, getNodeDimensions]);
+  }, [nodes, validatedEdges, getNodeDimensions, publishMiniMapPositions]);
 
   // Define initializeVisualization function with access to nodes data
   const initializeVisualization = useCallback(() => {
@@ -4001,7 +4019,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       // must not mark the new graph as placed, or it would skip its fit.
       const switching = performance.now() < zoomSwitchUntilRef.current;
       if (event.sourceEvent && !switching) {
-        cameraManuallyPositionedRef.current = true;
+        markCameraManual();
         if (currentGraphIdRef.current) fittedGraphsRef.current.add(currentGraphIdRef.current);
       }
       g.attr('transform', event.transform);
@@ -4078,6 +4096,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .alpha(hasUnpinnedNodes ? DEFAULT_PHYSICS.alpha.loadEnergy : 0)
       .alphaDecay(DEFAULT_PHYSICS.alpha.decay)
       .restart();
+    // Publish only after restored positions, force configuration, and the
+    // frozen/active state are all final for this dataset.
+    publishMiniMapPositions();
 
     // When the layout settles: record settle time, persist the arrangement so
     // it's durable across reloads, run a final edge-label de-overlap pass, and
@@ -4146,7 +4167,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     }
     itemPresentation.refresh();
     setTimeout(() => { if (simulationRef.current === simulation) updateEdgePositions(true); }, 500);
-  }, [nodes, validatedEdges, handleNodeClick, initializeEmptyVisualization]); // Include handleNodeClick to get fresh connection state
+  }, [nodes, validatedEdges, handleNodeClick, initializeEmptyVisualization, markCameraManual]); // Include handleNodeClick to get fresh connection state
 
   // One-shot layout instrumentation + the forced label-avoidance hook.
   const layoutStartRef = useRef<number | null>(null);
@@ -4188,12 +4209,12 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     setSelectedNode(item);
     setSelectedNodes(new Set([id]));
     setEditingEdge(null);
-    cameraManuallyPositionedRef.current = true;
+    markCameraManual();
     fittedGraphsRef.current.add(currentGraphIdRef.current);
     const k = 1.2;
     const transform = d3.zoomIdentity.translate(containerRef.current.clientWidth / 2 - item.x * k, containerRef.current.clientHeight / 2 - item.y * k).scale(k);
     d3.select(svgRef.current).interrupt().call(zoomBehaviorRef.current.transform, transform);
-  }, [requestLocalFocus]);
+  }, [requestLocalFocus, markCameraManual]);
   const returnToOverview = useCallback(() => {
     setSelectedNode(null);
     const saved = overviewReturnCamera.current;
@@ -4375,7 +4396,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   useEffect(() => {
     (window as any).miniMapNavigate = (graphX: number, graphY: number) => {
       if (!svgRef.current || !containerRef.current || !zoomBehaviorRef.current) return;
-      cameraManuallyPositionedRef.current = true;
+      markCameraManual();
       if (currentGraphIdRef.current) fittedGraphsRef.current.add(currentGraphIdRef.current);
       const svg = d3.select(svgRef.current);
       const k = d3.zoomTransform(svgRef.current).k || 1;
@@ -4389,7 +4410,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // zoom; applied via the shared zoom behavior so state + handlers stay in sync.
     (window as any).miniMapZoom = (graphX: number, graphY: number, targetK: number) => {
       if (!svgRef.current || !containerRef.current || !zoomBehaviorRef.current) return;
-      cameraManuallyPositionedRef.current = true;
+      markCameraManual();
       if (currentGraphIdRef.current) fittedGraphsRef.current.add(currentGraphIdRef.current);
       const svg = d3.select(svgRef.current);
       const k = Math.max(zoomBehaviorRef.current.scaleExtent()[0], Math.min(4, targetK));
@@ -4402,7 +4423,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       delete (window as any).miniMapNavigate;
       delete (window as any).miniMapZoom;
     };
-  }, []);
+  }, [markCameraManual]);
 
   // Seed the minimap from the laid-out graph on load. The tick-based publish
   // (in the simulation tick) only runs while the sim is ticking; with one-shot
@@ -4412,49 +4433,74 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   useEffect(() => {
     if (!currentGraph) return undefined;
     let n = 0;
-    const publish = () => {
-      const sim = simulationRef.current;
-      const upd = (window as { updateMiniMapPositions?: (p: Record<string, { x: number; y: number }>) => void }).updateMiniMapPositions;
-      if (!sim || !upd) return;
-      const simNodes = sim.nodes() as { id: string; x?: number; y?: number; type?: string }[];
-      const positions: Record<string, { x: number; y: number }> = {};
-      const types: Record<string, string> = {};
-      for (const nd of simNodes) {
-        if (nd.x !== undefined && nd.y !== undefined) { positions[nd.id] = { x: nd.x, y: nd.y }; types[nd.id] = nd.type as string; }
-      }
-      {
-        upd(positions);
-        (window as { updateMiniMapTypes?: (t: Record<string, string>) => void }).updateMiniMapTypes?.(types);
-      }
+    const publish = publishMiniMapPositions;
+    let alive = true;
+    let settleEpoch: number | null = null;
+    const refitIfCovered = (epoch: number) => {
+      if (!alive || settleEpoch !== epoch || cameraInteractionEpochRef.current !== epoch) return;
+      const obstacle = document.querySelector<HTMLElement>('[data-testid="mini-map-panel"]');
+      if (!obstacle || !svgRef.current) return;
+      const obstacleRect = obstacle.getBoundingClientRect();
+      const covered = Array.from(svgRef.current.querySelectorAll<SVGGraphicsElement>('.node-bg')).some(node => {
+        const style = getComputedStyle(node);
+        if (style.opacity === '0' || style.visibility === 'hidden' || style.display === 'none') return false;
+        const card = node.getBoundingClientRect();
+        return card.right > obstacleRect.left && card.left < obstacleRect.right
+          && card.bottom > obstacleRect.top && card.top < obstacleRect.bottom;
+      });
+      if (covered) fitViewRef.current(false);
     };
+    let settleTimer: number | undefined;
+    let settleFrame: number | undefined;
     const snapshot = () => {
+      // Opening the panel is an intentional framing opportunity. Capture the
+      // interaction epoch so only gestures after this snapshot veto the short
+      // settle refit; preserve the durable manual-camera marker itself.
+      const epoch = cameraInteractionEpochRef.current;
+      settleEpoch = epoch;
       publish();
       if (svgRef.current) (window as any).updateMiniMapViewport?.(d3.zoomTransform(svgRef.current));
       // Reopening the MiniMap must not leave an existing task underneath it.
       // Preserve the person's camera when there is no collision; refit only
       // when the newly mounted panel actually blocks a card.
-      requestAnimationFrame(() => {
-        const obstacle = document.querySelector<HTMLElement>('[data-graph-fit-obstacle="true"]');
-        if (!obstacle || !svgRef.current) return;
-        const obstacleRect = obstacle.getBoundingClientRect();
-        const covered = Array.from(svgRef.current.querySelectorAll<SVGGraphicsElement>('.node-bg')).some(node => {
-          const card = node.getBoundingClientRect();
-          return card.right > obstacleRect.left && card.left < obstacleRect.right
-            && card.bottom > obstacleRect.top && card.top < obstacleRect.bottom;
-        });
-        if (covered) fitViewRef.current(false);
+      if (settleFrame !== undefined) window.cancelAnimationFrame(settleFrame);
+      settleFrame = window.requestAnimationFrame(() => {
+        settleFrame = undefined;
+        refitIfCovered(epoch);
+        // The simulation can settle after the panel's first frame and move a
+        // card back under it. Recheck once after the settle window so the
+        // visible graph remains actionable without repeatedly reframing it.
+        if (settleTimer !== undefined) window.clearTimeout(settleTimer);
+        settleTimer = window.setTimeout(() => refitIfCovered(epoch), 700);
       });
     };
     window.addEventListener('graphdone:minimap-open', snapshot);
     window.addEventListener('graphdone:layout-organized', publish);
-    const id = setInterval(() => { publish(); if (++n >= 5) clearInterval(id); }, 800);
+    // Keep the short settle window frequent enough to catch a late simulation
+    // tick without polling for the lifetime of the graph.
+    const id = setInterval(() => {
+      publish();
+      if (settleEpoch !== null) refitIfCovered(settleEpoch);
+      // The publisher is only a short-lived simulation bootstrap.  Do not
+      // expire an open panel's settle epoch here: its own RAF/timer must still
+      // be able to refit when the graph settles after this interval ends.
+      if (++n >= 20) clearInterval(id);
+    }, 250);
     publish();
+    // Effects in the portaled MiniMap can run before this listener is attached
+    // on an already-mounted graph.  Initialize an open panel explicitly so a
+    // late data/render effect still gets the same short settle window.
+    if (document.querySelector('[data-testid="mini-map-panel"]')) snapshot();
     return () => {
+      alive = false;
+      settleEpoch = null;
+      if (settleFrame !== undefined) window.cancelAnimationFrame(settleFrame);
+      if (settleTimer !== undefined) window.clearTimeout(settleTimer);
       clearInterval(id);
       window.removeEventListener('graphdone:minimap-open', snapshot);
       window.removeEventListener('graphdone:layout-organized', publish);
     };
-  }, [currentGraph?.id, workItemsData?.workItems?.length]);
+  }, [currentGraph?.id, publishMiniMapPositions]);
 
   // Center on specific node
   const centerOnNode = useCallback((nodeId?: string) => {
@@ -4564,7 +4610,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     (window as any).__graphOrganization = {components:arranged.components,work:arranged.work};
     organizationZoomFloorRef.current = 0.65;
     organizationFocusRef.current = arranged.components[0]?.focus;
-    cameraManuallyPositionedRef.current = true;
+    markCameraManual();
     if (currentGraphIdRef.current) fittedGraphsRef.current.add(currentGraphIdRef.current);
     simulation.alpha(0).restart();
     window.dispatchEvent(new CustomEvent('graphdone:layout-organized'));
@@ -5132,6 +5178,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     edgesLoading, // Re-init when edges loading completes
     // Track node property changes for selective updates (only titles, descriptions, types)
     nodes.map(n => `${n.id}:${n.title}:${n.description}:${n.type}:${n.status}:${n.priority}`).join(','),
+    publishMiniMapPositions,
     // Track edge type/direction changes so a relationship edit or flip rebuilds
     validatedEdges.map((e: any) => {
       const sId = typeof e.source === 'object' ? e.source?.id : e.source;
