@@ -167,8 +167,13 @@ export const offlineLink=new ApolloLink((operation,forward)=>{
        if(table==='edges'&&(row.source_id===row.target_id||!s.nodes.some(n=>n.id===row.source_id)||!s.nodes.some(n=>n.id===row.target_id)))throw Error('Choose two different tasks from this project.');
        s[table].push(row);rows.push(row);
       }else {
-       rows=s[table].filter(row=>matches(table==='nodes'?workItem(row,s):edge(row,s),args.where));
-       for(const row of rows)Object.assign(row,table==='nodes'?{...nodeUpdate(args.update),updated_at:now()}:args.update);
+       s[table]=s[table].map(row=>{
+        if(!matches(table==='nodes'?workItem(row,s):edge(row,s),args.where))return row;
+        const update=table==='nodes'?{...nodeUpdate(args.update),updated_at:now()}:args.update;
+        const updated={...row,...update};
+        rows.push(updated);
+        return updated;
+       });
       }
       return table==='nodes'?{__typename:created?'CreateWorkItemsResponse':'UpdateWorkItemsResponse',workItems:rows.map(n=>workItem(n,s))}:{__typename:created?'CreateEdgesResponse':'UpdateEdgesResponse',edges:rows.map(e=>edge(e,s))};
      });

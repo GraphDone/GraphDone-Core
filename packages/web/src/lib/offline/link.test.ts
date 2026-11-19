@@ -73,6 +73,30 @@ describe('offline GraphQL bulk selection', () => {
     expect(fixture.account!.projects.other.local!.nodes.map(n => n.id)).toEqual(['d']);
   });
 
+  it('preserves an older stored request when a later offline edit updates its task', async () => {
+    const draft = fixture.account!.projects.project;
+    const row = draft.local!.nodes[0];
+    row.title = 'Previously submitted';
+    draft.request = {
+      requestId: 'retained-request', projectId: 'project', version: 1,
+      changes: [{table: 'nodes', id: row.id, action: 'put', value: row}],
+      sent: {...draft.local!, nodes: [...draft.local!.nodes]},
+    };
+    const requestBeforeEdit = JSON.stringify(draft.request);
+    fixture.account = structuredClone(fixture.account);
+
+    const result = await run(gql`
+      mutation RevisePending($where: WorkItemWhere!, $update: WorkItemUpdateInput!) {
+        updateWorkItems(where: $where, update: $update) { workItems { id title } }
+      }
+    `, { where: { graph: { id: 'project' }, id: row.id }, update: { title: 'New edit' } });
+
+    expect(result.data.updateWorkItems.workItems).toEqual([{id: row.id, title: 'New edit'}]);
+    const edited = fixture.account!.projects.project;
+    expect(edited.local?.nodes[0].title).toBe('New edit');
+    expect(JSON.stringify(edited.request)).toBe(requestBeforeEdit);
+  });
+
   it('supports an empty ID selection without deleting any work', async () => {
     const result = await run(gql`
       mutation DeleteSelected($where: WorkItemWhere!) {

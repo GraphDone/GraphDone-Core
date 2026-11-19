@@ -1,5 +1,5 @@
 import { describe,it,expect } from 'vitest';
-import { changes,dirty,merge,makeRequest,Snapshot,Project,Row,validateBackupSnapshot,validateBackupProjects,ambiguousRetriedCreation,graphPath,graphType,createsCycle } from './model';
+import { mergeAcknowledged,changes,dirty,merge,makeRequest,Snapshot,Project,Row,validateBackupSnapshot,validateBackupProjects,ambiguousRetriedCreation,graphPath,graphType,createsCycle } from './model';
 const base=():Snapshot=>({project:{id:'p',name:'Family plans',sync_version:1},nodes:[{id:'a',title:'Dinner',status:'PROPOSED',priority:.3,position_x:0,position_y:0}],edges:[],notes:[]});
 describe('durable project reconciliation',()=>{
  it('merges agent status with offline human title without overwriting either',()=>{const b=base(),l=structuredClone(b),r=structuredClone(b);l.nodes[0].title='Dinner for six';r.nodes[0].status='IN_PROGRESS';const m=merge(b,l,r);expect(m.conflicts).toEqual([]);expect(m.local!.nodes[0]).toMatchObject({title:'Dinner for six',status:'IN_PROGRESS'});});
@@ -7,6 +7,63 @@ describe('durable project reconciliation',()=>{
  it('detects delete versus edit in both directions',()=>{const b=base(),l=structuredClone(b),r=structuredClone(b);l.nodes=[];r.nodes[0].title='Agent edit';expect(merge(b,l,r).conflicts).toHaveLength(1);expect(merge(b,r,l).conflicts).toHaveLength(1);});
  it('does not treat remote timestamps as conflicting edits',()=>{const b=base(),l=structuredClone(b),r=structuredClone(b);l.nodes=[];r.nodes[0].updated_at=123;expect(merge(b,l,r).conflicts).toEqual([]);});
  it('preserves an edit made while its previous save was in flight',()=>{const b=base(),sent=structuredClone(b),l=structuredClone(b),r=structuredClone(b);sent.nodes[0].title='First';l.nodes[0].title='Second';r.nodes[0].title='First';r.project.sync_version=2;const m=merge(sent,l,r);expect(m.local!.nodes[0].title).toBe('Second');expect(m.conflicts).toEqual([]);});
+ it('keeps the captured request and acknowledgement snapshot through a reopened draft and a later edit',()=>{
+  const original = base();
+  const local = structuredClone(original);
+  local.nodes[0].title = 'First edit';
+  const draft: Project = {base: original, local, checkedAt: 0};
+  const captured = makeRequest('p',draft);
+  const reopened = structuredClone({...draft, request: captured});
+  const replay = JSON.stringify(reopened.request);
+
+  reopened.local!.nodes[0].title = 'Later edit';
+
+  expect(JSON.stringify(reopened.request)).toBe(replay);
+  expect(reopened.request.changes[0].value?.title).toBe('First edit');
+  expect(reopened.request.sent?.nodes[0].title).toBe('First edit');
+  const acknowledged = structuredClone(local);
+  acknowledged.project.sync_version = 2;
+  const result = merge(reopened.request.sent,reopened.local,acknowledged);
+  expect(result.conflicts).toEqual([]);
+  expect(result.local?.nodes[0].title).toBe('Later edit');
+ });
+ it('preserves a newer edit when an older aliased request disagrees with its acknowledgement',()=>{
+  const original = base();
+  const local = structuredClone(original);
+  local.nodes[0].title = 'Later edit';
+  const captured = makeRequest('p',{base: original, local, checkedAt: 0});
+  captured.changes[0].value = local.nodes[0];
+  captured.sent!.nodes[0] = local.nodes[0];
+  const reopened = structuredClone({base: original, local, checkedAt: 0, request: captured});
+  const acknowledged = structuredClone(original);
+  acknowledged.nodes[0].title = 'First edit';
+  acknowledged.project.sync_version = 2;
+
+  const result = mergeAcknowledged(reopened,reopened.request,acknowledged);
+  expect(result.local?.nodes[0].title).toBe('Later edit');
+  expect(result.conflicts).toEqual(['Later edit: title']);
+ });
+ it.each([false,true])('keeps a deliberate legacy revert with disjoint local work: %s',(alsoEditPriority)=>{
+  const original = base();
+  original.nodes.push({id:'b',title:'Other task'});
+  const local = structuredClone(original);
+  const captured = makeRequest('p',{base: original, local, checkedAt: 0});
+  captured.changes = [{table:'nodes',id:'a',action:'put',value:local.nodes[0]}];
+  captured.sent!.nodes[0] = local.nodes[0];
+  const remote = structuredClone(original);
+  remote.nodes[0].title = 'First submitted title';
+  remote.nodes[1].title = 'Server edit on another task';
+  remote.project.sync_version = 3;
+  if(alsoEditPriority)local.nodes[0].priority = 0.8;
+  const reopened = structuredClone({base: original, local, checkedAt: 0, request: captured});
+
+  const result = mergeAcknowledged(reopened,reopened.request,remote);
+  expect(result.local?.nodes).toEqual([
+   {...original.nodes[0],priority:alsoEditPriority?0.8:original.nodes[0].priority},
+   {...original.nodes[1],title:'Server edit on another task'},
+  ]);
+  expect(result.conflicts).toEqual(['Dinner: title']);
+ });
  it('orders batched dependencies and keeps the unsent tail',()=>{const b=base(),l=structuredClone(b);l.nodes.push(...Array.from({length:70},(_,i)=>({id:'new'+i,title:'Task '+i})));l.edges.push({id:'e',source_id:'new69',target_id:'a'});const p:Project={base:b,local:l,checkedAt:0},q=makeRequest('p',p);expect(q.changes).toHaveLength(25);expect(q.changes.every(c=>c.table==='nodes')).toBe(true);expect(q.sent!.nodes).toHaveLength(26);expect(changes(q.sent,l)).toHaveLength(46);});
  it('keeps a deletion made while its create acknowledgement was in flight',()=>{const sent=base(),remote=structuredClone(sent);remote.project.sync_version=4;remote.nodes[0].created_at=123;expect(merge(sent,null,remote)).toEqual({local:null,conflicts:[]});});
  it('creates and deletes empty projects as real pending work',()=>{expect(dirty({base:null,local:base(),checkedAt:0})).toBe(true);expect(makeRequest('p',{base:base(),local:null,checkedAt:0}).deleteProject).toBe(true);});
