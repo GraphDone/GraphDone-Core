@@ -73,6 +73,7 @@ import { DEFAULT_PHYSICS, collisionRadius, linkDistance, linkMaxDistance, linkSt
 import { computeCompactLayout, isHierarchicalLayout, parseLayoutMode, LAYOUT_MODE_STORAGE_KEY, type LayoutMode } from '../lib/layoutAlgorithms';
 import { edgeBorderEndpoints, minEdgeLength, clampToMinNeighbors } from '../lib/edgeGeometry';
 import { directionStrategy, arrowVisibility, perpendicularOffset } from '../lib/edgeLOD';
+import { edgeNeedsPaintGeometry } from '../lib/edgePaintScope';
 import { assignParallelEdgeIndices } from '../lib/parallelEdges';
 import { isTap, touchHitSize, isCoarsePointer } from '../lib/touchInteraction';
 import { usePositionSaveQueue } from '../hooks/usePositionSaveQueue';
@@ -3824,7 +3825,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         });
       }
       const liveK = svg.node() ? d3.zoomTransform(svg.node() as Element).k : 1;
-      linkElements.each(function(d: any) {
+      const routedLinks = linkElements.filter((d: any) => edgeNeedsPaintGeometry(d, cullActive));
+      routedLinks.each(function(d: any) {
         const ep = edgeBorderEndpoints(
           { x: d.source.x || 0, y: d.source.y || 0 }, getNodeDimensions(d.source),
           { x: d.target.x || 0, y: d.target.y || 0 }, getNodeDimensions(d.target)
@@ -3835,11 +3837,11 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           { id: d.target.id, x: ep.x2, y: ep.y2 }, offset
         );
       });
-      linkElements.attr('d', (d: any) => d._route?.path ?? null);
-      clickableEdges.attr('d', (d: any) => d._route?.path ?? null);
+      routedLinks.attr('d', (d: any) => d._route?.path ?? null);
+      clickableEdges.filter((d: any) => edgeNeedsPaintGeometry(d, cullActive)).attr('d', (d: any) => d._route?.path ?? null);
       applyEdgeDisplays();
       if (simplifiedRef.current && !forceAvoid) return;
-      arrowElements.attr('transform', (d: any) => {
+      arrowElements.filter((d: any) => edgeNeedsPaintGeometry(d, cullActive)).attr('transform', (d: any) => {
         const route = d._route as EdgeRouteGeometry | null;
         if (!route) return null;
         const target = route.target;
@@ -3975,7 +3977,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     let cullCounter = 0;
     let cullActive = false;
     const edgeDisplay = (d: any) => {
-      if (d._priorityVisible === false || !d._route || (cullActive && d.source?._culled && d.target?._culled)) return 'none';
+      if (!edgeNeedsPaintGeometry(d, cullActive) || !d._route) return 'none';
       if (localItemBoardRef.current) {
         const camera = d3.zoomTransform(svg.node()!);
         const visible = (node: any) => node.x * camera.k + camera.x >= 0 && node.x * camera.k + camera.x <= width && node.y * camera.k + camera.y >= 0 && node.y * camera.k + camera.y <= height;
