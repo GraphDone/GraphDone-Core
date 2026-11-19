@@ -1,17 +1,23 @@
-import type { CDPSession, Locator, Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 
 export type TouchPoint = { x: number; y: number };
 
-const contact = ({ x, y }: TouchPoint, index: number) => ({
-  x: Math.round(x), y: Math.round(y), id: index + 1, radiusX: 2, radiusY: 2, force: 1,
-});
+type SendContacts = (type: 'touchStart' | 'touchMove', points: TouchPoint[]) => Promise<void>;
 
-async function withTouchContacts(page: Page, start: TouchPoint[], move: (cdp: CDPSession) => Promise<void>) {
+async function withTouchContacts(page: Page, start: TouchPoint[], move: (send: SendContacts) => Promise<void>) {
   const cdp = await page.context().newCDPSession(page);
   try {
     await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
-    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: start.map(contact) });
-    await move(cdp);
+    const origin = await page.evaluate(() => ({ x: visualViewport?.offsetLeft ?? 0, y: visualViewport?.offsetTop ?? 0 }));
+    const send: SendContacts = async (type, points) => {
+      const touchPoints = points.map(({ x, y }, index) => ({
+        x: Math.round(x) - origin.x, y: Math.round(y) - origin.y,
+        id: index + 1, radiusX: 2, radiusY: 2, force: 1,
+      }));
+      await cdp.send('Input.dispatchTouchEvent', { type, touchPoints });
+    };
+    await send('touchStart', start);
+    await move(send);
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   } catch (error) {
     // A failed assertion or a torn-down target must not leave active contacts
@@ -25,9 +31,9 @@ async function withTouchContacts(page: Page, start: TouchPoint[], move: (cdp: CD
 }
 
 export async function touchGesture(page: Page, frames: TouchPoint[][], afterFirstMove?: () => Promise<void>) {
-  await withTouchContacts(page, frames[0], async cdp => {
+  await withTouchContacts(page, frames[0], async send => {
     for (const [index, frame] of frames.slice(1).entries()) {
-      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: frame.map(contact) });
+      await send('touchMove', frame);
       await page.waitForTimeout(30);
       if (index === 0) await afterFirstMove?.();
     }
@@ -37,11 +43,11 @@ export async function touchGesture(page: Page, frames: TouchPoint[][], afterFirs
 export async function cancelledThreeFingerPinch(page: Page, center: TouchPoint) {
   const two = [{ x: center.x - 20, y: center.y }, { x: center.x + 20, y: center.y }];
   const third = { x: center.x, y: center.y + 30 };
-  await withTouchContacts(page, two, async cdp => {
-    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [...two, third].map(contact) });
-    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [
+  await withTouchContacts(page, two, async send => {
+    await send('touchStart', [...two, third]);
+    await send('touchMove', [
       { x: center.x - 65, y: center.y }, { x: center.x + 65, y: center.y }, third,
-    ].map(contact) });
+    ]);
   });
 }
 
@@ -49,8 +55,13 @@ export async function cancelledThreeFingerPinch(page: Page, center: TouchPoint) 
 export async function visibleTileCenter(page: Page, tile: Locator, halfSpan = 0) {
   for (let drag = 0; drag <= 5; drag++) {
     const view = await tile.evaluate((element, span) => {
-      const rect = element.getBoundingClientRect();
-      const canvas = element.closest('.graph-container')!.getBoundingClientRect();
+      const rect = (element.querySelector('.zoom-tile-bg') ?? element).getBoundingClientRect();
+      const layout = element.closest('.graph-container')!.getBoundingClientRect();
+      const view = visualViewport;
+      const left = Math.max(layout.left, view?.offsetLeft ?? 0), top = Math.max(layout.top, view?.offsetTop ?? 0);
+      const right = Math.min(layout.right, (view?.offsetLeft ?? 0) + (view?.width ?? innerWidth));
+      const bottom = Math.min(layout.bottom, (view?.offsetTop ?? 0) + (view?.height ?? innerHeight));
+      const canvas = new DOMRect(left, top, right - left, bottom - top);
       const svg = element.closest('svg')!;
       const center = { x: Math.round(rect.x + rect.width / 2), y: Math.round(rect.y + rect.height / 2) };
       const inside = (x: number, y: number) => x > canvas.left && x < canvas.right && y > canvas.top && y < canvas.bottom;
@@ -66,7 +77,7 @@ export async function visibleTileCenter(page: Page, tile: Locator, halfSpan = 0)
         const start = { x: canvas.x + fx * canvas.width, y: canvas.y + fy * canvas.height };
         const end = { x: start.x + dx, y: start.y + dy };
         const target = hit(start.x, start.y);
-        if (target?.closest('svg') !== svg || target.closest('[data-zoom-tile], [role="button"], .node, .edge, [data-lod-controls]')) continue;
+        if (target !== svg && !(target?.matches('rect.background') && svg.contains(target))) continue;
         if (inside(end.x, end.y) && hit(end.x, end.y)?.closest('svg') === svg) return { start, end };
       }
       throw new Error('No visible canvas background is available to pan toward the sibling graph.');
