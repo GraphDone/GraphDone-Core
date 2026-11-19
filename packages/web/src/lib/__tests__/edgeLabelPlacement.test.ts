@@ -3,6 +3,7 @@ import { createEdgeRoute } from '../edgeRouteGeometry';
 import {
   labelsMissed,
   placeItemLabels,
+  placeItemLabelsWithRetry,
   ITEM_LABEL_BUDGET,
   type ItemLabelCandidate,
 } from '../edgeLabelPlacement';
@@ -117,4 +118,53 @@ it('a label is missed only when one on screen was tried and found no spot', () =
   expect(labelsMissed(placeItemLabels([candidate('a'), below], options, capped), capped)).toBe(false);
   const blocked = placeItemLabels([candidate('a')], { ...options, obstacles: [{ x: 150, y: 0, width: 1000, height: 1000 }] });
   expect(labelsMissed(blocked)).toBe(true);
+});
+
+it('counts both placement passes when the fresh positions recover a label', () => {
+  const first = { ...candidate('a'), t: 0.9, dims: { width: 100, height: 26 } };
+  const second = { ...first, id: 'b', t: 0.5, route: createEdgeRoute([{ x: 200, y: 0 }, { x: 320, y: 0 }])! };
+  const options = { viewport: { x: 300, y: 50, width: 700, height: 100 }, obstacles: [], segments: [] };
+  const remembered = placeItemLabels([first, second], options);
+  const fresh = placeItemLabels([{ ...first, t: 0.5 }, second], options);
+  expect(remembered.placements.size).toBe(1);
+  expect(fresh.placements.size).toBe(2);
+
+  const result = placeItemLabelsWithRetry([first, second], options);
+  expect(result.placements).toEqual(fresh.placements);
+  expect(result.attempts).toBe(remembered.attempts + fresh.attempts);
+  expect(result.checks).toBe(remembered.checks + fresh.checks);
+});
+
+it('uses only the remaining checks and attempts, even when the retry cannot place more labels', () => {
+  const labels = Array.from({ length: 60 }, (_, i) => ({ ...candidate(String(i)), t: 0.8 }));
+  const options = { viewport, obstacles: [
+    ...Array.from({ length: 2000 }, () => ({ x: 146, y: 150, width: 10, height: 10 })),
+    { x: 150, y: 0, width: 1000, height: 1000 },
+  ], segments: [] };
+  const first = placeItemLabels(labels, options);
+  expect(first.checks).toBeGreaterThan(ITEM_LABEL_BUDGET.checks / 2);
+  expect(first.checks).toBeLessThan(ITEM_LABEL_BUDGET.checks);
+  const result = placeItemLabelsWithRetry(labels, options);
+  expect(result.placements.size).toBe(0);
+  expect(result.checks).toBe(ITEM_LABEL_BUDGET.checks);
+  expect(result.attempts).toBeGreaterThan(first.attempts);
+
+  const capped = { ...ITEM_LABEL_BUDGET, attempts: first.attempts + 1 };
+  expect(placeItemLabelsWithRetry(labels, options, capped).attempts).toBe(capped.attempts);
+});
+
+it('avoids repeating the same placement or resetting a dragged label', () => {
+  const labels = [candidate('a'), { ...candidate('b'), t: 0.75, dragged: true }];
+  let obstacleReads = 0;
+  const obstacle = {
+    get x() { obstacleReads++; return 150; },
+    y: 0, width: 1000, height: 1000,
+  };
+  const options = { viewport, obstacles: [obstacle], segments: [] };
+  const first = placeItemLabels(labels, options);
+  const singlePassReads = obstacleReads;
+  expect(singlePassReads).toBeGreaterThan(0);
+  obstacleReads = 0;
+  expect(placeItemLabelsWithRetry(labels, options)).toEqual(first);
+  expect(obstacleReads).toBe(singlePassReads);
 });

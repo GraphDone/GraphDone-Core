@@ -63,7 +63,7 @@ import { PerfMeter, DriftMeter } from '../lib/perfMeter';
 import { computeGraphFit, type FitObstacle } from '../lib/graphFit';
 import { appendNodeControlGlyph, nodeControlGlyphTransform } from '../lib/nodeControlIcons';
 import { graphItemLayout, itemTitleScale, measureGraphText, edgeLabelDimensions, GRAPH_FONT_FAMILY, ITEM_TITLE_SIZE, ITEM_TITLE_LINE, ITEM_HEADER_HEIGHT, EDGE_LABEL_SIZE, ITEM_WIRE_WIDTH } from '../lib/graphSymbolLayout';
-import { placeItemLabels, labelsMissed } from '../lib/edgeLabelPlacement';
+import { placeItemLabelsWithRetry } from '../lib/edgeLabelPlacement';
 import { separateCards } from '../lib/separateCards';
 import { organizeTopology } from '../lib/topologyOrganization';
 import { clearFreeCards, framedZoom, labelGap, LABEL_MIN_ZOOM, LAYOUT_CHECKS, organizeWithLabelRoom, ORGANIZED_ZOOM_FLOOR, SMALL_GRAPH_ZOOM_FLOOR, WHOLE_FIT_MAX_CARDS, type LabelEdge, type LabelRoomOptions } from '../lib/labelClearance';
@@ -123,9 +123,6 @@ const drawnLabel = (edge: any) => edge._priorityVisible === false ? null
 // A new arrangement places labels afresh from the middle of their edges, where
 // the layout left them room; the renderer otherwise starts from each label's
 // last spot. A label a person dragged keeps its place.
-/** Graphs with at most this many relationships retry a missing label from fresh spots. */
-const FRESH_LABEL_RETRY_MAX = 60;
-
 const forgetLabelSpots = (edges: any[]) => {
   for (const edge of edges) if (!edge.labelTUser) delete edge.labelT;
 };
@@ -3789,20 +3786,11 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         return {
           id: d.id, route: d._route, eligible: liveK >= LABEL_MIN_ZOOM && edgeDisplay(d) !== 'none', priority: relationshipPriorityTier(d.type),
           dims: { width: d._labelDims.width * d._labelScale, height: d._labelDims.height * d._labelScale },
-          t: d.labelT, offset: (d._routeLabel?.offset < 0 ? -1 : 1) * (26 * d._labelScale + 3), dragged: !!d.labelTUser,
+          t: d.labelT ?? 0.5, offset: (d._routeLabel?.offset < 0 ? -1 : 1) * (26 * d._labelScale + 3), dragged: !!d.labelTUser,
         };
       });
       const placeOptions = { viewport: labelViewport, obstacles: nodeLabelObstacles.concat(uiLabelObstacles.filter(intersectsViewport), routeObstacles), segments: routeSegments };
-      let result = placeItemLabels(candidates, placeOptions);
-      // Spots remembered from earlier frames keep labels steady while cards
-      // move, but they can box out a label that a fresh placement shows (the
-      // layouts leave room for a fresh one, see labelClearance): in a small
-      // graph, when a label on screen found no spot (labelsMissed), try fresh
-      // spots and keep them if they show more.
-      if (candidates.length <= FRESH_LABEL_RETRY_MAX && labelsMissed(result)) {
-        const fresh = placeItemLabels(candidates.map(c => c.dragged ? c : { ...c, t: 0.5, offset: Math.abs(c.offset) }), placeOptions);
-        if (fresh.placements.size > result.placements.size) result = fresh;
-      }
+      const result = placeItemLabelsWithRetry(candidates, placeOptions);
       edgeLabelGroups.each(function(d: any) {
         const placement = result.placements.get(d.id) ?? null;
         d._labelBlocked = !placement;

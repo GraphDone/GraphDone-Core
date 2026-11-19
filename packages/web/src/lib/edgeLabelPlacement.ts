@@ -15,6 +15,7 @@ export interface ItemLabelCandidate {
   t: number;
   offset: number;
   priority?: number;
+  dragged?: boolean;
 }
 
 export const ITEM_LABEL_BUDGET = {
@@ -25,13 +26,15 @@ export const ITEM_LABEL_BUDGET = {
 
 export type ItemLabelBudget = { labels: number; attempts: number; checks: number };
 
+interface ItemLabelOptions {
+  viewport: ObstacleBox;
+  obstacles: readonly ObstacleBox[];
+  segments: readonly Pick<EdgeRouteSegment, 'source' | 'target'>[];
+}
+
 export function placeItemLabels(
   candidates: readonly ItemLabelCandidate[],
-  options: {
-    viewport: ObstacleBox;
-    obstacles: readonly ObstacleBox[];
-    segments: readonly Pick<EdgeRouteSegment, 'source' | 'target'>[];
-  },
+  options: ItemLabelOptions,
   limits: ItemLabelBudget = ITEM_LABEL_BUDGET
 ) {
   const placements = new Map<string, EdgeRouteLabel>();
@@ -93,4 +96,38 @@ export function labelsMissed(
   limits: ItemLabelBudget = ITEM_LABEL_BUDGET
 ) {
   return result.placements.size < Math.min(result.attempts, limits.labels);
+}
+
+const FRESH_LABEL_RETRY_MAX = 60;
+
+/** Keep the better placement while charging both passes to the same render budget. */
+export function placeItemLabelsWithRetry(
+  candidates: readonly ItemLabelCandidate[],
+  options: ItemLabelOptions,
+  limits: ItemLabelBudget = ITEM_LABEL_BUDGET
+) {
+  const first = placeItemLabels(candidates, options, limits);
+  const attemptsLeft = limits.attempts - first.attempts;
+  const checksLeft = limits.checks - first.checks;
+  if (candidates.length > FRESH_LABEL_RETRY_MAX || attemptsLeft <= 0 || checksLeft <= 0 || !labelsMissed(first, limits)) return first;
+
+  const hasRememberedPosition = candidates.some(candidate =>
+    !candidate.dragged && candidate.eligible && (candidate.t !== 0.5 || candidate.offset < 0) &&
+    candidate.route?.segments.some(segment => edgeSegmentHitsBox(segment, options.viewport))
+  );
+  if (!hasRememberedPosition) return first;
+
+  const midpoints = candidates.map(candidate => candidate.dragged ? candidate : {
+    ...candidate, t: 0.5, offset: Math.abs(candidate.offset),
+  });
+  const fresh = placeItemLabels(midpoints, options, {
+    labels: limits.labels,
+    attempts: attemptsLeft,
+    checks: checksLeft,
+  });
+  return {
+    placements: fresh.placements.size > first.placements.size ? fresh.placements : first.placements,
+    attempts: first.attempts + fresh.attempts,
+    checks: first.checks + fresh.checks,
+  };
 }
