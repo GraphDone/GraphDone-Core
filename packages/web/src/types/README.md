@@ -20,7 +20,6 @@ flowchart LR
 | --- | --- |
 | [`graph.ts`](graph.ts) | `Graph`, `GraphPermissions`, `ShareSettings`, `GraphSettings`, `GraphHierarchy`, `WorkItem`, `WorkItemEdge`, `RelationshipType`, `CreateGraphInput`, `GraphContextType`. Used by about ten files. |
 | [`auth.ts`](auth.ts) | `User` (roles `GUEST`, `VIEWER`, `USER`, `ADMIN`), `Team`, `AuthContextType`. |
-| [`projectData.ts`](projectData.ts) | Mock nodes and edges with relationship descriptions. Not imported anywhere. |
 
 Item type, status and relationship labels and colours are not types; they live
 in [`../constants/`](../constants/README.md).

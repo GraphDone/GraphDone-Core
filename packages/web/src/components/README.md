@@ -34,13 +34,6 @@ flowchart TD
 | Agents, feedback, admin | `AgentConnection`, `Feedback`, `AdminOperations`, `AdminUserManagement` | Connect an AI agent to a project, send feedback, review feedback and manage users. |
 | Tests | `*.test.tsx` next to their component, and [`__tests__/`](__tests__/README.md) | Vitest + Testing Library tests for the overview and relationship browser (`SemanticGraphOverview.test`, `SemanticRelationships.test`, `OverviewBusLayer.test`), local neighbourhood, inspector, sub-graph preview, quick edit, item details, the relationship editor, CAPTCHA, agent dialog, storage status, role guard and the graph selector's edit and delete buttons. |
 
-### Not used by any route
-
-`AgentSettingsModal`, `AnimatedGraph`, `DisconnectWorkItemModal`,
-`LoginSecurityDialog`, `McpServerCard`, `UserManagement`, `VideoModal` and
-`ViewSwitcher` are not imported anywhere. `GraphVisualization` is imported only
-by the unrouted `pages/GraphView.tsx`.
-
 Next: open [`../pages/Workspace.tsx`](../pages/Workspace.tsx) to see how these
 pieces are put together.
 

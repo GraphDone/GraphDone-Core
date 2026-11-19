@@ -130,7 +130,7 @@ export function validatePassword(password: string, requirements: PasswordRequire
 
 #### C. Login Security Transparency Dialog
 ```typescript
-// packages/web/src/components/LoginSecurityDialog.tsx
+// Historical design example
 export function LoginSecurityDialog({ isOpen, onClose }: {
   isOpen: boolean;
   onClose: () => void;
