@@ -13,8 +13,8 @@ import { ORGANIZED_ZOOM_FLOOR } from '../../../packages/web/src/lib/labelClearan
 /**
  * JOURNEY organize-labels: after "Organize around connections", at the camera
  * the app itself rests on, every relationship label a person can see must be
- * there and readable: text of at
- * least 11 px, not under any card, not on another label, reachable at its
+ * there and readable: painted text of at least 11 px or a named 24 px icon
+ * chip on a narrow touch canvas. Both must stay clear of cards and other labels, be reachable at their
  * centre and inside the visible gap of its own edge. Every edge whose two
  * cards are on screen, clear of the graph controls, must show its label. No
  * card title on screen is split inside a word (a word too wide ends in "…";
@@ -177,7 +177,7 @@ function brokenTitles(page: Page): Promise<string[]> {
 }
 
 const summary = (stages: Stage[]) => stages.map(s =>
-  `${s.graph} / ${s.stage}${s.checked ? '' : ' [not checked]'}: zoom ${s.scale}, ${s.cards - s.offScreen}/${s.cards} cards on screen (${s.underControlsCards} partly under controls), ${s.shown}/${s.drawn} labels shown, ${s.inView} edges in view (${s.underControls} under controls) — hidden ${s.problems.hidden.length}, under a card ${s.problems.covered.length}, on another label ${s.problems.overlapping.length}, centre not reachable ${s.problems.unreachable.length}, outside the gap ${s.problems.outOfGap.length}, text too small ${s.problems.small.length}, titles split mid-word ${s.brokenTitles.length}`
+  `${s.graph} / ${s.stage}${s.checked ? '' : ' [not checked]'}: zoom ${s.scale}, ${s.cards - s.offScreen}/${s.cards} cards on screen (${s.underControlsCards} partly under controls), ${s.shown}/${s.drawn} labels shown, ${s.inView} edges in view (${s.underControls} under controls) — hidden ${s.problems.hidden.length}, under a card ${s.problems.covered.length}, on another label ${s.problems.overlapping.length}, centre not reachable ${s.problems.unreachable.length}, outside the gap ${s.problems.outOfGap.length}, text too small or hidden ${s.problems.small.length}, invalid chips ${s.problems.invalidChips.length}, titles split mid-word ${s.brokenTitles.length}`
 ).join('\n');
 
 const slug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
@@ -226,15 +226,48 @@ test.beforeEach(async ({ page }) => {
 
 for (const shape of [WELCOME_SHAPE, LAUNCH_CHECKLIST_SHAPE])
   test(`JOURNEY organize-labels: ${shape.name} keeps every relationship label readable after Organize`, async ({ page, owned }, info) => {
-    // A phone at the 0.34 label cutoff is about 1150 graph units wide: the
-    // launch checklist's hub and its seven neighbours, each a full 14 px label
-    // apart, do not fit, so the camera rests on the hub with no neighbour
-    // whole beside it. Everything else is still checked there: every
-    // relationship drawn, the zoom, and every label on screen. Compact label
-    // chips (FOLLOW_UP) are what makes the whole graph fit.
     const crowdedPhone = info.project.name === 'journeys-iphone' && shape === LAUNCH_CHECKLIST_SHAPE;
-    if (crowdedPhone) info.annotations.push({ type: 'limit', description: `no edge has both cards on screen until compact label chips (${FOLLOW_UP})` });
+    if (crowdedPhone) info.annotations.push({ type: 'limit', description: `the whole Launch checklist still does not fit above the title-readability floor (${FOLLOW_UP})` });
     await report(info, await organizeAndCheck(page, owned, info, shape), !crowdedPhone);
+    if (crowdedPhone) {
+      const audit = await auditEdgeLabels(page);
+      expect(audit.scale).toBeCloseTo(ORGANIZED_ZOOM_FLOOR, 2);
+      const label = audit.labels.find(label => label.shown && label.hit && label.inView && label.chip)
+        ?? audit.labels.find(label => label.shown && label.hit && label.chip);
+      expect(label).toBeDefined();
+      const name = `Edit connection: ${label!.sourceTitle} ${label!.text.toLowerCase()} ${label!.targetTitle}`;
+      const button = page.getByRole('button', { name, exact: true });
+      const dialog = page.getByRole('dialog', { name: 'Edit relationship' });
+      const fullLabel = `Editing relationship: ${label!.sourceTitle} → ${label!.targetTitle}`;
+      const type = dialog.getByRole('button', { name: label!.text, exact: true });
+      const close = dialog.getByRole('button', { name: 'Close relationship editor' });
+      await button.tap();
+      await expect(dialog).toContainText(fullLabel);
+      await expect(type).toHaveAttribute('aria-pressed', 'true');
+      await evidence(info, 'chip-opened-full-label.png', await page.screenshot(), 'image/png');
+      await close.tap();
+      await expect(dialog).toHaveCount(0);
+      await button.focus();
+      await page.keyboard.press('Enter');
+      await expect(dialog).toContainText(fullLabel);
+      await expect(type).toHaveAttribute('aria-pressed', 'true');
+      await close.tap();
+      await evidence(info, 'chip-interaction.json', JSON.stringify({ scale: audit.scale, ...label!.chip, name, fullLabel, tap: true, keyboard: true }, null, 2), 'application/json');
+    }
+    if (shape === LAUNCH_CHECKLIST_SHAPE && info.project.name === 'journeys') {
+      const audit = await auditEdgeLabels(page);
+      const full = audit.labels.find(label => label.shown && label.textPx >= 11);
+      expect(full).toBeDefined();
+      const text = page.locator(`[data-edge-id="${full!.id}"] .edge-label`);
+      await text.evaluate(element => element.style.display = 'none');
+      try {
+        const hidden = await auditEdgeLabels(page);
+        expect(hidden.labels.find(label => label.id === full!.id)?.textPx).toBe(0);
+        expect(labelProblems(hidden).small).toContain(`${full!.text} (${full!.sourceTitle} → ${full!.targetTitle})`);
+      } finally {
+        await text.evaluate(element => element.style.removeProperty('display'));
+      }
+    }
   });
 
 test('JOURNEY organize-labels: a graph of unplaced items opens no smaller than its titles and labels show', async ({ page, owned }, info) => {

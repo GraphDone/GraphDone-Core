@@ -19,7 +19,8 @@ import type { Page } from '@playwright/test';
  * - `hit`: `elementFromPoint` at the label's centre lands on the label itself;
  * - `inGap`: the label lies alongside the visible part of its own edge, the
  *   line between the two cards' borders;
- * - `textPx`: the label text's font size on screen, in CSS pixels.
+ * - `textPx`: painted label text's font size on screen, in CSS pixels.
+ * - `chip`: painted glyph and screen size for a compact relationship control.
  *
  * `offScreenCards` counts the cards not wholly inside the graph area: with
  * none, the whole graph is on screen. `cardsUnderControls` counts cards a
@@ -45,6 +46,7 @@ export interface AuditedLabel {
   hit: boolean;
   inGap: boolean;
   textPx: number;
+  chip: { allowed: boolean; paintedIcon: boolean; width: number; height: number; accessibleName: string; keyboardButton: boolean } | null;
   box: { x: number; y: number }[];
 }
 
@@ -73,6 +75,7 @@ export interface LabelProblems {
   outOfGap: string[];
   /** Shown labels whose text is smaller than READABLE_TEXT_PX on screen. */
   small: string[];
+  invalidChips: string[];
 }
 
 /** Smallest label text, in CSS pixels, that counts as readable. */
@@ -87,6 +90,7 @@ export async function auditEdgeLabels(page: Page): Promise<LabelAudit> {
     if (!area || !svg) return { scale: 0, cards: 0, drawnEdges: 0, inViewEdges: 0, underControls: 0, shownLabels: 0, offScreenCards: 0, cardsUnderControls: 0, labels: [] };
     const scale = Number(/scale\(([^)]+)\)/.exec(group?.getAttribute('transform') ?? '')?.[1] ?? 1);
     const bounds = area.getBoundingClientRect();
+    const allowsChip = matchMedia('(pointer: coarse)').matches && area.clientWidth <= 430 && scale < 1;
     const painted = (el: Element | null) => {
       let opacity = 1;
       for (let node = el; node && node !== document.documentElement; node = node.parentElement) {
@@ -154,7 +158,7 @@ export async function auditEdgeLabels(page: Page): Promise<LabelAudit> {
       const source = datum?.source?.id ?? '', target = datum?.target?.id ?? '';
       const label = labelGroups.get(id);
       const bg = label?.querySelector<SVGRectElement>('.edge-label-bg');
-      const shown = !!label && !!bg && painted(label);
+      const shown = !!label && !!bg && painted(bg);
       const sourceCard = cards.get(source), targetCard = cards.get(target);
       const onScreen = !!sourceCard && !!targetCard && inside(sourceCard) && inside(targetCard);
       const covered = onScreen && controls.some(control =>
@@ -164,7 +168,7 @@ export async function auditEdgeLabels(page: Page): Promise<LabelAudit> {
         source, target, sourceTitle: titles.get(source) ?? source, targetTitle: titles.get(target) ?? target, shown,
         inView: onScreen && !covered,
         underControls: covered,
-        cards: [], labels: [], hit: false, inGap: false, textPx: 0,
+        cards: [], labels: [], hit: false, inGap: false, textPx: 0, chip: null,
         box: shown ? quad(bg!) : [],
         line: [{ x: a.x, y: a.y }, { x: b.x, y: b.y }],
       });
@@ -176,9 +180,26 @@ export async function auditEdgeLabels(page: Page): Promise<LabelAudit> {
       const cx = label.box.reduce((s, p) => s + p.x, 0) / 4, cy = label.box.reduce((s, p) => s + p.y, 0) / 4;
       const hitEl = document.elementFromPoint(cx, cy);
       label.hit = !!hitEl && hitEl.closest('.edge-label-group') === labelGroups.get(label.id);
-      const text = labelGroups.get(label.id)?.querySelector<SVGGraphicsElement>('.edge-label');
-      const ctm = text?.getScreenCTM();
-      label.textPx = text && ctm ? parseFloat(getComputedStyle(text).fontSize) * Math.hypot(ctm.a, ctm.b) : 0;
+      const control = labelGroups.get(label.id);
+      const text = control?.querySelector<SVGGraphicsElement>('.edge-label');
+      if (text && text.textContent?.trim() && painted(text) && text.getBBox().width > 0) {
+        const ctm = text.getScreenCTM();
+        if (ctm) label.textPx = parseFloat(getComputedStyle(text).fontSize) * Math.hypot(ctm.a, ctm.b);
+      }
+      if (control?.dataset.edgeLabelChip === 'true') {
+        const icon = control.querySelector('.edge-label-icon svg');
+        const glyph = icon?.querySelector('path, circle, ellipse, line, polyline, polygon, rect');
+        const glyphBox = glyph?.getBoundingClientRect();
+        const [a, b, , d] = label.box;
+        label.chip = {
+          allowed: allowsChip,
+          paintedIcon: !!glyphBox && (glyphBox.width > 0 || glyphBox.height > 0) && painted(glyph ?? null),
+          width: Math.hypot(a.x - b.x, a.y - b.y),
+          height: Math.hypot(a.x - d.x, a.y - d.y),
+          accessibleName: control.getAttribute('aria-label')?.trim() ?? '',
+          keyboardButton: control.getAttribute('role') === 'button' && (control.tabIndex >= 0),
+        };
+      }
       const [a, b] = label.line!;
       const len = Math.hypot(b.x - a.x, b.y - a.y);
       const ux = (b.x - a.x) / len, uy = (b.y - a.y) / len;
@@ -250,7 +271,11 @@ export function labelProblems(audit: LabelAudit): LabelProblems {
     })),
     unreachable: shown.filter(l => !l.hit).map(name),
     outOfGap: shown.filter(l => !l.inGap).map(name),
-    small: shown.filter(l => l.textPx < READABLE_TEXT_PX).map(name),
+    small: shown.filter(l => !l.chip && l.textPx < READABLE_TEXT_PX).map(name),
+    invalidChips: shown.filter(({ chip }) => chip && (
+      !chip.allowed || !chip.paintedIcon || !chip.accessibleName || !chip.keyboardButton ||
+      Math.abs(chip.width - 24) > 0.5 || Math.abs(chip.height - 24) > 0.5
+    )).map(name),
   };
 }
 
