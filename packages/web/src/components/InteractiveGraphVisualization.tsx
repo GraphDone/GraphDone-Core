@@ -4468,8 +4468,19 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     window.addEventListener('graphdone:layout-organized', publish);
     // Keep the short settle window frequent enough to catch a late simulation
     // tick without polling for the lifetime of the graph.
-    const id = setInterval(() => { publish(); if (settleEpoch !== null) refitIfCovered(settleEpoch); if (++n >= 20) { settleEpoch = null; clearInterval(id); } }, 250);
+    const id = setInterval(() => {
+      publish();
+      if (settleEpoch !== null) refitIfCovered(settleEpoch);
+      // The publisher is only a short-lived simulation bootstrap.  Do not
+      // expire an open panel's settle epoch here: its own RAF/timer must still
+      // be able to refit when the graph settles after this interval ends.
+      if (++n >= 20) clearInterval(id);
+    }, 250);
     publish();
+    // Effects in the portaled MiniMap can run before this listener is attached
+    // on an already-mounted graph.  Initialize an open panel explicitly so a
+    // late data/render effect still gets the same short settle window.
+    if (document.querySelector('[data-testid="mini-map-panel"]')) snapshot();
     return () => {
       alive = false;
       settleEpoch = null;
@@ -4479,7 +4490,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       window.removeEventListener('graphdone:minimap-open', snapshot);
       window.removeEventListener('graphdone:layout-organized', publish);
     };
-  }, [currentGraph?.id, workItemsData?.workItems?.length]);
+  }, [currentGraph?.id]);
 
   // Center on specific node
   const centerOnNode = useCallback((nodeId?: string) => {
