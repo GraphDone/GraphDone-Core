@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import { ChevronDown, Plus, Folder, FolderOpen, FileText, Share2, Eye, Edit3, Crown, Trash2, FolderPlus, ChevronRight, Users, Bot, Settings, Zap, User, Lock, Sparkles } from 'lucide-react';
 import { useQuery } from '@apollo/client';
 import { useGraph } from '../contexts/GraphContext';
+import type { GraphHierarchy } from '../types/graph';
 import { useAuth } from '../contexts/AuthContext';
 import { GET_WORK_ITEMS, GET_EDGES } from '../lib/queries';
 import { offlineEnabled, localGuest } from '../lib/offline/engine';
@@ -216,11 +217,11 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
   // Organize graphs into folder structure
   const organizeGraphsIntoFolders = () => {
     const folders = {
-      team: [] as any[],
-      personal: [] as any[],
-      system: [] as any[],
-      ai: [] as any[],
-      templates: [] as any[]
+      team: [] as GraphHierarchy[],
+      personal: [] as GraphHierarchy[],
+      system: [] as GraphHierarchy[],
+      ai: [] as GraphHierarchy[],
+      templates: [] as GraphHierarchy[]
     };
 
     graphHierarchy.forEach(graph => {
@@ -277,6 +278,52 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
       case 'templates': return 'Templates';
       default: return folderId;
     }
+  };
+
+  const renderGraph = (graph: GraphHierarchy, depth = 0): ReactNode => {
+    const expanded = expandedGraphs.has(graph.id);
+    const active = graph.id === currentGraph?.id;
+    return (
+      <div key={graph.id}>
+        <div
+          className={`flex min-w-0 items-center group/item ${depth > 0 ? 'border-l border-gray-700/40 pl-2' : ''}`}
+          style={{ marginLeft: Math.min(depth, 4) * 12 }}
+        >
+          {graph.children.length > 0 && (
+            <button
+              onClick={() => toggleGraphExpand(graph.id)}
+              className="min-h-11 min-w-11 flex shrink-0 items-center justify-center rounded-lg text-gray-400 hover:text-white"
+              title={`${graph.children.length} sub-graphs`}
+              aria-label={`${expanded ? 'Collapse' : 'Expand'} ${graph.name}`}
+              aria-expanded={expanded}
+            >
+              <ChevronRight className={`h-3.5 w-3.5 transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`} />
+            </button>
+          )}
+          <button
+            onClick={() => handleGraphSelect(graph.id)}
+            className={`min-w-0 flex-1 flex items-center gap-2 rounded-xl border p-2 text-left transition-all duration-200 ${
+              active
+                ? 'bg-gradient-to-r from-emerald-500/25 to-green-500/25 text-emerald-200 border-emerald-400/40'
+                : 'hover:bg-gray-700/50 text-gray-300 border-transparent hover:border-gray-600/30'
+            }`}
+          >
+            <div className={`w-7 h-7 rounded-lg flex shrink-0 items-center justify-center ${getGraphTypeColor(graph.type)}`}>
+              {getGraphTypeIcon(graph.type)}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-medium truncate">{graph.name}</div>
+              <div className="text-xs text-gray-400">
+                {active ? actualNodeCount : graph.nodeCount || 0} items • {active ? actualEdgeCount : graph.edgeCount || 0} connections
+              </div>
+            </div>
+            {active && <div className="w-2 h-2 shrink-0 bg-green-400 rounded-full animate-pulse shadow-lg shadow-green-400/50" />}
+          </button>
+          {graphActions(graph)}
+        </div>
+        {expanded && graph.children.map(child => renderGraph(child, depth + 1))}
+      </div>
+    );
   };
 
   // Show no graphs available if we have no available graphs at all
@@ -389,79 +436,7 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
                     {/* Folder Contents */}
                     {isExpanded && (
                       <div className="ml-5 mt-1 space-y-1">
-                        {graphs.map((graph) => (
-                          <div key={graph.id}>
-                          <div className="flex min-w-0 items-center group/item">
-                            {graph.children && graph.children.length > 0 && (
-                              <button
-                                onClick={(e) => { e.stopPropagation(); toggleGraphExpand(graph.id); }}
-                                className="p-1 mr-0.5 flex-shrink-0 text-gray-400 hover:text-white"
-                                title={`${graph.children.length} sub-graphs`}
-                              >
-                                <ChevronRight className={`h-3.5 w-3.5 transition-transform duration-200 ${expandedGraphs.has(graph.id) ? 'rotate-90' : ''}`} />
-                              </button>
-                            )}
-                            <button
-                              onClick={() => handleGraphSelect(graph.id)}
-                              className={`min-w-0 flex-1 flex items-center space-x-2.5 p-2.5 rounded-xl text-left transition-all duration-200 ${
-                                graph.id === currentGraph?.id
-                                  ? 'bg-gradient-to-r from-emerald-500/25 to-green-500/25 text-emerald-200 border-2 border-emerald-400/40 shadow-lg'
-                                  : 'hover:bg-gray-700/50 text-gray-300 border border-transparent hover:border-gray-600/30'
-                              }`}
-                            >
-                              <div className="flex-shrink-0">
-                                <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${getGraphTypeColor(graph.type)} shadow-sm`}>
-                                  {getGraphTypeIcon(graph.type)}
-                                </div>
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="text-sm font-medium truncate">{graph.name}</div>
-                                <div className="text-xs text-gray-400 flex flex-wrap items-center gap-x-1.5">
-                                  <span className="flex items-center">
-                                    <span className="font-normal">{graph.id === currentGraph?.id ? actualNodeCount : (graph.nodeCount || 0)}</span>
-                                    <span className="ml-0.5">items</span>
-                                  </span>
-                                  <span>•</span>
-                                  <span className="flex items-center">
-                                    <span className="font-normal">{graph.id === currentGraph?.id ? actualEdgeCount : (graph.edgeCount || 0)}</span>
-                                    <span className="ml-0.5">connections</span>
-                                  </span>
-                                </div>
-                              </div>
-                              {graph.id === currentGraph?.id && (
-                                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse shadow-lg shadow-green-400/50"></div>
-                              )}
-                            </button>
-                            
-                            {graphActions(graph)}
-                          </div>
-                          {graph.children && graph.children.length > 0 && expandedGraphs.has(graph.id) && (
-                            <div className="ml-6 mt-1 space-y-1 border-l border-gray-700/40 pl-2">
-                              {graph.children.map((child: any) => (
-                                <div key={child.id} className="flex min-w-0 items-center group/item">
-                                  <button
-                                    onClick={() => handleGraphSelect(child.id)}
-                                    className={`min-w-0 flex-1 flex items-center space-x-2 p-2 rounded-lg text-left transition-all duration-200 ${
-                                      child.id === currentGraph?.id
-                                        ? 'bg-emerald-500/20 text-emerald-200 border border-emerald-400/40'
-                                        : 'hover:bg-gray-700/50 text-gray-300 border border-transparent'
-                                    }`}
-                                  >
-                                    <div className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 ${getGraphTypeColor(child.type)}`}>
-                                      {getGraphTypeIcon(child.type)}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                      <div className="text-xs font-medium truncate">{child.name}</div>
-                                      <div className="text-xs text-gray-400">{child.nodeCount || 0} items • {child.edgeCount || 0} connections</div>
-                                    </div>
-                                  </button>
-                                  {graphActions(child)}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                          </div>
-                        ))}
+                        {graphs.map(graph => renderGraph(graph))}
                       </div>
                     )}
                   </div>
@@ -508,7 +483,7 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
           {graphHierarchy.length > 0 && (
             <div className="shrink-0 border-t border-gray-600 p-3 bg-gray-700/50">
               <div className="flex items-center justify-between text-xs font-normal text-gray-400">
-                <span>Total: {graphHierarchy.length} Graph{graphHierarchy.length !== 1 ? 's' : ''}</span>
+                <span>Total: {availableGraphs.length} Graph{availableGraphs.length !== 1 ? 's' : ''}</span>
               </div>
             </div>
           )}

@@ -50,6 +50,21 @@ describe('zoomContextOf', () => {
     expect(context.childCount.get('gs')).toBe(4);
   });
 
+  it('totals items and graph counts at every depth while keeping direct children for navigation', () => {
+    const context = zoomContextOf([
+      ...starter,
+      g('archive', 'Archive', 'launch', 3),
+      g('older', 'Older', 'archive', 2),
+      g('nested', 'Nested', 'move', 7),
+    ], 'welcome')!;
+    expect(context.projects.map(({items, graphCount}) => ({items, graphCount}))).toEqual([
+      {items: 32, graphCount: 6},
+      {items: 13, graphCount: 2},
+      {items: 9, graphCount: 0},
+    ]);
+    expect(context.projects[0].children.map(child => child.id)).toEqual(['launch', 'welcome', 'bugs', 'ideas']);
+  });
+
   it('gives a top-level graph its top-level neighbours and no project level', () => {
     const context = zoomContextOf(starter, 'old')!;
     expect(context.parent).toBeNull();

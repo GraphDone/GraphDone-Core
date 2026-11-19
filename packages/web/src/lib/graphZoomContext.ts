@@ -31,6 +31,7 @@ export interface Rect {
 export interface ProjectSummary {
   graph: ZoomGraph;
   children: ZoomGraph[];
+  graphCount: number;
   items: number;
   current: boolean;
 }
@@ -59,32 +60,41 @@ function orderGraphs(graphs: ZoomGraph[], childCount: ReadonlyMap<string, number
 export function zoomContextOf(graphs: readonly ZoomGraph[], currentId: string): ZoomContext | null {
   const current = graphs.find(graph => graph.id === currentId);
   if (!current) return null;
+  const childrenByParent = new Map<string | null, ZoomGraph[]>();
   const childCount = new Map<string, number>();
   for (const graph of graphs) {
-    const parent = parentOf(graph);
-    if (parent) childCount.set(parent, (childCount.get(parent) ?? 0) + 1);
+    const parentId = parentOf(graph);
+    const children = childrenByParent.get(parentId) ?? [];
+    children.push(graph);
+    childrenByParent.set(parentId, children);
+    if (parentId) childCount.set(parentId, children.length);
   }
   const parentId = parentOf(current);
   const parent = parentId ? graphs.find(graph => graph.id === parentId) ?? null : null;
   const siblings = orderGraphs(
-    graphs.filter(graph => graph.id !== current.id && parentOf(graph) === parentId),
+    (childrenByParent.get(parentId) ?? []).filter(graph => graph.id !== current.id),
     childCount
   );
   const projects: ProjectSummary[] = [];
   if (parent) {
     const level = parentOf(parent);
     const others = orderGraphs(
-      graphs.filter(graph => graph.id !== parent.id && parentOf(graph) === level),
+      (childrenByParent.get(level) ?? []).filter(graph => graph.id !== parent.id),
       childCount
     );
     for (const graph of [parent, ...others]) {
-      const children = orderGraphs(graphs.filter(child => parentOf(child) === graph.id), childCount);
-      projects.push({
-        graph,
-        children,
-        items: (graph.nodeCount ?? 0) + children.reduce((sum, child) => sum + (child.nodeCount ?? 0), 0),
-        current: graph.id === parent.id,
-      });
+      const children = orderGraphs(childrenByParent.get(graph.id) ?? [], childCount);
+      const seen = new Set<string>();
+      const pending = [graph];
+      let items = 0;
+      while (pending.length > 0) {
+        const descendant = pending.pop()!;
+        if (seen.has(descendant.id)) continue;
+        seen.add(descendant.id);
+        items += descendant.nodeCount ?? 0;
+        for (const child of childrenByParent.get(descendant.id) ?? []) pending.push(child);
+      }
+      projects.push({ graph, children, graphCount: seen.size - 1, items, current: graph.id === parent.id });
     }
   }
   return { current, parent, siblings, projects, childCount };
