@@ -2432,7 +2432,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .style('cursor', 'pointer')
       .call(d3.drag<any, any>()
         // Locked (phone) → reject the drag so the gesture pans the canvas instead.
-        .filter((event: any) => canSaveLayoutRef.current && !interactionLockedRef.current && !event.ctrlKey && !event.button)
+        .filter((event: any) => simulationRef.current === simulation && canSaveLayoutRef.current && !interactionLockedRef.current && !event.ctrlKey && !event.button)
         .on('start', (event, d: any) => {
           d._dragging = false;
           delete d._dragStart;
@@ -2458,7 +2458,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
         })
         .on('drag', (event, d: any) => {
-          if (!d._dragStart) return;
+          if (simulationRef.current !== simulation || !canSaveLayoutRef.current || !d._dragStart) return;
           if (!d._dragging) {
             d._dragging = true;
             simulation.alphaTarget(0.2).restart();
@@ -2515,7 +2515,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           d.y = d.fy;
         })
         .on('end', (event, d: any) => {
-          if (simulationRef.current !== simulation || simulationLayoutScopeRef.current !== activeLayoutScopeRef.current) return;
+          if (!canSaveLayoutRef.current || simulationRef.current !== simulation || simulationLayoutScopeRef.current !== activeLayoutScopeRef.current) return;
           const dragged = d._dragging;
           d._dragging = false;
           delete d._dragStart;
@@ -4161,7 +4161,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
   // Store simulation reference for resize handling
   const simulationRef = useRef<d3.Simulation<any, any> | null>(null);
-  useLayoutEffect(() => () => stopActiveSimulation(), [layoutScope, stopActiveSimulation]);
+  useLayoutEffect(() => () => {
+    altDragSourceRef.current = null;
+    stopActiveSimulation();
+  }, [layoutScope, canSaveLayout, stopActiveSimulation]);
   const zoomBehaviorRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
   useLayoutEffect(() => {
     itemPresentation.refresh();
@@ -5071,6 +5074,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     const shouldReinit =
       !svgRef.current ||
       !containerRef.current ||
+      !simulationRef.current ||
       nodes.length === 0 ||
       !d3.select(svgRef.current).select('.main-graph-group').node() ||
       reinitTrigger > 0 ||
@@ -5120,6 +5124,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     nodes.length,
     validatedEdges.length,
     currentGraph?.id, // Re-init when graph changes
+    canSaveLayout,
+    layoutRecoveryReady,
     reinitTrigger, // Manual trigger
     loading, // Re-init when loading completes
     edgesLoading, // Re-init when edges loading completes

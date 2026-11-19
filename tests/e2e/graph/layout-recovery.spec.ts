@@ -617,3 +617,62 @@ test('viewing an unplaced read-only graph never queues or sends positions @layou
   expect(writes).toEqual([]);
   await expect(page.getByText('Layout needs attention', { exact: true })).toHaveCount(0);
 });
+
+test('permission loss cancels an active drag and leaves earlier edits recoverable @layout-recovery', async ({ page, ownedGraphIds }) => {
+  test.setTimeout(90000);
+  await login(page, TEST_USERS.ADMIN);
+  const graph = await ownedGraphIds.seed({ size: 2, spacing: 340, edgeFactor: 0, namePrefix: 'Layout permission transition' });
+  const [pendingId, draggedId] = graph.nodeIds;
+  const viewer = (await gql(page, '{me{id}}')).me.id;
+  const updateAccess = async (editable: boolean) => {
+    await gql(page, 'mutation($id:ID!,$acl:String!){updateGraphs(where:{id:$id},update:{permissions:$acl}){graphs{id}}}', {
+      id: graph.graphId, acl: JSON.stringify({ owner: editable ? viewer : 'fixture-owner', admins: [], editors: [], viewers: [viewer], teamPermission: 'VIEW' }),
+    });
+    await page.evaluate(() => window.dispatchEvent(new Event('graphdone-sync-refresh')));
+  };
+
+  await openGraph(page, graph.graphId);
+  const organize = page.getByRole('button', { name: 'Organize around connections', exact: true });
+  await expect(organize).toBeEnabled();
+  const canonical = await readSaved(page, graph.graphId, draggedId);
+  const attempts: Array<{ x: number; y: number }> = [];
+  const route = failLayout(graph.graphId, pendingId, attempts);
+  await page.route('**/api/graphql', route);
+  const pending = await drag(page, pendingId);
+  await expect.poll(() => attempts.length).toBeGreaterThan(0);
+  await expect.poll(async () => {
+    const { receipt } = await readReceipt(page, graph.graphId, pendingId);
+    return receipt && rounded(receipt);
+  }).toEqual(rounded(pending));
+
+  const card = page.locator('.graph-container svg .node').filter({ has: page.locator(`[data-node-id="${draggedId}"]`) }).locator('.node-bg');
+  await expect(card).toBeInViewport({ ratio: 1 });
+  const box = (await card.boundingBox())!;
+  const center = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  await page.mouse.move(center.x, center.y);
+  await page.mouse.down();
+  try {
+    await page.mouse.move(center.x + 80, center.y + 55, { steps: 8 });
+    await expect.poll(async () => rounded((await readPosition(page, draggedId))!)).not.toEqual(rounded(canonical));
+    await updateAccess(false);
+    await expect(organize).toBeDisabled();
+    await page.mouse.move(center.x + 110, center.y + 75, { steps: 6 });
+  } finally {
+    await page.mouse.up();
+  }
+  await expect.poll(async () => {
+    const position = await readPosition(page, draggedId);
+    return position && rounded(position);
+  }).toEqual(rounded(canonical));
+  expect(await readSaved(page, graph.graphId, draggedId)).toEqual(canonical);
+  expect((await readReceipt(page, graph.graphId, draggedId)).receipt).toBeUndefined();
+  expect(rounded((await readReceipt(page, graph.graphId, pendingId)).receipt)).toEqual(rounded(pending));
+
+  await page.unroute('**/api/graphql', route);
+  await updateAccess(true);
+  await expect(organize).toBeEnabled();
+  await expect.poll(async () => rounded(await readSaved(page, graph.graphId, pendingId)), { timeout: 15000 }).toEqual(rounded(pending));
+  await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pagehide')));
+  expect(await readSaved(page, graph.graphId, draggedId)).toEqual(canonical);
+  expect((await readReceipt(page, graph.graphId, draggedId)).receipt).toBeUndefined();
+});
