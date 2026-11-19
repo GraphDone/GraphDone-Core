@@ -189,7 +189,7 @@ Copy the output and use it as your `SESSION_SECRET` value.
 2. ✅ Passport.js initialized with OAuth strategies
 3. ✅ OAuth initiation routes for each provider
 4. ✅ OAuth callback handlers with JWT token generation
-5. ✅ Frontend token handling via URL parameters
+5. ✅ A one-time handover code the sign-in page confirms before it stores the session
 
 The OAuth routes are automatically enabled when you provide OAuth credentials in your `.env` file.
 
@@ -201,8 +201,11 @@ The OAuth routes are automatically enabled when you provide OAuth credentials in
 4. **Server receives callback** - Passport.js validates the OAuth response
 5. **User creation/linking** - Server finds or creates user via `findOrCreateUserFromOAuth()`
 6. **JWT token generation** - Server generates a JWT token for the user
-7. **Frontend redirect** - Server redirects to `/login?token=<jwt_token>`
-8. **Token storage** - Frontend saves token to localStorage and navigates to dashboard
+7. **Frontend redirect** - Server keeps the token and redirects to `/login#handover=<code>`, a one-time code that expires after two minutes. It sits in the address fragment, so it is not sent to servers, logged or passed on as a referrer, and the page removes it at once.
+8. **Confirmation** - The sign-in page asks the server which account the code belongs to (`POST /auth/session/handover/preview`) and shows "Finish signing in as …?"
+9. **Token storage** - When the person presses Continue, the page exchanges the code for the token (`POST /auth/session/handover/complete`, single use), stores it and opens the app. Nothing is stored before Continue.
+
+The handover codes live in the API process's memory, so a sign-in must start and finish on the same API process.
 
 ### OAuth Routes Available
 

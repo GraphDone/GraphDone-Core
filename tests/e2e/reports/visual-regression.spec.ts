@@ -1,18 +1,6 @@
-import { test, expect, Page } from '@playwright/test';
-import * as fs from 'fs';
-import * as path from 'path';
+import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test';
+import { join } from 'node:path';
 
-/**
- * Comprehensive Visual Regression Test Suite
- *
- * Captures screenshots of every screen at multiple resolutions for:
- * - Visual regression testing
- * - DevOps monitoring
- * - UI/UX documentation
- * - Cross-device compatibility verification
- */
-
-// Device configurations with real-world resolutions
 const DEVICES = [
   // Mobile Phones - Portrait
   { name: 'iPhone-SE', width: 375, height: 667, deviceScaleFactor: 2 },
@@ -47,248 +35,140 @@ const DEVICES = [
   { name: 'Ultrawide-4K', width: 5120, height: 2160, deviceScaleFactor: 1 },
 ];
 
-// All screens/routes to capture
-const SCREENS = [
-  { route: '/', name: 'landing-page' },
-  { route: '/login', name: 'login' },
-  { route: '/workspace', name: 'workspace' },
-  { route: '/graph', name: 'graph-view' },
-  { route: '/projects', name: 'projects' },
-  { route: '/settings', name: 'settings' },
-  { route: '/profile', name: 'profile' },
-  { route: '/admin', name: 'admin-panel' },
-  { route: '/admin/users', name: 'admin-users' },
-  { route: '/admin/system', name: 'admin-system' },
+const PAGES = [
+  { route: '/settings', name: 'settings', heading: 'Settings' },
+  { route: '/admin', name: 'admin-panel', heading: 'System Administration' },
 ];
 
-// Create timestamped directory for this test run
-const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-const SCREENSHOT_BASE_DIR = `test-artifacts/visual-regression/${timestamp}`;
-
-// Ensure screenshot directories exist
-function ensureDirectoryExists(dir: string) {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
+async function open(page: Page, route: string, ready: Locator) {
+  const response = await page.goto(route, { waitUntil: 'domcontentloaded' });
+  expect(response?.ok(), `navigation to ${route}`).toBe(true);
+  await expect(page).toHaveURL(url => url.pathname === route);
+  await expect(ready).toBeVisible({ timeout: 15_000 });
 }
 
-// Helper to take a screenshot with retry logic
-async function captureScreenshot(
-  page: Page,
-  filepath: string,
-  options: { fullPage?: boolean; timeout?: number } = {}
-) {
-  const maxRetries = 3;
-  let lastError: Error | null = null;
+async function capture(page: Page, info: TestInfo, device: string, screen: string) {
+  const path = join(info.config.metadata.screenshotDir, device, `${screen}.png`);
+  await page.screenshot({ path, animations: 'disabled', fullPage: true });
+  await info.attach(`${device}-${screen}`, { path, contentType: 'image/png' });
+}
 
-  for (let i = 0; i < maxRetries; i++) {
-    try {
-      await page.screenshot({
-        path: filepath,
-        fullPage: options.fullPage ?? true,
-        timeout: options.timeout ?? 30000,
-      });
-      return true;
-    } catch (error) {
-      lastError = error as Error;
-      console.warn(`Screenshot attempt ${i + 1} failed: ${filepath}`, error);
-      await page.waitForTimeout(1000);
+async function waitForGraphPaint(page: Page) {
+  await expect.poll(() => page.evaluate(() => {
+    const perf = (window as Window & { __graphPerf?: { settled: boolean; graphId: string } }).__graphPerf;
+    const canvas = document.querySelector('.graph-container svg');
+    if (!canvas || !perf?.settled || perf.graphId !== localStorage.getItem('currentGraphId')) {
+      return { settled: false, readableCards: 0, usable: false };
     }
-  }
 
-  console.error(`Failed to capture screenshot after ${maxRetries} attempts: ${filepath}`, lastError);
-  return false;
+    const viewport = canvas.getBoundingClientRect();
+    const visibleFraction = (bounds: DOMRect) => {
+      const width = Math.max(0, Math.min(innerWidth, viewport.right, bounds.right) - Math.max(0, viewport.left, bounds.left));
+      const height = Math.max(0, Math.min(innerHeight, viewport.bottom, bounds.bottom) - Math.max(0, viewport.top, bounds.top));
+      return bounds.width && bounds.height ? (width * height) / (bounds.width * bounds.height) : 0;
+    };
+    const hasPaint = (element: Element) => {
+      const paint = getComputedStyle(element);
+      if (paint.fill === 'none') return false;
+
+      let opacity = Number(paint.fillOpacity);
+      for (let ancestor: Element | null = element; ancestor; ancestor = ancestor.parentElement) {
+        const style = getComputedStyle(ancestor);
+        if (style.display === 'none' || style.visibility !== 'visible') return false;
+        opacity *= Number(style.opacity);
+      }
+      return opacity >= 0.5;
+    };
+
+    const cards = [...canvas.querySelectorAll('g.node[aria-label^="Visual item "]')];
+    const readableCards = cards.filter(node => {
+      const background = node.querySelector('.node-bg');
+      if (!background || !hasPaint(background) || visibleFraction(background.getBoundingClientRect()) < 0.5) return false;
+
+      const titleLines = [...node.querySelectorAll('.node-title-text')];
+      return titleLines.length > 0 && titleLines.every(line => {
+        const bounds = line.getBoundingClientRect();
+        return Boolean(line.textContent?.trim()) && hasPaint(line) && bounds.height >= 8 && visibleFraction(bounds) >= 0.9;
+      });
+    }).length;
+    return { settled: true, readableCards, usable: readableCards >= 2 };
+  }), { message: 'settled graph paints at least two readable fixture cards', timeout: 25_000 })
+    .toEqual(expect.objectContaining({ settled: true, usable: true }));
+  await expect(page.getByTestId('mini-map-status')).toBeHidden();
 }
 
-// Main test suite
-test.describe('Visual Regression Test Suite - All Screens, All Resolutions', () => {
+for (const { name, width, height, deviceScaleFactor } of DEVICES) {
+  test.describe(name, () => {
+    test.use({ viewport: { width, height }, deviceScaleFactor });
 
-  test.beforeAll(() => {
-    // Create base directory structure
-    ensureDirectoryExists(SCREENSHOT_BASE_DIR);
+    test.describe('signed out', () => {
+      test.use({ storageState: { cookies: [], origins: [] } });
 
-    // Create device-specific directories
-    DEVICES.forEach(device => {
-      ensureDirectoryExists(path.join(SCREENSHOT_BASE_DIR, device.name));
-    });
-
-    console.log(`\n📸 Visual Regression Suite Started`);
-    console.log(`📁 Screenshots will be saved to: ${SCREENSHOT_BASE_DIR}`);
-    console.log(`📱 Testing ${DEVICES.length} device configurations`);
-    console.log(`🖼️  Capturing ${SCREENS.length} screens per device`);
-    console.log(`📊 Total screenshots: ${DEVICES.length * SCREENS.length}\n`);
-  });
-
-  // Generate a test for each device configuration
-  for (const device of DEVICES) {
-    test.describe(`Device: ${device.name} (${device.width}x${device.height})`, () => {
-
-      // Test each screen at this resolution
-      for (const screen of SCREENS) {
-        test(`Capture ${screen.name} at ${device.name}`, async ({ page }) => {
-          // Set viewport for this device
-          await page.setViewportSize({
-            width: device.width,
-            height: device.height,
-          });
-
-          // Navigate to the screen
-          const url = `http://localhost:3127${screen.route}`;
-
-          try {
-            await page.goto(url, {
-              waitUntil: 'networkidle',
-              timeout: 30000
-            });
-          } catch (error) {
-            console.warn(`Failed to navigate to ${url}, continuing with screenshot...`);
-          }
-
-          // Wait for page to settle
-          await page.waitForTimeout(2000);
-
-          // Additional wait for any animations or dynamic content
-          try {
-            // Wait for main content area if it exists
-            await page.waitForSelector('main, [role="main"], .main-content', {
-              timeout: 5000
-            }).catch(() => {
-              // Ignore if selector not found
-            });
-          } catch {
-            // Continue even if selector not found
-          }
-
-          // Construct filename
-          const sanitizedScreenName = screen.name.replace(/[^a-z0-9-]/gi, '_');
-          const filename = `${sanitizedScreenName}.png`;
-          const filepath = path.join(SCREENSHOT_BASE_DIR, device.name, filename);
-
-          // Capture screenshot
-          const success = await captureScreenshot(page, filepath);
-
-          // Log result
-          if (success) {
-            console.log(`✅ ${device.name}/${filename}`);
-          } else {
-            console.error(`❌ ${device.name}/${filename}`);
-          }
-
-          // Soft assertion - don't fail test if screenshot fails
-          // This allows the suite to continue even if some screens are inaccessible
-          expect(success).toBeTruthy();
+      for (const { route, screen } of [
+        { route: '/', screen: 'landing-page' },
+        { route: '/login', screen: 'login' },
+      ]) {
+        test(`capture ${screen}`, async ({ page }, info) => {
+          const guestButton = page.getByRole('button', { name: 'Continue as Guest', exact: true }).filter({ visible: true });
+          await open(page, route, guestButton.first());
+          await capture(page, info, name, screen);
         });
       }
+    });
 
-      // Additional test: Capture interactive states
-      test(`Interactive states at ${device.name}`, async ({ page }) => {
-        await page.setViewportSize({
-          width: device.width,
-          height: device.height,
-        });
+    test('capture workspace', async ({ page }, info) => {
+      await page.addInitScript(() => localStorage.setItem('graphdone:viewMode', 'cards'));
+      const firstCard = page.getByTestId('task-list').getByRole('button', { name: 'Edit Visual item 1', exact: true });
+      await open(page, '/workspace', firstCard);
+      await capture(page, info, name, 'workspace');
+    });
 
-        // Go to main page
-        await page.goto('http://localhost:3127', {
-          waitUntil: 'networkidle',
-          timeout: 30000
-        }).catch(() => {});
+    test('capture graph-view', async ({ page }, info) => {
+      await page.addInitScript(() => localStorage.setItem('graphdone:viewMode', 'graph'));
+      const firstNode = page.locator('.graph-container svg g.node[aria-label^="Visual item 1,"]');
+      await open(page, '/workspace', firstNode);
+      await waitForGraphPaint(page);
+      await capture(page, info, name, 'graph-view');
+    });
 
-        await page.waitForTimeout(2000);
-
-        const deviceDir = path.join(SCREENSHOT_BASE_DIR, device.name);
-
-        // Capture hover states on buttons if they exist
-        const buttons = await page.locator('button').all();
-        for (let i = 0; i < Math.min(buttons.length, 5); i++) {
-          try {
-            await buttons[i].hover();
-            await page.waitForTimeout(500);
-            await captureScreenshot(
-              page,
-              path.join(deviceDir, `interactive-button-hover-${i}.png`),
-              { fullPage: false }
-            );
-          } catch {
-            // Continue if button interaction fails
-          }
-        }
-
-        // Capture modal states if modals exist
-        const modalTriggers = await page.locator('[data-testid*="modal"], [aria-haspopup="dialog"]').all();
-        for (let i = 0; i < Math.min(modalTriggers.length, 3); i++) {
-          try {
-            await modalTriggers[i].click();
-            await page.waitForTimeout(1000);
-            await captureScreenshot(
-              page,
-              path.join(deviceDir, `modal-state-${i}.png`)
-            );
-
-            // Try to close modal
-            await page.keyboard.press('Escape');
-            await page.waitForTimeout(500);
-          } catch {
-            // Continue if modal interaction fails
-          }
-        }
+    for (const { route, name: screen, heading } of PAGES) {
+      test(`capture ${screen}`, async ({ page }, info) => {
+        await open(page, route, page.getByRole('heading', { name: heading, exact: true }));
+        await capture(page, info, name, screen);
       });
-    });
-  }
+    }
 
-  test.afterAll(async () => {
-    // Generate summary report
-    const summaryPath = path.join(SCREENSHOT_BASE_DIR, 'SUMMARY.md');
-
-    let summary = `# Visual Regression Test Summary\n\n`;
-    summary += `**Test Run:** ${timestamp}\n`;
-    summary += `**Total Devices:** ${DEVICES.length}\n`;
-    summary += `**Total Screens:** ${SCREENS.length}\n`;
-    summary += `**Total Screenshots:** ${DEVICES.length * SCREENS.length}\n\n`;
-
-    summary += `## Device Configurations\n\n`;
-    summary += `| Device | Resolution | Scale Factor | Orientation |\n`;
-    summary += `|--------|-----------|--------------|-------------|\n`;
-
-    DEVICES.forEach(device => {
-      const orientation = device.width > device.height ? 'Landscape' : 'Portrait';
-      summary += `| ${device.name} | ${device.width}x${device.height} | ${device.deviceScaleFactor}x | ${orientation} |\n`;
+    test('capture agents', async ({ page }, info) => {
+      await open(page, '/agents', page.getByRole('heading', { name: 'Working with AI', exact: true }));
+      await expect(page.getByRole('button', { name: 'Refresh agent work' })).toBeEnabled();
+      const activity = page.getByRole('region', { name: 'Recorded agent activity' });
+      const empty = activity.getByRole('heading', { name: 'No AI contributions recorded here yet' });
+      const populated = activity.getByRole('status').filter({ hasText: /recorded AI contributors/ });
+      await expect(empty.or(populated)).toBeVisible();
+      const setup = page.getByRole('region', { name: 'Agent setup' });
+      await expect(setup.getByRole('button', { name: 'Create agent token' })).toBeEnabled();
+      await capture(page, info, name, 'agents');
     });
 
-    summary += `\n## Screens Captured\n\n`;
-    SCREENS.forEach(screen => {
-      summary += `- **${screen.name}**: \`${screen.route}\`\n`;
+    test('capture ontology', async ({ page }, info) => {
+      await open(page, '/ontology', page.getByRole('heading', { name: 'Ontology', exact: true }));
+      await expect(page.getByText(/^[1-9]\d* in this graph$/).first()).toBeVisible();
+      await expect(page.getByText('Loading usage…', { exact: true })).toHaveCount(0);
+      await capture(page, info, name, 'ontology');
     });
 
-    summary += `\n## Directory Structure\n\n`;
-    summary += `\`\`\`\n`;
-    summary += `${SCREENSHOT_BASE_DIR}/\n`;
-    DEVICES.forEach(device => {
-      summary += `├── ${device.name}/\n`;
-      SCREENS.forEach(screen => {
-        summary += `│   ├── ${screen.name.replace(/[^a-z0-9-]/gi, '_')}.png\n`;
-      });
+    test('capture admin-system', async ({ page }, info) => {
+      await open(page, '/backend', page.getByRole('heading', { name: 'Backend Status', exact: true }));
+      await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled();
+      await capture(page, info, name, 'admin-system');
     });
-    summary += `\`\`\`\n`;
 
-    summary += `\n## Usage\n\n`;
-    summary += `These screenshots can be used for:\n`;
-    summary += `- Visual regression testing (compare against baseline)\n`;
-    summary += `- UI/UX documentation\n`;
-    summary += `- Cross-device compatibility verification\n`;
-    summary += `- Design review and QA\n`;
-    summary += `- DevOps monitoring and alerts\n\n`;
-
-    summary += `## Integration with GraphDone-DevOps\n\n`;
-    summary += `To integrate these screenshots with your DevOps pipeline:\n\n`;
-    summary += `1. **Automated comparison**: Use tools like Pixelmatch or Percy for visual diff\n`;
-    summary += `2. **Artifact storage**: Upload to S3/artifact storage for historical tracking\n`;
-    summary += `3. **CI/CD alerts**: Trigger notifications on visual changes\n`;
-    summary += `4. **Baseline management**: Store approved screenshots as baselines\n\n`;
-
-    fs.writeFileSync(summaryPath, summary);
-
-    console.log(`\n✅ Visual Regression Suite Complete!`);
-    console.log(`📁 Screenshots saved to: ${SCREENSHOT_BASE_DIR}`);
-    console.log(`📄 Summary report: ${summaryPath}\n`);
+    test('capture admin-users', async ({ page }, info) => {
+      const usersTab = page.getByRole('button', { name: 'Users', exact: true });
+      await open(page, '/admin', usersTab);
+      await usersTab.click();
+      await expect(page.getByRole('heading', { name: 'User Management', exact: true })).toBeVisible();
+      await capture(page, info, name, 'admin-users');
+    });
   });
-});
+}
