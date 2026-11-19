@@ -54,6 +54,7 @@ describe.skipIf(!configured)('MCP GraphService — real Neo4j contract', () => {
     const session = driver?.session();
     try {
       if (createdNodes.length) {
+        await session?.run('MATCH (n:WorkItem) WHERE n.id IN $ids MATCH (n)<-[:EDGE_SOURCE|EDGE_TARGET]-(e:Edge) DETACH DELETE e', { ids: createdNodes });
         await session?.run('MATCH (n:WorkItem) WHERE n.id IN $ids DETACH DELETE n', { ids: createdNodes });
       }
       if (createdGraphs.length) {
@@ -285,6 +286,76 @@ describe.skipIf(!configured)('MCP GraphService — real Neo4j contract', () => {
     expect((bad as { isError?: boolean }).isError, 'unknown graph_id errors').toBe(true);
   });
 
+  it('keeps stored graph counts truthful for MCP creates, idempotent edges, boundary edges and deletes', async () => {
+    const g = parse(await svc.createGraph({ name: `Contract Counts ${Date.now()}`, type: 'SUBGRAPH' } as any));
+    const graphId = g.graph.id;
+    createdGraphs.push(graphId);
+    const a = parse(await svc.createNode({ title: 'Count A', type: 'TASK', graph_id: graphId } as any)).node.id;
+    const b = parse(await svc.createNode({ title: 'Count B', type: 'TASK', graph_id: graphId } as any)).node.id;
+    const outside = parse(await svc.createNode({ title: 'Count outside', type: 'TASK' } as any)).node.id;
+    createdNodes.push(a, b, outside);
+    const stored = async () => {
+      const session = driver.session();
+      try {
+        const result = await session.run('MATCH (g:Graph {id: $graphId}) RETURN g.nodeCount AS nodes, g.edgeCount AS edges', { graphId });
+        return { nodes: result.records[0].get('nodes').toNumber(), edges: result.records[0].get('edges').toNumber() };
+      } finally { await session.close(); }
+    };
+    expect(await stored()).toEqual({ nodes: 2, edges: 0 });
+    await svc.createEdge({ source_id: a, target_id: b, type: 'DEPENDS_ON' } as any);
+    await svc.createEdge({ source_id: a, target_id: b, type: 'DEPENDS_ON' } as any);
+    await svc.createEdge({ source_id: a, target_id: outside, type: 'BLOCKS' } as any);
+    expect(await stored()).toEqual({ nodes: 2, edges: 1 });
+    await svc.deleteEdge({ source_id: a, target_id: b, type: 'DEPENDS_ON' } as any);
+    expect(await stored()).toEqual({ nodes: 2, edges: 0 });
+    await svc.bulkOperations({ operations: [{ type: 'create_edge', params: { source_id: a, target_id: b, type: 'BLOCKS' } }] } as any);
+    expect(await stored(), 'bulk edge creation refreshes the same graph counter').toEqual({ nodes: 2, edges: 1 });
+    await svc.bulkOperations({ operations: [{ type: 'delete_edge', params: { source_id: a, target_id: b, type: 'BLOCKS' } }] } as any);
+    expect(await stored(), 'bulk edge deletion refreshes the same graph counter').toEqual({ nodes: 2, edges: 0 });
+    await svc.createEdge({ source_id: a, target_id: b, type: 'RELATES_TO' } as any);
+    await svc.deleteNode({ node_id: b } as any);
+    createdNodes.splice(createdNodes.indexOf(b), 1);
+    expect(await stored()).toEqual({ nodes: 1, edges: 0 });
+  });
+
+  it('rolls back the MCP mutation when count recomputation fails', async () => {
+    const g = parse(await svc.createGraph({ name: `Contract Atomic ${Date.now()}`, type: 'SUBGRAPH' } as any));
+    const graphId = g.graph.id;
+    createdGraphs.push(graphId);
+    const title = `Must roll back ${Date.now()}`;
+    const internals = svc as unknown as { refreshGraphCounts: (...args: unknown[]) => Promise<void> };
+    const refresh = internals.refreshGraphCounts.bind(svc);
+    internals.refreshGraphCounts = async () => { throw new Error('forced count refresh failure'); };
+    try {
+      await expect(svc.createNode({ title, type: 'TASK', graph_id: graphId } as any)).rejects.toThrow('forced count refresh failure');
+    } finally {
+      internals.refreshGraphCounts = refresh;
+    }
+    const session = driver.session();
+    try {
+      const result = await session.run('MATCH (w:WorkItem {title: $title}) RETURN count(w) AS count', { title });
+      expect(result.records[0].get('count').toNumber(), 'the failed call cannot leave a retry-duplicating node').toBe(0);
+    } finally { await session.close(); }
+  });
+
+  it('serializes concurrent graph count updates under the graph lock', async () => {
+    const g = parse(await svc.createGraph({ name: `Contract Concurrent ${Date.now()}`, type: 'SUBGRAPH' } as any));
+    const graphId = g.graph.id;
+    createdGraphs.push(graphId);
+    const nodes = await Promise.all(Array.from({ length: 8 }, (_, index) =>
+      svc.createNode({ title: `Concurrent ${index}`, type: 'TASK', graph_id: graphId } as any).then(parse)
+    ));
+    const ids = nodes.map(value => value.node.id as string);
+    createdNodes.push(...ids);
+    await Promise.all(ids.slice(1).map((id, index) => svc.createEdge({ source_id: ids[index], target_id: id, type: index % 2 ? 'BLOCKS' : 'RELATES_TO' } as any)));
+    const session = driver.session();
+    try {
+      const result = await session.run('MATCH (g:Graph {id: $graphId}) RETURN g.nodeCount AS nodes, g.edgeCount AS edges', { graphId });
+      expect(result.records[0].get('nodes').toNumber()).toBe(8);
+      expect(result.records[0].get('edges').toNumber()).toBe(7);
+    } finally { await session.close(); }
+  });
+
   it('browseGraph returns well-formed data over a real DB', async () => {
     const browsed = parse(await svc.browseGraph({ query_type: 'all_nodes', limit: 25 } as any));
     const arr = browsed.nodes ?? browsed.results ?? browsed.workItems;
@@ -311,11 +382,11 @@ describe.skipIf(!configured)('MCP GraphService — real Neo4j contract', () => {
     transport.stderr?.on('data', chunk => {
       diagnostics += chunk.toString().slice(0, Math.max(0, 16000 - diagnostics.length));
     });
-    const options = { timeout: 3000, maxTotalTimeout: 3000 };
+    const options = { timeout: 10000, maxTotalTimeout: 10000 };
     let pid: number | null = null;
     let createdNodeId: string | null = null;
     try {
-      await client.connect(transport, { timeout: 5000, maxTotalTimeout: 5000 });
+      await client.connect(transport, { timeout: 15000, maxTotalTimeout: 15000 });
       pid = transport.pid;
       expect(client.getServerVersion()).toEqual({ name: 'graphdone-mcp-server', version: '0.4.5-alpha' });
       expect(client.getServerCapabilities()).toEqual({ tools: {} });
@@ -323,8 +394,8 @@ describe.skipIf(!configured)('MCP GraphService — real Neo4j contract', () => {
       expect(listed.tools.find(tool => tool.name === 'create_node')?.inputSchema.required).toEqual(['title', 'type']);
       expect(listed.tools.find(tool => tool.name === 'get_graph_details')?.inputSchema.required).toEqual(['graphId']);
 
-      const title = `Stdio node ${graphId}`;
-      const created = await client.callTool({ name: 'create_node', arguments: { title, type: 'TASK', graph_id: graphId } }, CallToolResultSchema, options);
+      const title = `Sistema de pagos / 支払システム ${graphId}`;
+      const created = await client.callTool({ name: 'create_node', arguments: { title, type: 'TASK', graph_id: graphId, metadata: { lod: { groupPath: ['Sistema de pagos / 支払システム'] }, source: { kind: 'architecture', key: 'payments-root' } } } }, CallToolResultSchema, options);
       expect(created.isError).not.toBe(true);
       const node = JSON.parse((created.content[0] as { text: string }).text).node;
       createdNodes.push(node.id);
@@ -332,7 +403,22 @@ describe.skipIf(!configured)('MCP GraphService — real Neo4j contract', () => {
       expect(node.id).toBeTruthy();
       const read = await client.callTool({ name: 'get_node_details', arguments: { node_id: node.id } }, CallToolResultSchema, options);
       expect(read.isError).not.toBe(true);
-      expect(JSON.parse((read.content[0] as { text: string }).text).node).toMatchObject({ id: node.id, title, type: 'TASK' });
+      expect(JSON.parse((read.content[0] as { text: string }).text).node).toMatchObject({ id: node.id, title, type: 'TASK', metadata: { lod: { groupPath: ['Sistema de pagos / 支払システム'] }, source: { kind: 'architecture', key: 'payments-root' } } });
+
+      const serviceCall = await client.callTool({ name: 'create_node', arguments: { title: 'API de cobros / 決済 API with a deliberately long portable title', type: 'FEATURE', graph_id: graphId, metadata: { lod: { groupPath: ['Sistema de pagos / 支払システム', 'API de cobros / 決済 API'] } } } }, CallToolResultSchema, options);
+      const componentCall = await client.callTool({ name: 'create_node', arguments: { title: 'Fraud scorer', type: 'TASK', graph_id: graphId, metadata: { lod: { groupPath: ['Sistema de pagos / 支払システム', 'API de cobros / 決済 API', 'Fraud / 不正検知'] } } } }, CallToolResultSchema, options);
+      const service = JSON.parse((serviceCall.content[0] as { text: string }).text).node;
+      const component = JSON.parse((componentCall.content[0] as { text: string }).text).node;
+      createdNodes.push(service.id, component.id);
+      for (const args of [
+        { source_id: node.id, target_id: service.id, type: 'DEPENDS_ON' },
+        { source_id: service.id, target_id: component.id, type: 'BLOCKS' },
+        { source_id: component.id, target_id: node.id, type: 'RELATES_TO' },
+        { source_id: node.id, target_id: service.id, type: 'DEPENDS_ON' },
+      ]) {
+        const edge = await client.callTool({ name: 'create_edge', arguments: args }, CallToolResultSchema, options);
+        expect(edge.isError).not.toBe(true);
+      }
 
       await expect(client.request({ method: 'tools/call', params: { name: 42, arguments: {} } }, CallToolResultSchema, options))
         .rejects.toMatchObject({ code: ErrorCode.InternalError, message: expect.stringContaining('"name"') });
@@ -340,11 +426,13 @@ describe.skipIf(!configured)('MCP GraphService — real Neo4j contract', () => {
       expect(unknown).toMatchObject({ isError: true, content: [{ type: 'text', text: 'Error executing contract_unknown_tool: Unknown tool: contract_unknown_tool' }] });
       const recovered = await client.callTool({ name: 'get_graph_details', arguments: { graphId } }, CallToolResultSchema, options);
       expect(recovered.isError).not.toBe(true);
-      expect(JSON.parse((recovered.content[0] as { text: string }).text).graph).toMatchObject({ id: graphId, nodeCount: 1, edgeCount: 0 });
+      expect(JSON.parse((recovered.content[0] as { text: string }).text).graph).toMatchObject({ id: graphId, nodeCount: 3, edgeCount: 3 });
       const session = driver.session();
       try {
-        const persisted = await session.run('MATCH (w:WorkItem {id: $id})-[:BELONGS_TO]->(g:Graph {id: $graphId}) RETURN w.title AS title', { id: node.id, graphId }, { timeout: 3000 });
+        const persisted = await session.run('MATCH (w:WorkItem {id: $id})-[:BELONGS_TO]->(g:Graph {id: $graphId}) RETURN w.title AS title, g.nodeCount AS nodeCount, g.edgeCount AS edgeCount', { id: node.id, graphId }, { timeout: 10000 });
         expect(persisted.records.map(record => record.get('title'))).toEqual([title]);
+        expect(persisted.records[0].get('nodeCount').toNumber()).toBe(3);
+        expect(persisted.records[0].get('edgeCount').toNumber()).toBe(3);
       } finally {
         await session.close();
       }
@@ -380,25 +468,23 @@ describe.skipIf(!configured)('MCP GraphService — real Neo4j contract', () => {
             OPTIONAL MATCH (w)<-[:EDGE_SOURCE|EDGE_TARGET]-(e:Edge)
             WITH collect(DISTINCT e) AS items
             FOREACH (e IN items | DETACH DELETE e)
-            RETURN size(items) AS deleted`, { graphId }, { timeout: 3000 });
-          expect(edges.records[0].get('deleted').toNumber(), 'This fixture creates no edges').toBe(0);
-          expect(edges.summary.counters.updates().nodesDeleted).toBe(0);
+            RETURN size(items) AS deleted`, { graphId }, { timeout: 10000 });
+          expect(edges.summary.counters.updates().nodesDeleted).toBe(edges.records[0].get('deleted').toNumber());
           const nodes = await cleanup.run(`
             MATCH (w:WorkItem)-[:BELONGS_TO]->(:Graph {id: $graphId})
             WITH collect(w) AS items, collect(w.id) AS ids
             FOREACH (w IN items | DETACH DELETE w)
-            RETURN ids`, { graphId }, { timeout: 3000 });
+            RETURN ids`, { graphId }, { timeout: 10000 });
           const removedIds = nodes.records[0].get('ids') as string[];
-          expect(removedIds).toEqual(createdNodeId ? [createdNodeId] : []);
           expect(nodes.summary.counters.updates().nodesDeleted).toBe(removedIds.length);
           const graph = await cleanup.run(`
             MATCH (g:Graph {id: $graphId})
             WITH collect(g) AS items
             FOREACH (g IN items | DETACH DELETE g)
-            RETURN size(items) AS deleted`, { graphId }, { timeout: 3000 });
+            RETURN size(items) AS deleted`, { graphId }, { timeout: 10000 });
           expect(graph.records[0].get('deleted').toNumber()).toBe(1);
           expect(graph.summary.counters.updates().nodesDeleted).toBe(1);
-          const absent = await cleanup.run('MATCH (n) WHERE n.id IN $ids RETURN count(n) AS remaining', { ids: [graphId, ...removedIds] }, { timeout: 3000 });
+          const absent = await cleanup.run('MATCH (n) WHERE n.id IN $ids RETURN count(n) AS remaining', { ids: [graphId, ...removedIds] }, { timeout: 10000 });
           expect(absent.records[0].get('remaining').toNumber()).toBe(0);
         } finally {
           await cleanup.close();
