@@ -265,7 +265,8 @@ export function GraphZoomContext({ graphs, currentGraphId, camera, readPositions
       const graphId = tile?.dataset.zoomTile;
       const bounds = tile?.getBoundingClientRect();
       const initialGap = gap(a, b);
-      if (!graphId || !bounds || !initialGap) { cancel(); return; }
+      if (!graphId || !bounds || !initialGap || !svg.contains(tile) ||
+          !svg.contains(a.target as Node) || !svg.contains(b.target as Node)) { cancel(); return; }
       session = { ids: [a.identifier, b.identifier], graphId, initialGap, previousGap: initialGap, initialSize: Math.max(bounds.width, bounds.height) };
     };
     const move = (event: TouchEvent) => {
