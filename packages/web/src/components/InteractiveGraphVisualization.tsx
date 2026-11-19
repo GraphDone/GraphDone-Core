@@ -284,6 +284,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const interactionLockedRef = useRef<boolean>(!!interactionLocked);
   useEffect(() => { interactionLockedRef.current = !!interactionLocked; }, [interactionLocked]);
   const { currentGraph, availableGraphs, descendInto, canEditGraph } = useGraph();
+  const canEditCurrentGraph = !!currentGraph && canEditGraph(currentGraph.id);
+  const canEditCurrentGraphRef = useRef(canEditCurrentGraph);
+  canEditCurrentGraphRef.current = canEditCurrentGraph;
   // descendInto from context isn't memoized; hold the latest in a ref so the
   // D3-bound node click handler can call it without re-binding every render.
   const descendIntoRef = useRef(descendInto);
@@ -654,13 +657,14 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   // compact and their "+" is hidden (#262). Next tap/click on an item connects.
   useEffect(() => {
     if (!connectRequest) return;
+    onConnectRequestHandled?.();
+    if (!canEditCurrentGraph) return;
     setInlineEdit(null);
     setExpandedNode(null);
     setNodeMenu({ node: null, position: { x: 0, y: 0 }, visible: false });
     setConnectionSource(connectRequest.id);
     setIsConnecting(true);
-    onConnectRequestHandled?.();
-  }, [connectRequest, onConnectRequestHandled]);
+  }, [canEditCurrentGraph, connectRequest, onConnectRequestHandled]);
 
   // D3 handlers are bound once at init and the init effect intentionally
   // avoids re-initialising on mode changes — so handlers would capture STALE
@@ -902,10 +906,6 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // Window will be controlled manually by user interactions
   }, [selectedNodes.size, editingEdge]);
   
-  const canSaveLayout = !!currentGraph && canEditGraph(currentGraph.id);
-  const canSaveLayoutRef = useRef(canSaveLayout);
-  canSaveLayoutRef.current = canSaveLayout;
-
   // Function to save node position to database
   const saveNodePosition = useCallback(async (nodeId: string, x: number, y: number) => {
     if (!currentUser || !currentGraph) throw new Error('A signed-in owner and graph are required.');
@@ -928,7 +928,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     position => saveNodePosition(position.id, position.x, position.y),
     message => showError('Layout needs attention', message || 'Check the layout save status before closing this tab. Return to this graph after reconnecting to retry pending positions.'),
     currentUser && currentGraph ? { ownerId: currentUser.id, graphId: currentGraph.id } : null,
-    canSaveLayout,
+    canEditCurrentGraph,
   );
   const layoutScope = currentUser && currentGraph ? JSON.stringify([currentUser.id, currentGraph.id]) : null;
   const activeLayoutScopeRef = useRef(layoutScope);
@@ -943,7 +943,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   // Dragging queues its dropped item directly; Organize commits the whole layout.
   const persistPositions = useCallback((reason: 'automatic' | 'organize') => {
     const sim = simulationRef.current;
-    if (!canSaveLayoutRef.current || !sim || simulationLayoutScopeRef.current !== activeLayoutScopeRef.current) return;
+    if (!canEditCurrentGraphRef.current || !sim || simulationLayoutScopeRef.current !== activeLayoutScopeRef.current) return;
     const moved = (sim.nodes() as any[]).filter((n: any) =>
       (reason === 'organize' || ((n.positionX ?? 0) === 0 && (n.positionY ?? 0) === 0)) &&
       typeof n.x === 'number' && typeof n.y === 'number' &&
@@ -1187,7 +1187,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // Read mode through refs: this handler is bound to D3 elements once and
     // must see live state without forcing a full re-init.
     const growSource = connectionSourceRef.current;
-    if (isConnectingRef.current && growSource) {
+    if (canEditCurrentGraphRef.current && isConnectingRef.current && growSource) {
       // Complete connection (clicking the source itself just cancels)
       if (growSource !== node.id) {
         void connectItemsRef.current(growSource, node.id, selectedRelationTypeRef.current);
@@ -1251,8 +1251,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
   // Remove unused handleEdgeClick to fix TypeScript warning
 
-  const layoutRecoveryReady = !canSaveLayout || !!positionSaveQueue.state?.recovered || !!positionSaveQueue.error;
-  const pendingPositions = canSaveLayout ? positionSaveQueue.state?.positions : undefined;
+  const layoutRecoveryReady = !canEditCurrentGraph || !!positionSaveQueue.state?.recovered || !!positionSaveQueue.error;
+  const pendingPositions = canEditCurrentGraph ? positionSaveQueue.state?.positions : undefined;
   const workItems = useMemo<WorkItem[]>(() => {
     if (!layoutRecoveryReady) return [];
     const saved: WorkItem[] = workItemsData?.workItems || [];
@@ -1434,7 +1434,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
    * the person when the save fails instead of failing silently (#262).
    */
   const connectItems = (sourceId: string, targetId: string, type: string = selectedRelationTypeRef.current): Promise<boolean> => {
-    if (sourceId === targetId) return Promise.resolve(false);
+    if (!canEditCurrentGraphRef.current || sourceId === targetId) return Promise.resolve(false);
     const title = (nodeId: string) => validatedNodes.find(n => n.id === nodeId)?.title || 'item';
     if (edgeExists(sourceId, targetId)) {
       showSuccess('Already connected', `"${title(sourceId)}" and "${title(targetId)}" are already connected.`);
@@ -1704,10 +1704,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     options?: { type?: string; connectFrom?: { id: string; type?: string } }
   ) => {
     // Create inline node function
-    if (!currentGraph?.id) {
-      // No current graph selected
-      return;
-    }
+    if (!currentGraph?.id || (options?.connectFrom && !canEditCurrentGraphRef.current)) return;
 
     try {
       // Generate a unique name that doesn't conflict with existing nodes
@@ -1761,7 +1758,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
         // Grow mode: wire the new node to its source immediately
         let grownEdgeId: string | undefined;
-        if (newNode?.id && options?.connectFrom) {
+        if (newNode?.id && options?.connectFrom && canEditCurrentGraphRef.current && activeLayoutScopeRef.current === layoutScope) {
           const edgeResult = await createEdgeMutation({
             variables: {
               input: [{
@@ -2487,7 +2484,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .style('cursor', 'pointer')
       .call(d3.drag<any, any>()
         // Locked (phone) → reject the drag so the gesture pans the canvas instead.
-        .filter((event: any) => simulationRef.current === simulation && canSaveLayoutRef.current && !interactionLockedRef.current && !event.ctrlKey && !event.button)
+        .filter((event: any) => simulationRef.current === simulation && canEditCurrentGraphRef.current && !interactionLockedRef.current && !event.ctrlKey && !event.button)
         .on('start', (event, d: any) => {
           d._dragging = false;
           delete d._dragStart;
@@ -2513,7 +2510,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
         })
         .on('drag', (event, d: any) => {
-          if (simulationRef.current !== simulation || !canSaveLayoutRef.current || !d._dragStart) return;
+          if (simulationRef.current !== simulation || !canEditCurrentGraphRef.current || !d._dragStart) return;
           if (!d._dragging) {
             d._dragging = true;
             simulation.alphaTarget(0.2).restart();
@@ -2570,7 +2567,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           d.y = d.fy;
         })
         .on('end', (event, d: any) => {
-          if (!canSaveLayoutRef.current || simulationRef.current !== simulation || simulationLayoutScopeRef.current !== activeLayoutScopeRef.current) return;
+          if (!canEditCurrentGraphRef.current || simulationRef.current !== simulation || simulationLayoutScopeRef.current !== activeLayoutScopeRef.current) return;
           const dragged = d._dragging;
           d._dragging = false;
           delete d._dragStart;
@@ -2607,7 +2604,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           
           // Save the new position via the coalescing queue (#95) so a drag during
           // a reflow doesn't add another parallel write.
-          if (canSaveLayoutRef.current && (d.fx !== d.positionX || d.fy !== d.positionY) && positionSaveQueueRef.current.queue(d.id, d.fx, d.fy)) {
+          if (canEditCurrentGraphRef.current && (d.fx !== d.positionX || d.fy !== d.positionY) && positionSaveQueueRef.current.queue(d.id, d.fx, d.fy)) {
             d.positionX = d.fx;
             d.positionY = d.fy;
             positionSaveQueueRef.current.flush();
@@ -2926,6 +2923,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         return `translate(${x}, ${y}) scale(${1 / (currentTransform?.k || 1)})`;
       })
       .style('cursor', 'pointer')
+      .style('display', () => canEditCurrentGraphRef.current ? null : 'none')
       .style('opacity', (currentTransform?.k || 1) >= LOD_THRESHOLDS.FAR ? 0.85 : 0)
       .style('pointer-events', 'all');
     relationshipIcons.append('title').text('Add a connection (grow)'); // native hover tooltip
@@ -2988,6 +2986,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // connect to it; Esc / right-click / clicking this node → cancel.
     // No modals, no instructions-as-UI (interaction-model W3).
     const startGrow = (event: MouseEvent | KeyboardEvent, d: WorkItem) => {
+      if (!canEditCurrentGraphRef.current) return;
       event.stopPropagation();
       event.preventDefault();
       setNodeMenu({ node: null, position: { x: 0, y: 0 }, visible: false });
@@ -3378,7 +3377,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     nodeElements
     .on('click', (event: MouseEvent, d: any) => {
       // Shift+Click for edge creation
-      if (event.shiftKey) {
+      if (event.shiftKey && canEditCurrentGraphRef.current) {
         event.stopPropagation();
         event.preventDefault();
         
@@ -3674,8 +3673,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         node.select('.node-subgraph-count').attr('y', layout.height / 2 - 10);
         renderItemTitle(element, d, layout);
         renderItemMetadata(element, d, layout);
-        node.selectAll('.node-title-bar, .node-type-text, .node-edit-icon, .node-relationship-icon, .node-expand-icon, .node-descend-icon, .node-description-text, .node-meta, .node-subgraph-count, .node-subgraph-stack')
+        node.selectAll('.node-title-bar, .node-type-text, .node-edit-icon, .node-expand-icon, .node-descend-icon, .node-description-text, .node-meta, .node-subgraph-count, .node-subgraph-stack')
           .style('display', () => layout.compact ? 'none' : null);
+        node.select('.node-relationship-icon').style('display', () => layout.compact || !canEditCurrentGraphRef.current ? 'none' : null);
         if (layout.compact && focusedHeaderControl) {
           compactFocusOrigins.set(element, focusedHeaderControl.getAttribute('class') ?? 'node-edit-icon');
           element.focus({ preventScroll: true });
@@ -4256,10 +4256,18 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
   // Store simulation reference for resize handling
   const simulationRef = useRef<d3.Simulation<any, any> | null>(null);
+  useLayoutEffect(() => {
+    if (canEditCurrentGraph) return;
+    mousedownNodeRef.current = null;
+    setIsConnecting(false);
+    setConnectionSource(null);
+    setShowConnectModal(false);
+    setOpenedFromDeleteModal(false);
+  }, [canEditCurrentGraph]);
   useLayoutEffect(() => () => {
     altDragSourceRef.current = null;
     stopActiveSimulation();
-  }, [layoutScope, canSaveLayout, stopActiveSimulation]);
+  }, [layoutScope, canEditCurrentGraph, stopActiveSimulation]);
   const zoomBehaviorRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
   useLayoutEffect(() => {
     itemPresentation.refresh();
@@ -5249,7 +5257,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     nodes.length,
     validatedEdges.length,
     currentGraph?.id, // Re-init when graph changes
-    canSaveLayout,
+    canEditCurrentGraph,
     layoutRecoveryReady,
     reinitTrigger, // Manual trigger
     loading, // Re-init when loading completes
@@ -5845,7 +5853,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
             rootTestId="node-expand-inspector"
             onClose={closeExpandedNode}
             onEdit={() => { expandedReturnFocusIdRef.current = null; setQuickEditNode(expandedNode); setExpandedNode(null); }}
-            onConnect={() => { expandedReturnFocusIdRef.current = null; const from = expandedNode; setExpandedNode(null); setConnectionSource(from.id); setIsConnecting(true); }}
+            onConnect={canEditCurrentGraph ? () => { expandedReturnFocusIdRef.current = null; const from = expandedNode; setExpandedNode(null); setConnectionSource(from.id); setIsConnecting(true); } : undefined}
           />
         </div>,
         document.body
@@ -6074,6 +6082,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
                   {
                     icon: GitBranch,
                     title: "Create New & Connect",
+                    requiresGraphEdit: true,
                     description: "Add a new work item linked to this one",
                     onClick: (e: React.MouseEvent) => handleCreateConnectedNode(nodeMenu.node!, e),
                     gradient: "from-blue-500/20 via-cyan-500/10 to-blue-500/5",
@@ -6082,6 +6091,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
                   {
                     icon: Link2,
                     title: "Connect to Existing Work Items",
+                    requiresGraphEdit: true,
                     description: (
                       <>
                         <span className="hidden [@media(pointer:fine)]:inline">Shift-click two items, or Alt-drag from one to another.</span>
@@ -6096,6 +6106,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
                   {
                     icon: Unlink,
                     title: "Disconnect Work Items",
+                    requiresGraphEdit: true,
                     description: "Remove connections from this work item",
                     onClick: () => handleDisconnectNodes(nodeMenu.node!),
                     gradient: "from-orange-500/20 via-red-500/10 to-orange-500/5",
@@ -6103,7 +6114,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
                     badge: connectionCount
                   }
                 ];
-              })().map((action, index) => (
+              })().filter(action => canEditCurrentGraph || !action.requiresGraphEdit).map((action, index) => (
                 <button
                   key={index}
                   onClick={action.onClick}
@@ -6209,7 +6220,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
               <span className="text-gray-300">Strength: {Math.round((edgeMenu.edge.strength || 0.8) * 100)}%</span>
             </div>
           </div>
-          <div className="py-1">
+          {canEditCurrentGraph && <div className="py-1">
             <button 
               onClick={() => handleEditEdge(edgeMenu.edge!)}
               className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
@@ -6224,7 +6235,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
               <Trash2 className="h-4 w-4 mr-3" />
               Delete Relationship
             </button>
-          </div>
+          </div>}
         </div>
       )}
 
@@ -6357,7 +6368,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       })()}
 
       {/* Connect / Disconnect: opened from the item menu and from the details modal */}
-      {showConnectModal && selectedNode && (
+      {canEditCurrentGraph && showConnectModal && selectedNode && (
         <ConnectWorkItemModal
           isOpen={showConnectModal}
           onClose={handleCloseConnectModal}

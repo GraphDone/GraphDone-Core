@@ -175,6 +175,7 @@ export interface GraphContextType {
   
   // Utilities
   canEditGraph: (graphId: string) => boolean;
+  canEditGraphNow: (graphId: string, ownerId: string) => boolean;
   canDeleteGraph: (graphId: string) => boolean;
   canShareGraph: (graphId: string) => boolean;
   refreshGraphs: () => Promise<void>;

@@ -5,13 +5,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkItemDetailsModal } from './WorkItemDetailsModal';
 import { GET_WORK_ITEMS } from '../lib/queries';
 import { UndoStack } from '../lib/undoStack';
-import type { WorkItem } from '../types/graph';
+import type { WorkItem, WorkItemEdge } from '../types/graph';
 import { StrictMode } from 'react';
 import { GraphQLError } from 'graphql';
 
-const context = vi.hoisted(() => ({ ownerId: 'owner-a', graphId: 'graph-a', success: vi.fn(), error: vi.fn() }));
+const context = vi.hoisted(() => ({ ownerId: 'owner-a', graphId: 'graph-a', editable: true, success: vi.fn(), error: vi.fn() }));
 vi.mock('../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: context.ownerId, name: 'Owner', role: 'ADMIN' } }) }));
-vi.mock('../contexts/GraphContext', () => ({ useGraph: () => ({ currentGraph: { id: context.graphId, name: 'Test graph' } }) }));
+vi.mock('../contexts/GraphContext', () => ({ useGraph: () => ({ currentGraph: { id: context.graphId, name: 'Test graph' }, canEditGraph: () => context.editable, canEditGraphNow: (id: string, owner: string) => context.editable && id === context.graphId && owner === context.ownerId }) }));
 vi.mock('../contexts/NotificationContext', () => ({ useNotifications: () => ({ showSuccess: context.success, showError: context.error, showWarning: vi.fn() }) }));
 
 function workItem(id: string, title: string) {
@@ -25,13 +25,14 @@ function workItem(id: string, title: string) {
   };
 }
 
-function editor() {
+function editor(edges: WorkItemEdge[] = []) {
   const records = new Map([['item-a', workItem('item-a', 'First item')], ['item-b', workItem('item-b', 'Second item')]]);
   const attempts: Array<{ where: { id: string }; update: Record<string, unknown> }> = [];
   type Failure = Error | 'graphql' | 'empty' | 'wrong-item';
   const mutations: Array<(failure?: Failure) => void> = [];
   const refetches: Array<() => void> = [];
   const undoStack = new UndoStack();
+  const edgeMutations: string[] = [];
   const client = new ApolloClient({
     cache: new InMemoryCache(),
     link: new ApolloLink(operation => new Observable(observer => {
@@ -39,7 +40,14 @@ function editor() {
       if (operation.operationName === 'GetWorkItems') {
         finish({ workItems: [...records.values()] });
       } else if (operation.operationName === 'GetEdges') {
-        refetches.push(() => finish({ edges: [] }));
+        if (edges.length) finish({ edges: [] });
+        else refetches.push(() => finish({ edges: [] }));
+      } else if (operation.operationName === 'DeleteEdges') {
+        edgeMutations.push(operation.operationName);
+        finish({ deleteEdges: { nodesDeleted: 0, relationshipsDeleted: 1 } });
+      } else if (operation.operationName === 'CreateEdges') {
+        edgeMutations.push(operation.operationName);
+        finish({ createEdges: { edges: [] } });
       } else if (operation.operationName === 'UpdateWorkItems') {
         const variables = structuredClone(operation.variables) as (typeof attempts)[number];
         attempts.push(variables);
@@ -64,12 +72,12 @@ function editor() {
   function Editor({ id, open }: { id: string; open: boolean }) {
     const { data } = useQuery(GET_WORK_ITEMS, { variables: { where: { graph: { id: context.graphId } } } });
     const node = data?.workItems.find((item: WorkItem) => item.id === id) ?? null;
-    return <WorkItemDetailsModal isOpen={open} onClose={() => {}} node={node} undoStack={undoStack} />;
+    return <WorkItemDetailsModal isOpen={open} onClose={() => {}} node={node} edges={edges} nodes={[...records.values()].map(({ id, title, type, status }) => ({ id, title, type, status }))} undoStack={undoStack} />;
   }
   const tree = (id = 'item-a', open = true) => <StrictMode><ApolloProvider client={client}><Editor id={id} open={open} /></ApolloProvider></StrictMode>;
   const view = render(tree());
   return {
-    records, attempts, mutations, refetches, undoStack,
+    records, attempts, mutations, refetches, undoStack, edgeMutations,
     unmount: view.unmount,
     navigate: (id = 'item-a', open = true) => view.rerender(tree(id, open)),
     async acknowledgeMutation() {
@@ -102,12 +110,42 @@ const save = () => {
 beforeEach(() => {
   context.ownerId = 'owner-a';
   context.graphId = 'graph-a';
+  context.editable = true;
   vi.clearAllMocks();
   vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
   vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
 });
 
 afterEach(() => { vi.unstubAllGlobals(); });
+
+const connection: WorkItemEdge = { id: 'edge-a', source: 'item-a', target: 'item-b', type: 'DEPENDS_ON' };
+
+it('keeps connection details visible without offering connection writes on a read-only graph', async () => {
+  context.editable = false;
+  const view = editor([connection]);
+  await screen.findByText('Connections (1)');
+  expect(screen.queryByRole('button', { name: /^Connect to other work items/ })).toBeNull();
+  expect(screen.queryByRole('button', { name: /^Disconnect from work items/ })).toBeNull();
+  expect(view.edgeMutations).toEqual([]);
+});
+
+it.each([true, false])('rechecks permission when undoing a disconnection after details has closed: %s', async editable => {
+  const view = editor([connection]);
+  fireEvent.click(await screen.findByRole('button', { name: /^Disconnect from work items/ }));
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Select Second item to disconnect' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Remove Selected (1)' }));
+  await waitFor(() => expect(view.undoStack.peekLabel()).toBe('Disconnect items'));
+  view.unmount();
+
+  context.editable = editable;
+  if (editable) {
+    await expect(view.undoStack.undo()).resolves.toMatchObject({ label: 'Disconnect items' });
+    expect(view.edgeMutations).toEqual(['DeleteEdges', 'CreateEdges']);
+  } else {
+    await expect(view.undoStack.undo()).rejects.toThrow('Editing access is required');
+    expect(view.edgeMutations).toEqual(['DeleteEdges']);
+  }
+});
 
 describe('work item save completion', () => {
   it('preserves edits made after the mutation commits while its refetch is pending, then saves and undoes both snapshots', async () => {

@@ -34,7 +34,7 @@ import {
 } from '../lib/semanticRelationships';
 import { SemanticRelationshipBrowser } from './SemanticRelationshipBrowser';
 import { routeSchematicConnections } from '../lib/schematicRouting';
-import { boundsOf, type Rect } from '../lib/graphZoomContext';
+import { boundsOf, plural, type Rect } from '../lib/graphZoomContext';
 import { organizeOverview } from '../lib/overviewOrganization';
 import {
   projectSemanticTrace,
@@ -547,6 +547,8 @@ export function SemanticGraphOverview({
         ].join(' / ')
       : 'No visible summary';
   };
+  const groupCount = plural(projection.groups.length, 'group');
+  const itemCount = plural(items.length, 'item');
   return (
     <div
       ref={host}
@@ -589,7 +591,7 @@ export function SemanticGraphOverview({
         {!active && itemDetailControl ? itemDetailControl : <>
         <button
           ref={groupListButton}
-          aria-label={`${projection.groups.length} groups · ${items.length} items`}
+          aria-label={`${groupCount} · ${itemCount}`}
           className="flex md:block items-center justify-center gap-2 rounded-xl bg-slate-900/95 border border-slate-600 px-3 py-1 min-h-11 md:w-32 md:h-14 max-w-full text-slate-100 shadow-lg"
           onClick={() => {
             returnFocus.current = document.activeElement as HTMLElement;
@@ -598,11 +600,11 @@ export function SemanticGraphOverview({
             setGroupId(null);
           }}
         >
-          <span className="md:block">{projection.groups.length} groups</span>
+          <span className="md:block">{groupCount}</span>
           <span className="md:hidden" aria-hidden="true">
             ·
           </span>
-          <span className="md:block">{items.length} items</span>
+          <span className="md:block">{itemCount}</span>
         </button>
         </>}
         {mode === 'overview' && effectiveExpanded.size > 0 && (
