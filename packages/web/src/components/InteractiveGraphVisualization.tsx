@@ -1710,8 +1710,14 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     y: number,
     options?: { type?: string; connectFrom?: { id: string; type?: string } }
   ) => {
-    // Create inline node function
-    if (!currentGraph?.id || (options?.connectFrom && !canEditCurrentGraphRef.current)) return;
+    const growFrom = options?.connectFrom;
+    const canEditScope = () => activeLayoutScopeRef.current === layoutScope && canEditCurrentGraphRef.current;
+    if (!currentGraph?.id || (growFrom && (!currentUser || !canEditScope()))) return;
+    const graphId = currentGraph.id;
+    const ownerId = currentUser?.id;
+    const generation = undoStack.generation;
+    const canFinishGrow = () => canEditScope() && undoStack.generation === generation;
+    const confirmedWrite = growFrom ? { awaitRefetchQueries: false, context: { expectedOwnerId: ownerId } } : {};
 
     try {
       // Generate a unique name that doesn't conflict with existing nodes
@@ -1756,51 +1762,75 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       };
 
       const result = await createNodeMutation({
+        ...confirmedWrite,
         variables: { input: [workItemInput] }
       });
+      const newNode = result.data?.createWorkItems?.workItems?.[0];
+      if (!newNode?.id || (growFrom && (result.errors?.length || newNode.graph?.id !== graphId))) {
+        throw new Error('The work item was not saved.');
+      }
+      setNodeCounter(prev => prev + 1);
 
-      if (result.data) {
-        setNodeCounter(prev => prev + 1);
-        const newNode = result.data.createWorkItems?.workItems?.[0];
-
-        // Grow mode: wire the new node to its source immediately
-        let grownEdgeId: string | undefined;
-        if (newNode?.id && options?.connectFrom && canEditCurrentGraphRef.current && activeLayoutScopeRef.current === layoutScope) {
+      let grownEdgeId: string | undefined;
+      if (growFrom && canFinishGrow()) {
+        try {
           const edgeResult = await createEdgeMutation({
+            ...confirmedWrite,
             variables: {
               input: [{
                 type: 'IS_PART_OF',
                 weight: 0.8,
-                source: { connect: { where: { node: { id: newNode.id } } } },
-                target: { connect: { where: { node: { id: options.connectFrom.id } } } }
+                source: { connect: { where: { node: { id: newNode.id, graph: { id: graphId } } } } },
+                target: { connect: { where: { node: { id: growFrom.id, graph: { id: graphId } } } } }
               }]
             }
-          }).catch(() => undefined); /* edge failure shouldn't kill the node */
-          grownEdgeId = edgeResult?.data?.createEdges?.edges?.[0]?.id;
-        }
-
-        if (newNode?.id) {
-          const createdId = newNode.id;
-          const edgeToRemove = grownEdgeId;
-          undoStack.push({
-            label: 'Create item',
-            undo: async () => {
-              // edges first — orphan edges break the whole edges query
-              if (edgeToRemove) {
-                await deleteEdgeMutation({ variables: { where: { id: edgeToRemove } } }).catch(() => {});
-              }
-              await deleteWorkItemMutation({ variables: { where: { id: createdId } } });
-            }
           });
+          const edge = edgeResult.data?.createEdges?.edges?.[0];
+          if (edgeResult.errors?.length || !edge?.id || edge.type !== 'IS_PART_OF' ||
+              edge.source?.id !== newNode.id || edge.target?.id !== growFrom.id) {
+            throw new Error('The connection was not saved.');
+          }
+          grownEdgeId = edge.id;
+        } catch {
+          if (canFinishGrow()) showError('Item created, but the connection was not saved');
         }
-
-        // The name is the next thing a person wants to set — put them
-        // straight into an inline rename, no modal (interaction-model W2/W3)
-        if (newNode?.id && activeLayoutScopeRef.current === layoutScope && canEditCurrentGraphRef.current) {
-          setInlineEdit({ nodeId: newNode.id, value: newNode.title || nodeTitle, original: newNode.title || nodeTitle, graphX: x, graphY: y, scope: layoutScope });
-        }
-        return newNode;
       }
+
+      if (!growFrom || canFinishGrow()) {
+        const createdId = newNode.id;
+        const edgeToRemove = grownEdgeId;
+        undoStack.push({
+          label: 'Create item',
+          undo: async () => {
+            if (growFrom && !canFinishGrow()) throw new Error('This work item can no longer be edited.');
+            if (edgeToRemove && growFrom) {
+              const result = await deleteEdgeMutation({
+                ...confirmedWrite,
+                variables: { where: { id: edgeToRemove, source: { id: createdId, graph: { id: graphId } }, target: { id: growFrom.id } } }
+              });
+              const deletion = result.data?.deleteEdges;
+              if (result.errors?.length || (!deletion?.nodesDeleted && !deletion?.relationshipsDeleted)) {
+                throw new Error('The connection could not be removed.');
+              }
+              if (!canFinishGrow()) throw new Error('This work item can no longer be edited.');
+            }
+            const result = await deleteWorkItemMutation({
+              ...confirmedWrite,
+              variables: { where: growFrom ? { id: createdId, graph: { id: graphId } } : { id: createdId } },
+            });
+            if (growFrom && (result.errors?.length || result.data?.deleteWorkItems?.nodesDeleted !== 1)) {
+              throw new Error('The work item could not be removed.');
+            }
+          }
+        });
+      }
+
+      // The name is the next thing a person wants to set — put them
+      // straight into an inline rename, no modal (interaction-model W2/W3)
+      if (growFrom ? canFinishGrow() : canEditScope()) {
+        setInlineEdit({ nodeId: newNode.id, value: newNode.title || nodeTitle, original: newNode.title || nodeTitle, graphX: x, graphY: y, scope: layoutScope });
+      }
+      return newNode;
     } catch (error) {
       console.error('[Create Work Item Error]', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to create work item';
