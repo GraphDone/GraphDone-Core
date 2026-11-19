@@ -283,6 +283,14 @@ jobs:
       - name: Dump dev log on failure
         if: failure()
         run: tail -100 /tmp/dev.log || true
+      - name: Upload compact failure reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-reports-${{ github.sha }}-${{ strategy.job-index }}
+          path: test-artifacts/ci-*/report.json
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Upload test artifacts
         if: always()
         uses: actions/upload-artifact@v4

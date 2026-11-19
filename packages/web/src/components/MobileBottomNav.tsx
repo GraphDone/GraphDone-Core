@@ -76,11 +76,11 @@ export function MobileBottomNav() {
         aria-label="Main navigation"
         className="md:hidden flex-shrink-0 relative z-30 flex items-stretch border-t border-gray-700/60 bg-gray-900/95 backdrop-blur-md pb-safe"
       >
-        <button onClick={() => goView('cards')} className={tabActive(onWorkspace && viewMode === 'cards')}>
+        <button onClick={() => goView('cards')} aria-pressed={onWorkspace && viewMode === 'cards'} className={tabActive(onWorkspace && viewMode === 'cards')}>
           <CreditCard className="h-5 w-5" strokeWidth={2} />
           <span className="text-xs font-medium">List</span>
         </button>
-        <button onClick={() => goView('graph')} className={tabActive(onWorkspace && viewMode === 'graph')}>
+        <button onClick={() => goView('graph')} aria-pressed={onWorkspace && viewMode === 'graph'} className={tabActive(onWorkspace && viewMode === 'graph')}>
           <Network className="h-5 w-5" strokeWidth={2} />
           <span className="text-xs font-medium">Graph</span>
         </button>

@@ -1,6 +1,7 @@
 import { test, expect, Page, TestInfo } from '@playwright/test';
 import { writeFile } from 'node:fs/promises';
 import { backend, openGraphView, SetupError } from '../../lib/journeys/workspace';
+import { cancelledThreeFingerPinch, touchGesture, type TouchPoint } from '../../lib/journeys/touchContacts';
 import { readableLabels } from '../../lib/journeys/readableLabels';
 
 async function evidence(info: TestInfo, name: string, body: string | Buffer, contentType: string) {
@@ -29,44 +30,11 @@ async function camera(page: Page) {
   });
 }
 
-type TouchPoint = { x: number; y: number };
-
-async function touchGesture(page: Page, frames: [TouchPoint, TouchPoint][], afterFirstMove?: () => Promise<void>) {
-  const cdp = await page.context().newCDPSession(page);
-  await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
-  const points = ([a, b]: [TouchPoint, TouchPoint]) => [a, b].map((point, index) =>
-    ({ x: Math.round(point.x), y: Math.round(point.y), id: index + 1, radiusX: 2, radiusY: 2, force: 1 }));
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: points(frames[0]) });
-  for (const [index, frame] of frames.slice(1).entries()) {
-    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: points(frame) });
-    await page.waitForTimeout(30);
-    if (index === 0) await afterFirstMove?.();
-  }
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-  await cdp.detach();
-  await page.waitForTimeout(400);
-}
-
 async function pinch(page: Page, center: TouchPoint, from: number, to: number) {
   await touchGesture(page, Array.from({ length: 9 }, (_, step) => {
     const distance = from + (to - from) * step / 8;
     return [{ x: center.x - distance, y: center.y }, { x: center.x + distance, y: center.y }];
   }));
-}
-
-async function cancelledThreeFingerPinch(page: Page, center: TouchPoint) {
-  const cdp = await page.context().newCDPSession(page);
-  await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
-  const point = (x: number, y: number, id: number) => ({ x: Math.round(x), y: Math.round(y), id, radiusX: 2, radiusY: 2, force: 1 });
-  const two = [point(center.x - 20, center.y, 1), point(center.x + 20, center.y, 2)];
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: two });
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [...two, point(center.x, center.y + 30, 3)] });
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [
-    point(center.x - 65, center.y, 1), point(center.x + 65, center.y, 2), point(center.x, center.y + 30, 3),
-  ] });
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-  await cdp.detach();
-  await page.waitForTimeout(400);
 }
 
 async function localSourcePositions(page: Page) {
@@ -91,7 +59,8 @@ test('JOURNEY zoom-out: pinching into a sibling opens that graph on a phone', as
     await expect(selector(page)).toContainText('Welcome');
     expect(await page.evaluate(() => localStorage.getItem('currentGraphId'))).toBe(originalGraphId);
   };
-  const resetOverview = async () => {
+  const resetOverview = async (gesture: string) => {
+    info.annotations.push({ type: 'phone-pinch', description: gesture });
     await page.evaluate(id => localStorage.removeItem(`graphdone:camera:${id}`), originalGraphId);
     await page.reload();
     await openGraphView(page);
@@ -106,7 +75,7 @@ test('JOURNEY zoom-out: pinching into a sibling opens that graph on a phone', as
     await expect(page.locator('.graph-container')).toHaveAttribute('data-zoom-level', '2');
     return area;
   };
-  await resetOverview();
+  await resetOverview('cross-tile contacts');
   const fixTile = () => page.getByRole('button', { name: /^Fix bugs graph, \d+ items?$/ });
   const tileCenter = async (tile: ReturnType<typeof fixTile>) => {
     const box = (await tile.boundingBox())!;
@@ -125,7 +94,7 @@ test('JOURNEY zoom-out: pinching into a sibling opens that graph on a phone', as
   ]]);
   await welcomeStaysSelected();
 
-  await resetOverview();
+  await resetOverview('background');
   const background = await page.evaluate(() => {
     const box = document.querySelector('.graph-container')!.getBoundingClientRect();
     for (const fy of [0.2, 0.5, 0.8]) for (const fx of [0.2, 0.5, 0.8]) {
@@ -137,7 +106,7 @@ test('JOURNEY zoom-out: pinching into a sibling opens that graph on a phone', as
   await pinch(page, background, 20, 65);
   await welcomeStaysSelected();
 
-  await resetOverview();
+  await resetOverview('jitter');
   let center = await tileCenter(fixTile());
   const around = (distances: number[]) => distances.map(distance => [
     { x: center.x - distance, y: center.y }, { x: center.x + distance, y: center.y },
@@ -145,22 +114,22 @@ test('JOURNEY zoom-out: pinching into a sibling opens that graph on a phone', as
   await touchGesture(page, around([20, 23, 19, 22])); // sensor jitter
   await welcomeStaysSelected();
 
-  await resetOverview();
+  await resetOverview('inward');
   center = await tileCenter(fixTile());
   await touchGesture(page, around([40, 32, 24, 16])); // inward pinch
   await welcomeStaysSelected();
 
-  await resetOverview();
+  await resetOverview('reversal');
   center = await tileCenter(fixTile());
   await touchGesture(page, around([20, 24, 16, 65])); // outward, then reversed: cancelled
   await welcomeStaysSelected();
 
-  await resetOverview();
+  await resetOverview('third contact');
   center = await tileCenter(fixTile());
   await cancelledThreeFingerPinch(page, center);
   await welcomeStaysSelected();
 
-  const area = await resetOverview();
+  const area = await resetOverview('slow expansion into sibling');
   const tile = fixTile();
   const tileBox = (await tile.boundingBox())!;
   const shortSide = Math.min(area.width, area.height);

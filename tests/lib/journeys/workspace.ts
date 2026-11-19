@@ -47,10 +47,11 @@ export async function enterWorkspace(page: Page): Promise<{ graphId?: string }> 
 /** Phones open on the List view; a person taps "Graph" in the bottom bar. */
 export async function openGraphView(page: Page) {
   const graph = page.locator('.graph-container');
-  const nav = page.getByTestId('mobile-bottom-nav');
-  await graph.or(nav).first().waitFor({ timeout: 20000 });
-  if (!(await graph.isVisible()) && (await nav.isVisible())) {
-    await nav.getByRole('button', { name: 'Graph', exact: true }).click();
+  const graphTab = page.getByTestId('mobile-bottom-nav').getByRole('button', { name: 'Graph', exact: true });
+  await graph.or(graphTab).filter({ visible: true }).first().waitFor({ timeout: 20000 });
+  // On reload the selected Graph tab is visible before its canvas mounts.
+  if (!(await graph.isVisible()) && await graphTab.isVisible() && await graphTab.getAttribute('aria-pressed') !== 'true') {
+    await graphTab.click({ timeout: 10000 });
   }
   await expect(graph).toBeVisible({ timeout: 20000 });
 }
