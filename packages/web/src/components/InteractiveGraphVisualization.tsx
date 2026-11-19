@@ -1819,6 +1819,11 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   // same key as the presented one reuses the presented layout, and other keys
   // keep a small bounded per-item cache (a live resize refits every frame).
   const itemLayoutAtCache = useRef(new WeakMap<object, { title: string; type: string; description: unknown; subgraphId: unknown; layouts: Map<number, ReturnType<typeof graphItemLayout>> }>());
+  // Collision/label repair is a presentation adjustment until the owner
+  // explicitly saves a new layout. Keep that live pin across data polls so
+  // simulation.nodes() cannot snap the DOM back to the older canonical
+  // coordinates and leave routes disconnected from their cards.
+  const presentationPositionsRef = useRef(new Map<string, { canonicalX: number; canonicalY: number; x: number; y: number }>());
   const getNodeDimensionsAt = useCallback((d: WorkItem, scale: number) => {
     const layoutKey = (value: number) => value >= 1 ? 0 : itemTitleScale(value);
     const key = layoutKey(scale);
@@ -1888,6 +1893,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     const simNodes = simulation.nodes() as any[];
     const prevStatuses = new Map(simNodes.map((n: any) => [n.id, n.status]));
     const nodeMerge = mergeSimulationNodes(simNodes, nodes as any[]);
+    const incomingById = new Map((nodes as any[]).map(node => [node.id, node]));
 
     // LIVE-3: work that just transitioned to completed celebrates.
     if (qualityProfileRef.current.particleCelebrations) {
@@ -1907,7 +1913,22 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // and drift. Snapshot-authoritative load must hold here too.
     (nodeMerge.nodes as any[]).forEach((node: any) => {
         const placed = !(((node.positionX ?? 0) === 0) && ((node.positionY ?? 0) === 0));
-        if (placed && !node._dragging) {
+        const presentation = presentationPositionsRef.current.get(node.id);
+        const incoming = incomingById.get(node.id);
+        const canonicalX = incoming?.positionX ?? node.positionX ?? 0;
+        const canonicalY = incoming?.positionY ?? node.positionY ?? 0;
+        const sameCanonical = presentation
+          && canonicalX === presentation.canonicalX
+          && canonicalY === presentation.canonicalY;
+        if (sameCanonical && !node._dragging) {
+          node.x = presentation.x;
+          node.y = presentation.y;
+          node.fx = presentation.x;
+          node.fy = presentation.y;
+          node.vx = 0;
+          node.vy = 0;
+          node.userPinned = true;
+        } else if (placed && !node._dragging) {
           node.fx = node.positionX;
           node.fy = node.positionY;
           node.userPinned = true;
@@ -1986,6 +2007,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
     const container = containerRef.current;
     const svg = d3.select(svgRef.current);
+    // A rebuild is a new live graph scope; never carry display-only repairs
+    // across graph switches or a node-set replacement.
+    presentationPositionsRef.current.clear();
     
     // Check if this is the first initialization or we need to preserve existing structure
     const existingMainGroup = svg.select('g.main-graph-group');
@@ -2197,6 +2221,12 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       if (repairedCards.has(node.id) && node.fx != null) {
         node.fx = node.x;
         node.fy = node.y;
+        presentationPositionsRef.current.set(node.id, {
+          canonicalX: node.positionX ?? 0,
+          canonicalY: node.positionY ?? 0,
+          x: node.x,
+          y: node.y,
+        });
       }
     });
 
@@ -2486,6 +2516,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         // Locked (phone) → reject the drag so the gesture pans the canvas instead.
         .filter((event: any) => simulationRef.current === simulation && canEditCurrentGraphRef.current && !interactionLockedRef.current && !event.ctrlKey && !event.button)
         .on('start', (event, d: any) => {
+          presentationPositionsRef.current.delete(d.id);
           d._dragging = false;
           delete d._dragStart;
           delete d._connectedNodes;
@@ -4665,6 +4696,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const resetLayout = useCallback(() => {
     const simulation = simulationRef.current, container = containerRef.current;
     if (!simulation || !container || simulationLayoutScopeRef.current !== activeLayoutScopeRef.current) return;
+    presentationPositionsRef.current.clear();
     layoutModeRef.current = 'force';
     try { window.localStorage.setItem(LAYOUT_MODE_STORAGE_KEY, 'force'); } catch (error) { console.warn('Unable to save layout mode', error); }
     window.dispatchEvent(new CustomEvent('graphdone-layout-mode-change', { detail: 'force' }));
