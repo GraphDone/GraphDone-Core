@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import { getToken, getUserRaw } from './authStorage';
+import { handleSessionRevoked, isSessionRevoked } from './sessionRevoked';
 export const hostedUsageEnabled = import.meta.env.VITE_HOSTED_USAGE === 'true';
 type Meter = { operations: number; reads: number; writes: number };
 export type HostedUsage = { sharing?:{used:{links:number;reads:number};limit:{links:number;reads:number;perMinute:number}}; agents?:{used:{requests:number;updates:number};limit:{requests:number;updates:number;perMinute:number};resetAt:string}; used: Meter; limit: Meter; status: string; resetAt: string; rolloutOperations?: number; allocationShares: number; kind: string; limits: {projectsPerAccount?: number; tasksPerProject: number; linksPerProject: number} };
@@ -20,7 +21,10 @@ export async function refreshHostedUsage(force = false) {
   pending = true; lastFetch = Date.now();
   try {
     const response = await fetch(`${import.meta.env.VITE_API_URL || window.location.origin}/api/usage`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store', signal: AbortSignal.timeout(10000) });
-    if (!response.ok) throw Error('Usage is temporarily unavailable. Cloud saves may be paused.');
+    if (!response.ok) {
+      if (isSessionRevoked((await response.json().catch(() => ({})))?.code)) handleSessionRevoked(token);
+      throw Error('Usage is temporarily unavailable. Cloud saves may be paused.');
+    }
     const usage = await response.json();
     if (!usage.hosted || !usage.limit || !usage.used) throw Error('Usage is temporarily unavailable.');
     if (getToken() === token) publish({ usage, error: '', drafts: readDrafts().length });

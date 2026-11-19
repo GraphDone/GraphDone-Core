@@ -107,7 +107,7 @@ GraphDone-DevOps (consumption & analysis)
 
 **Format**: PNG images organized by device
 
-**Devices**: 21 configurations (see VISUAL_REGRESSION_README.md)
+**Devices**: 20 viewport sizes ([visual screenshot suite](../../tests/e2e/reports/VISUAL_REGRESSION_README.md))
 
 **Naming Convention**: `{screen-name}.png`
 

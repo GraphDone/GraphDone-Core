@@ -21,6 +21,7 @@ flowchart LR
 | --- | --- |
 | [`captcha.test.ts`](captcha.test.ts), [`captcha-auth.test.ts`](captcha-auth.test.ts) | The ALTCHA service on its own, then at the real GraphQL login/signup boundary (forged, reused and wrong-action proofs; forwarded-IP tricks). |
 | [`magic-link.test.ts`](magic-link.test.ts), [`auth-link-boundary.test.ts`](auth-link-boundary.test.ts) | Single-use, purpose-bound email links, including concurrent redemption and disabled accounts. |
+| [`session-handover.test.ts`](session-handover.test.ts) | One-time sign-in handover codes: single use, two-minute expiry, capped, hash-only, and the preview/complete endpoints. |
 | [`oauth-identity.test.ts`](oauth-identity.test.ts), [`oauth-profiles.test.ts`](oauth-profiles.test.ts), [`oauth-strategies.test.ts`](oauth-strategies.test.ts) | Linking provider identities to accounts, trusting only verified provider emails, and start-up failure for half-configured providers. |
 | [`password-login-limiter.test.ts`](password-login-limiter.test.ts), [`password-login-limits.test.ts`](password-login-limits.test.ts) | The limiter's accounting, then real HTTP 429s for aliased login mutations. |
 | [`folder-authorization.test.ts`](folder-authorization.test.ts) | Folder queries and mutations need authentication and never cross owners. |
