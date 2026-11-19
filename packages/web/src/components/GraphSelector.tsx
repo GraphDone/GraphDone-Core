@@ -1,5 +1,5 @@
 import { ProjectTransfer } from './ProjectTransfer';
-import { useState, useRef, useEffect, type ReactNode } from 'react';
+import { useState, useRef, useEffect, useId, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Plus, Folder, FolderOpen, FileText, Share2, Eye, Edit3, Crown, Trash2, FolderPlus, ChevronRight, Users, Bot, Settings, Zap, User, Lock, Sparkles } from 'lucide-react';
 import { useQuery } from '@apollo/client';
@@ -28,6 +28,7 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
   const { currentGraph, availableGraphs, graphHierarchy, selectGraph, addExampleProject, canEditGraph, canDeleteGraph } = useGraph();
   const { currentTeam, currentUser } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
+  const dropdownId = useId();
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['team', 'personal', 'system']));
   // Which parent graphs are expanded to show their sub-graphs (the hierarchy).
   const [expandedGraphs, setExpandedGraphs] = useState<Set<string>>(new Set());
@@ -203,7 +204,7 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
     const deleteReason = isSystemGraph ? "🔒 System graph — can't be deleted"
       : !canDeleteGraph(graph.id) ? 'Only the graph owner or admin can delete this graph.' : undefined;
     return (
-      <div className="shrink-0 flex items-center space-x-1 opacity-0 group-hover/item:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity ml-2">
+      <div className="shrink-0 flex items-center space-x-1 opacity-0 group-hover/item:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity ml-2">
         {onEditGraph && action('Edit', onEditGraph, editReason, 'hover:text-blue-400 hover:bg-blue-500/20', <Edit3 className="h-3.5 w-3.5" />)}
         {onDeleteGraph && action('Delete', onDeleteGraph, deleteReason, 'hover:text-red-400 hover:bg-red-500/20', <Trash2 className="h-3.5 w-3.5" />)}
       </div>
@@ -371,6 +372,8 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
         ref={buttonRef}
         onClick={toggleDropdown}
         data-testid={testId}
+        aria-expanded={isOpen}
+        aria-controls={isOpen ? dropdownId : undefined}
         className="project-switcher flex items-center gap-3 w-full p-3 text-left rounded-lg transition-colors border"
       >
         <div className="flex-shrink-0">
@@ -394,7 +397,10 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
       {/* Dropdown menu with folder structure - Portal based for proper z-index */}
       {isOpen && buttonPosition && createPortal(
         <div
+          id={dropdownId}
           data-testid="graph-selector-dropdown"
+          role="region"
+          aria-label="Projects"
           className="project-menu flex flex-col bg-gray-800 border border-gray-600/50 rounded-xl shadow-2xl overflow-hidden"
           style={{
             position: 'fixed',
@@ -455,7 +461,7 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
                       <ChevronRight className={`h-3.5 w-3.5 text-gray-400 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
                       {getFolderIcon(folderId)}
                       <span className="text-sm font-medium text-gray-200 group-hover:text-white flex-1">{getFolderName(folderId)}</span>
-                      <span className="text-xs font-normal text-gray-500 bg-gray-700/50 px-2 py-0.5 rounded-full">{graphs.length}</span>
+                      <span className="text-xs font-normal text-gray-300 bg-gray-700/50 px-2 py-0.5 rounded-full">{graphs.length}</span>
                     </button>
 
                     {/* Folder Contents */}

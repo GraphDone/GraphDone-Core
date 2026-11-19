@@ -267,7 +267,7 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
                 <p className="text-sm text-gray-400 mt-1">Choose the type that best fits your needs</p>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                 {graphTypes.map((type, index) => (
                   <button
                     key={type.type}
@@ -275,12 +275,12 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
                     disabled={type.disabled}
                     title={type.comingSoon ? "Template functionality coming soon!" : undefined}
                     style={{ animationDelay: `${index * 50}ms` }}
-                    className={`group p-5 border-2 rounded-2xl text-left transition-all duration-300 relative overflow-hidden animate-in slide-in-from-bottom-2 ${
+                    className={`group min-w-0 p-3 sm:p-5 border-2 rounded-2xl text-left transition-all duration-300 relative overflow-hidden animate-in slide-in-from-bottom-2 ${
                       formData.type === type.type
-                        ? 'border-green-500/70 bg-gradient-to-br from-green-900/40 to-emerald-900/30 shadow-xl shadow-green-500/20 scale-105'
+                        ? 'border-green-500/70 bg-gradient-to-br from-green-900/40 to-emerald-900/30 shadow-xl shadow-green-500/20 sm:scale-105'
                         : type.disabled
                         ? 'border-gray-700/50 bg-gray-800/30 cursor-not-allowed opacity-50'
-                        : 'border-gray-700/50 bg-gradient-to-br from-gray-800/40 to-gray-900/40 hover:bg-gray-700/50 hover:border-gray-600/70 hover:scale-105 hover:shadow-xl'
+                        : 'border-gray-700/50 bg-gradient-to-br from-gray-800/40 to-gray-900/40 hover:bg-gray-700/50 hover:border-gray-600/70 sm:hover:scale-105 hover:shadow-xl'
                     }`}
                   >
                     {/* Animated gradient overlay */}

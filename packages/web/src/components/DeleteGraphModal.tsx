@@ -289,6 +289,7 @@ export function DeleteGraphModal({ isOpen, onClose, graph }: DeleteGraphModalPro
             </div>
             <button
               onClick={onClose}
+              aria-label="Close"
               className="p-2 text-gray-400 hover:text-white hover:bg-red-600 rounded-lg transition-all duration-200 hover:scale-110"
             >
               <X className="h-5 w-5" />
@@ -471,7 +472,7 @@ export function DeleteGraphModal({ isOpen, onClose, graph }: DeleteGraphModalPro
                     )}
                     
                     {/* Nodes list */}
-                    <div className="max-h-64 overflow-y-auto space-y-3">
+                    <div className="space-y-3 sm:max-h-64 sm:overflow-y-auto">
                       {nodes.map((node) => {
                         const connections = nodeConnections[node.id] || [];
                         const hasConnections = connections.length > 0;
