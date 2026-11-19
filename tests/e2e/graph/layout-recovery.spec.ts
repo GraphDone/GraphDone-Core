@@ -291,7 +291,8 @@ test('a killed owned browser process recovers committed layout receipts from its
     await expect(owned.page.getByTestId('graph-selector')).toBeVisible();
     await expect.poll(async () => rounded(await readSaved(page, graph.graphId, nodeId))).toEqual(rounded(latest));
     await expect.poll(async () => { const value = await readPosition(owned!.page, nodeId); return value && rounded(value); }).toEqual(rounded(latest));
-    expect((await readReceipt(owned.page, graph.graphId, nodeId)).receipt).toBeUndefined();
+    const restoredPage = owned.page;
+    await expect.poll(async () => (await readReceipt(restoredPage, graph.graphId, nodeId)).receipt).toBeUndefined();
     await owned.page.reload();
     await expect.poll(async () => { const value = await readPosition(owned!.page, nodeId); return value && rounded(value); }).toEqual(rounded(latest));
     await info.attach('layout-process-restart.json', { contentType: 'application/json', body: JSON.stringify({ graphId: graph.graphId, nodeId, initial, first, latest, attempts, signal: 'SIGKILL', unloads, independentReadback: await readSaved(page, graph.graphId, nodeId) }) });
