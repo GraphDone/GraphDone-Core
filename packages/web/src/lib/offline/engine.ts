@@ -2,7 +2,7 @@ import { useSyncExternalStore } from 'react';
 import { getToken,getUserRaw } from '../authStorage';
 import { cloudFailure, skipBackgroundPoll } from '../hostedUsage';
 import { handleSessionRevoked, isSessionRevoked } from '../sessionRevoked';
-import { acknowledgedBase,changes,dirty,makeRequest,merge,Snapshot,Row,validateBackupSnapshot,validateBackupProjects,ambiguousRetriedCreation,OFFLINE_PROJECT_LIMIT } from './model';
+import { changes,dirty,makeRequest,merge,mergeAcknowledged,Snapshot,Row,validateBackupSnapshot,validateBackupProjects,ambiguousRetriedCreation,OFFLINE_PROJECT_LIMIT } from './model';
 import { readAccount,editAccount,channel } from './store';
 import { PROJECT_FORMAT,parseProjectDocument,projectDocument,projectMermaid,projectFilename,downloadText } from '../project-transfer/format';
 export const offlineEnabled=import.meta.env.VITE_OFFLINE_SYNC==='true';
@@ -81,8 +81,7 @@ async function acceptRemote(owner:string,id:string,remote:Snapshot|null,ack?:str
   // Never replace an unresolved conflict through background refresh.
   if(p.conflicts?.length)return;
   if(p.request&&!ack)return; // resolve uncertain acknowledgement before pulling
-  const base=ack&&p.request?.requestId===ack?acknowledgedBase(p,p.request,remote):p.base;
-  const result=merge(base,p.local,remote);
+  const result=ack&&p.request?.requestId===ack?mergeAcknowledged(p,p.request,remote):merge(p.base,p.local,remote);
   a.projects[id]={base:remote,local:result.local,conflicts:result.conflicts,remote:result.conflicts.length?remote:undefined,checkedAt:Date.now()};
  });
 }

@@ -1,5 +1,5 @@
 import { describe,it,expect } from 'vitest';
-import { acknowledgedBase,changes,dirty,merge,makeRequest,Snapshot,Project,Row,validateBackupSnapshot,validateBackupProjects,ambiguousRetriedCreation,graphPath,graphType,createsCycle } from './model';
+import { mergeAcknowledged,changes,dirty,merge,makeRequest,Snapshot,Project,Row,validateBackupSnapshot,validateBackupProjects,ambiguousRetriedCreation,graphPath,graphType,createsCycle } from './model';
 const base=():Snapshot=>({project:{id:'p',name:'Family plans',sync_version:1},nodes:[{id:'a',title:'Dinner',status:'PROPOSED',priority:.3,position_x:0,position_y:0}],edges:[],notes:[]});
 describe('durable project reconciliation',()=>{
  it('merges agent status with offline human title without overwriting either',()=>{const b=base(),l=structuredClone(b),r=structuredClone(b);l.nodes[0].title='Dinner for six';r.nodes[0].status='IN_PROGRESS';const m=merge(b,l,r);expect(m.conflicts).toEqual([]);expect(m.local!.nodes[0]).toMatchObject({title:'Dinner for six',status:'IN_PROGRESS'});});
@@ -39,10 +39,30 @@ describe('durable project reconciliation',()=>{
   acknowledged.nodes[0].title = 'First edit';
   acknowledged.project.sync_version = 2;
 
-  const basis = acknowledgedBase(reopened,reopened.request,acknowledged);
-  const result = merge(basis,reopened.local,acknowledged);
+  const result = mergeAcknowledged(reopened,reopened.request,acknowledged);
   expect(result.local?.nodes[0].title).toBe('Later edit');
   expect(result.conflicts).toEqual(['Later edit: title']);
+ });
+ it.each([false,true])('keeps a deliberate legacy revert with disjoint local work: %s',(alsoEditPriority)=>{
+  const original = base();
+  original.nodes.push({id:'b',title:'Other task'});
+  const local = structuredClone(original);
+  const captured = makeRequest('p',{base: original, local, checkedAt: 0});
+  captured.changes = [{table:'nodes',id:'a',action:'put',value:local.nodes[0]}];
+  captured.sent!.nodes[0] = local.nodes[0];
+  const remote = structuredClone(original);
+  remote.nodes[0].title = 'First submitted title';
+  remote.nodes[1].title = 'Server edit on another task';
+  remote.project.sync_version = 3;
+  if(alsoEditPriority)local.nodes[0].priority = 0.8;
+  const reopened = structuredClone({base: original, local, checkedAt: 0, request: captured});
+
+  const result = mergeAcknowledged(reopened,reopened.request,remote);
+  expect(result.local?.nodes).toEqual([
+   {...original.nodes[0],priority:alsoEditPriority?0.8:original.nodes[0].priority},
+   {...original.nodes[1],title:'Server edit on another task'},
+  ]);
+  expect(result.conflicts).toEqual(['Dinner: title']);
  });
  it('orders batched dependencies and keeps the unsent tail',()=>{const b=base(),l=structuredClone(b);l.nodes.push(...Array.from({length:70},(_,i)=>({id:'new'+i,title:'Task '+i})));l.edges.push({id:'e',source_id:'new69',target_id:'a'});const p:Project={base:b,local:l,checkedAt:0},q=makeRequest('p',p);expect(q.changes).toHaveLength(25);expect(q.changes.every(c=>c.table==='nodes')).toBe(true);expect(q.sent!.nodes).toHaveLength(26);expect(changes(q.sent,l)).toHaveLength(46);});
  it('keeps a deletion made while its create acknowledgement was in flight',()=>{const sent=base(),remote=structuredClone(sent);remote.project.sync_version=4;remote.nodes[0].created_at=123;expect(merge(sent,null,remote)).toEqual({local:null,conflicts:[]});});

@@ -37,8 +37,9 @@ export function dirty(p:Project) {return !!p.request || (!!p.base!==!!p.local) |
 /** Three-way merge preserves disjoint human/agent edits; never resolves competing
  * edits or delete-vs-edit silently. Metadata is an atomic field. */
 const equivalent=(a:Snapshot|null,b:Snapshot|null)=>!a&&!b || !!a&&!!b&&a.project.name===b.project.name&&changes(a,b).length===0;
-export function merge(base:Snapshot|null,local:Snapshot|null,remote:Snapshot|null):{local:Snapshot|null;conflicts:string[]} {
- if(equivalent(base,local))return {local:structuredClone(remote),conflicts:[]};
+type LegacyAcknowledgement = { confirmed: Snapshot|null; writes: Change[] };
+export function merge(base:Snapshot|null,local:Snapshot|null,remote:Snapshot|null,legacy?:LegacyAcknowledgement):{local:Snapshot|null;conflicts:string[]} {
+ if(!legacy&&equivalent(base,local))return {local:structuredClone(remote),conflicts:[]};
  if(!remote || !local || !base) {
   if(equivalent(base,remote))return {local:structuredClone(local),conflicts:[]};
   if(equivalent(local,remote))return {local:structuredClone(remote),conflicts:[]};
@@ -53,17 +54,30 @@ export function merge(base:Snapshot|null,local:Snapshot|null,remote:Snapshot|nul
  out.project.name=field('Project','name',base.project.name,local.project.name,remote.project.name);
  for(const table of ['nodes','edges','notes'] as const) {
   const b=new Map(base[table].map(r=>[r.id,r])),l=new Map(local[table].map(r=>[r.id,r])),r=new Map(remote[table].map(r=>[r.id,r]));
+  const confirmed=legacy?.confirmed?.[table];
   const rows:Row[]=[];
   for(const id of new Set([...b.keys(),...l.keys(),...r.keys()])) {
    const before=b.get(id),mine=l.get(id),theirs=r.get(id),label=mine?.title||theirs?.title||id;
-   if(!before||!mine||!theirs) {
+   const legacyWrite=legacy?.writes.some(change=>change.table===table&&change.id===id);
+   if(legacyWrite&&mine&&!theirs) {
+    conflicts.push(`${label}: deleted or changed elsewhere`);
+    rows.push(mine);
+   }else if(!before||!mine||!theirs) {
     // Ignore server timestamps when deciding if a row was edited.
     const equals=(x:any,y:any)=>!!x===!!y && (!x||editable[table].every(k=>same(x[k],y[k])));
     if(equals(mine,before)){if(theirs)rows.push(theirs);}
     else if(equals(theirs,before)||equals(mine,theirs)){if(mine)rows.push(mine);}
     else {conflicts.push(`${label}: deleted or changed elsewhere`);if(mine)rows.push(mine);}
    }else{
-    const row={...theirs};for(const key of editable[table])row[key]=field(label,key,before[key],mine[key],theirs[key]);rows.push(row);
+    const row={...theirs};
+    const lastConfirmed=legacyWrite?confirmed?.find(row=>row.id===id):undefined;
+    for(const key of editable[table]) {
+     if(legacyWrite&&!same(before[key],theirs[key])&&!same(mine[key],theirs[key])) {
+      if(!lastConfirmed||!same(lastConfirmed[key],theirs[key]))conflicts.push(`${label}: ${key}`);
+      row[key]=mine[key];
+     }else row[key]=field(label,key,before[key],mine[key],theirs[key]);
+    }
+    rows.push(row);
    }
   }
   out[table]=rows;
@@ -87,14 +101,11 @@ export function makeRequest(id:string,p:Project):PendingRequest {
  return {requestId:crypto.randomUUID(),attempts:0,projectId:id,version:p.base?.project.sync_version??-1,name:p.local?.project.name,deleteProject:!p.local,changes:p.local?structuredClone(selected):[],sent};
 }
 
-export function acknowledgedBase(project:Project, request:PendingRequest, remote:Snapshot|null):Snapshot|null {
+export function mergeAcknowledged(project:Project, request:PendingRequest, remote:Snapshot|null) {
  const {sent}=request;
- const legacyWrites=request.changes.filter(change=>change.value&&sent?.[change.table].includes(change.value));
- if(!legacyWrites.length)return sent;
- const remoteDifferences=changes(sent,remote);
- return legacyWrites.some(write=>remoteDifferences.some(diff=>diff.table===write.table&&diff.id===write.id))
-  ? project.base
-  : sent;
+ const writes=request.changes.filter(change=>change.value&&sent?.[change.table].includes(change.value));
+ const legacy=writes.length?{confirmed:project.base,writes}:undefined;
+ return merge(sent,project.local,remote,legacy);
 }
 
 /** Backups are untrusted files. Reject malformed renderable values before they
