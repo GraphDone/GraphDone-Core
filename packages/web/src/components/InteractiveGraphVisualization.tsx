@@ -1819,6 +1819,11 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   // same key as the presented one reuses the presented layout, and other keys
   // keep a small bounded per-item cache (a live resize refits every frame).
   const itemLayoutAtCache = useRef(new WeakMap<object, { title: string; type: string; description: unknown; subgraphId: unknown; layouts: Map<number, ReturnType<typeof graphItemLayout>> }>());
+  // Collision/label repair is a presentation adjustment until the owner
+  // explicitly saves a new layout. Keep that live pin across data polls so
+  // simulation.nodes() cannot snap the DOM back to the older canonical
+  // coordinates and leave routes disconnected from their cards.
+  const presentationPositionsRef = useRef(new Map<string, { canonicalX: number; canonicalY: number; x: number; y: number }>());
   const getNodeDimensionsAt = useCallback((d: WorkItem, scale: number) => {
     const layoutKey = (value: number) => value >= 1 ? 0 : itemTitleScale(value);
     const key = layoutKey(scale);
@@ -1888,6 +1893,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     const simNodes = simulation.nodes() as any[];
     const prevStatuses = new Map(simNodes.map((n: any) => [n.id, n.status]));
     const nodeMerge = mergeSimulationNodes(simNodes, nodes as any[]);
+    const incomingById = new Map((nodes as any[]).map(node => [node.id, node]));
 
     // LIVE-3: work that just transitioned to completed celebrates.
     if (qualityProfileRef.current.particleCelebrations) {
@@ -1905,12 +1911,54 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // strips physics keys (fx/fy) to preserve live velocity, so placed nodes
     // arriving via a graph-switch or poll would otherwise come back unpinned
     // and drift. Snapshot-authoritative load must hold here too.
+    let remoteGeometryChanged = false;
     (nodeMerge.nodes as any[]).forEach((node: any) => {
         const placed = !(((node.positionX ?? 0) === 0) && ((node.positionY ?? 0) === 0));
-        if (placed && !node._dragging) {
-          node.fx = node.positionX;
-          node.fy = node.positionY;
+        const presentation = presentationPositionsRef.current.get(node.id);
+        const incoming = incomingById.get(node.id);
+        const canonicalX = incoming?.positionX ?? node.positionX ?? 0;
+        const canonicalY = incoming?.positionY ?? node.positionY ?? 0;
+        const incomingPlaced = !((canonicalX === 0) && (canonicalY === 0));
+        const sameCanonical = presentation
+          && canonicalX === presentation.canonicalX
+          && canonicalY === presentation.canonicalY;
+        if (sameCanonical && !node._dragging) {
+          node.x = presentation.x;
+          node.y = presentation.y;
+          node.fx = presentation.x;
+          node.fy = presentation.y;
+          node.vx = 0;
+          node.vy = 0;
           node.userPinned = true;
+        } else {
+          // The server has authoritative coordinates only when the incoming
+          // payload differs from the repair's snapshot. Do not fall through
+          // to the merged D3 object's old positionX/Y (mergeSimulationNodes
+          // intentionally preserves those fields for live interaction).
+          const invalidatedPresentation = !!presentation && !sameCanonical;
+          if (invalidatedPresentation) {
+            presentationPositionsRef.current.delete(node.id);
+            if (!node._dragging && incoming) {
+              remoteGeometryChanged = true;
+              // Advance the live object's fetched snapshot too. The merge
+              // helper intentionally preserves position fields for local
+              // interaction, but after accepting a remote canonical change a
+              // later poll must not fall back to the obsolete A coordinate.
+              node.positionX = canonicalX;
+              node.positionY = canonicalY;
+              node.x = canonicalX;
+              node.y = canonicalY;
+              node.fx = incomingPlaced ? canonicalX : null;
+              node.fy = incomingPlaced ? canonicalY : null;
+              node.vx = 0;
+              node.vy = 0;
+            }
+          }
+          if ((invalidatedPresentation ? incomingPlaced : placed) && !node._dragging) {
+            node.fx = invalidatedPresentation ? canonicalX : node.positionX;
+            node.fy = invalidatedPresentation ? canonicalY : node.positionY;
+            node.userPinned = true;
+          }
         }
     });
     simulation.nodes(nodeMerge.nodes as any);
@@ -1958,6 +2006,11 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     const hasUnpinned = (simulation.nodes() as any[]).some((n: any) => n.fx == null || n.fy == null);
     if (hasUnpinned) {
       simulation.alpha(0.1).restart();
+    } else if (remoteGeometryChanged) {
+      // A frozen graph has no natural tick after a position-only refetch.
+      // Run one owned render tick so the card transform and edge route both
+      // consume the accepted canonical coordinates; pinned nodes do not move.
+      simulation.alpha(0.001).restart();
     }
 
   }, [nodes, validatedEdges, getNodeDimensions, publishMiniMapPositions]);
@@ -1986,6 +2039,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
     const container = containerRef.current;
     const svg = d3.select(svgRef.current);
+    // A rebuild is a new live graph scope; never carry display-only repairs
+    // across graph switches or a node-set replacement.
+    presentationPositionsRef.current.clear();
     
     // Check if this is the first initialization or we need to preserve existing structure
     const existingMainGroup = svg.select('g.main-graph-group');
@@ -2197,6 +2253,12 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       if (repairedCards.has(node.id) && node.fx != null) {
         node.fx = node.x;
         node.fy = node.y;
+        presentationPositionsRef.current.set(node.id, {
+          canonicalX: node.positionX ?? 0,
+          canonicalY: node.positionY ?? 0,
+          x: node.x,
+          y: node.y,
+        });
       }
     });
 
@@ -2513,6 +2575,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           if (simulationRef.current !== simulation || !canEditCurrentGraphRef.current || !d._dragStart) return;
           if (!d._dragging) {
             d._dragging = true;
+            // D3 fires drag start for an ordinary press. Retire a repaired
+            // pin only after movement proves this is an explicit layout edit.
+            presentationPositionsRef.current.delete(d.id);
             simulation.alphaTarget(0.2).restart();
             d.fx = d.x;
             d.fy = d.y;
@@ -4665,6 +4730,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const resetLayout = useCallback(() => {
     const simulation = simulationRef.current, container = containerRef.current;
     if (!simulation || !container || simulationLayoutScopeRef.current !== activeLayoutScopeRef.current) return;
+    presentationPositionsRef.current.clear();
     layoutModeRef.current = 'force';
     try { window.localStorage.setItem(LAYOUT_MODE_STORAGE_KEY, 'force'); } catch (error) { console.warn('Unable to save layout mode', error); }
     window.dispatchEvent(new CustomEvent('graphdone-layout-mode-change', { detail: 'force' }));
@@ -5262,8 +5328,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     reinitTrigger, // Manual trigger
     loading, // Re-init when loading completes
     edgesLoading, // Re-init when edges loading completes
-    // Track node property changes for selective updates (only titles, descriptions, types)
-    nodes.map(n => `${n.id}:${n.title}:${n.description}:${n.type}:${n.status}:${n.priority}`).join(','),
+    // Track node property changes for selective updates, including canonical
+    // coordinates so a remote position-only edit reaches the live simulation
+    // and repaints repaired cards/edge routes without a full graph rebuild.
+    nodes.map(n => `${n.id}:${n.title}:${n.description}:${n.type}:${n.status}:${n.priority}:${n.positionX}:${n.positionY}`).join(','),
     publishMiniMapPositions,
     // Track edge type/direction changes so a relationship edit or flip rebuilds
     validatedEdges.map((e: any) => {
