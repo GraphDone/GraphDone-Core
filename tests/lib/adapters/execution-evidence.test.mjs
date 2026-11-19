@@ -83,6 +83,25 @@ test('playwright: flaky retry retains first failure diagnostic and labels every 
     'first-screenshot (attempt 1)', 'retry-screenshot (attempt 2)',
   ]);
 });
+test('playwright: terminal failed retry keeps its distinct final diagnostic', async t => {
+  const report = playwrightReport([{
+    status: 'unexpected', expectedStatus: 'passed',
+    results: [
+      { status: 'failed', error: { message: 'first failure' } },
+      { status: 'failed', error: { message: 'terminal failure' } },
+    ],
+  }]);
+  const result = await execute(t, 'playwright', report);
+  assert.equal(result.cases[0].error, 'terminal failure');
+});
+test('playwright: timed-out attempt remains diagnostic after a passing retry', async t => {
+  const report = playwrightReport([{
+    status: 'flaky', expectedStatus: 'passed',
+    results: [{ status: 'timedOut', timedOut: true }, { status: 'passed' }],
+  }]);
+  const result = await execute(t, 'playwright', report);
+  assert.equal(result.cases[0].error, 'Playwright attempt timed out.');
+});
 test('playwright: listed tests with no execution results fail', async t => {
   assert.equal((await execute(t, 'playwright', playwrightReport([{ expectedStatus: 'passed', results: [] }]))).status, 'failed');
 });

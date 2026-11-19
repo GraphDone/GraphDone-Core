@@ -39,13 +39,24 @@ export async function runPlaywrightSequence({ id, title, args = [], target, time
           if (Object.hasOwn(outcomes, t?.status)) outcomes[t.status]++;
           const results = Array.isArray(t?.results) ? t.results : [];
           const last = results.at(-1) || {};
-          // A flaky test is still a failed unified case. Keep the first
-          // failing attempt as the diagnostic: the final successful retry has
-          // no error and otherwise erases the original failure from the
-          // report. Attachments remain collected from every attempt below.
-          const diagnostic = results.find((result) => result?.status === 'failed' && result.error)
-            || results.find((result) => result?.error)
-            || last;
+          const diagnosticText = (result) => {
+            const message = typeof result?.error === 'string' ? result.error : result?.error?.message;
+            if (message) return message;
+            const error = (result?.errors || []).find((entry) => typeof entry === 'string' ? entry : entry?.message);
+            if (error) return typeof error === 'string' ? error : error.message;
+            if (result?.status === 'timedOut' || result?.timedOut) return 'Playwright attempt timed out.';
+            if (result?.status === 'interrupted' || result?.interrupted) return 'Playwright attempt was interrupted.';
+            return undefined;
+          };
+          // A flaky test is still a failed unified case. Prefer the terminal
+          // failed attempt when it has its own diagnostic; when a successful
+          // retry follows, retain the earliest actual non-passed diagnostic
+          // instead of letting the pass erase the original failure.
+          const terminalDiagnostic = last.status !== 'passed' && diagnosticText(last);
+          const diagnostic = terminalDiagnostic
+            ? { error: { message: terminalDiagnostic } }
+            : results.map((result) => ({ result, message: diagnosticText(result) }))
+              .find(({ result, message }) => result?.status !== 'passed' && message);
           const skipped = t?.status === 'skipped' || last.status === 'skipped';
           const passed = t?.status === 'expected' && t.expectedStatus === 'passed' && results.length > 0 && results.every(r => r?.status === 'passed');
           let status = skipped ? 'skipped' : passed ? 'passed' : 'failed';
@@ -56,18 +67,18 @@ export async function runPlaywrightSequence({ id, title, args = [], target, time
             if (!r || (r.attachments !== undefined && !Array.isArray(r.attachments))) { errors.push('Invalid Playwright result attachments.'); continue; }
             for (const a of r.attachments || []) {
               if (!a?.path) continue;
-              const name = results.length > 1 ? `${a.name || spec.title} (attempt ${attempt + 1})` : (a.name || spec.title);
-              if ((a.contentType || '').startsWith('video')) attachments.push({ type: 'video', name, srcPath: a.path });
-              else if ((a.contentType || '').startsWith('image')) attachments.push({ type: 'image', name, srcPath: a.path });
+              const attemptName = results.length > 1 ? `${a.name || spec.title} (attempt ${attempt + 1})` : (a.name || spec.title);
+              if ((a.contentType || '').startsWith('video')) attachments.push({ type: 'video', name: results.length > 1 ? attemptName : spec.title, srcPath: a.path });
+              else if ((a.contentType || '').startsWith('image')) attachments.push({ type: 'image', name: attemptName, srcPath: a.path });
               else if ((a.name === 'trace' && a.contentType === 'application/zip') || a.contentType === 'application/json') {
-                try { attachments.push({ type: 'file', name, srcPath: ownedEvidencePath(process.cwd(), a.path) }); }
+                try { attachments.push({ type: 'file', name: attemptName, srcPath: ownedEvidencePath(process.cwd(), a.path) }); }
                 catch (error) { errors.push(`Rejected file attachment: ${error.message}`); }
               }
             }
           }
           const annotations = (Array.isArray(last.annotations) && last.annotations.length ? last.annotations : t?.annotations || [])
             .filter((a) => a && typeof a.type === 'string').map((a) => ({ type: a.type, description: String(a.description ?? '') }));
-          cases.push({ title: spec.title, project: t?.projectName, status, durationMs: last.duration, error: diagnostic.error?.message || (status === 'failed' ? 'Expected an executed, non-flaky passing test result.' : undefined), attachments, ...(annotations.length ? { annotations } : {}) });
+          cases.push({ title: spec.title, project: t?.projectName, status, durationMs: last.duration, error: diagnostic?.error?.message || diagnostic?.message || (status === 'failed' ? 'Expected an executed, non-flaky passing test result.' : undefined), attachments, ...(annotations.length ? { annotations } : {}) });
         }
       }
       if (s.suites) walk(s.suites);
