@@ -5,12 +5,14 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, gql } from '@apollo/client';
 import { Eye, EyeOff, ArrowRight, Mail, Lock, Users, Github, Zap, Check, CheckCircle, XCircle, AlertTriangle, Shield } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { setToken } from '../lib/authStorage';
+import { getToken, setToken } from '../lib/authStorage';
 import { InsecureConnectionBanner } from '../components/TlsStatusIndicator';
 import { GuestModeDialog } from '../components/GuestModeDialog';
 import { PasswordRequirements } from '../components/PasswordRequirements';
 import { isValidEmail } from '../utils/validation';
 import { AuthCaptcha } from '../components/AuthCaptcha';
+import { TurnstileChallenge } from '../components/TurnstileChallenge';
+import { SessionHandover } from '../components/SessionHandover';
 import { magicLinkFocusTarget, hasEnteredEmail } from '../lib/loginFocus';
 import { formatLoginCodeInput, isCompleteLoginCode } from '../lib/loginCode';
 
@@ -84,6 +86,14 @@ const GET_SYSTEM_SETTINGS = gql`
   }
 `;
 
+const INVALID_MAGIC_LINK = {
+  title: 'Invalid Magic Link',
+  message: 'This magic link is not valid or has already been used.',
+  action: 'Request a new magic link below.'
+};
+
+const HANDOVER_PREFIX = '#handover=';
+
 export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean } = {}) {
   const navigate = useNavigate();
   const { login: setAuthUser } = useAuth();
@@ -98,6 +108,9 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
   const [captchaReset, setCaptchaReset] = useState(0);
   const [passwordCaptchaReady, setPasswordCaptchaReady] = useState(false);
   const [magicLinkCaptchaPayload, setMagicLinkCaptchaPayload] = useState<string | null>(null);
+  const [signInTurnstile, setSignInTurnstile] = useState<{ siteKey: string; action: string } | null>(null);
+  const [magicLinkTurnstileToken, setMagicLinkTurnstileToken] = useState<string | null>(null);
+  const magicLinkProof = signInTurnstile ? magicLinkTurnstileToken : magicLinkCaptchaPayload;
   const magicLinkEmailRef = useRef<HTMLInputElement>(null);
   const [loginCodeInput, setLoginCodeInput] = useState('');
   const [codeVerifying, setCodeVerifying] = useState(false);
@@ -121,11 +134,69 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
   const [turnstileSiteKey, setTurnstileSiteKey] = useState<string | undefined>();
   const [guestDescription, setGuestDescription] = useState<string | undefined>();
   const [showGuestInfo, setShowGuestInfo] = useState(false);
+  const [handover, setHandover] = useState<{ code: string; account: string | null; busy: boolean } | null>(() => {
+    const code = window.location.hash.startsWith(HANDOVER_PREFIX) ? window.location.hash.slice(HANDOVER_PREFIX.length) : '';
+    return code ? { code, account: null, busy: false } : null;
+  });
+  const handoverCode = handover?.code;
   const [oauthConfig, setOauthConfig] = useState<{
     google: { enabled: boolean; configured: boolean };
     github: { enabled: boolean; configured: boolean };
     linkedin: { enabled: boolean; configured: boolean };
   } | null>(null);
+
+  useEffect(() => {
+    const address = new URL(window.location.href);
+    if (address.searchParams.has('token')) address.searchParams.delete('token');
+    if (address.hash.startsWith(HANDOVER_PREFIX)) address.hash = '';
+    if (address.href !== window.location.href) {
+      window.history.replaceState(window.history.state, '', `${address.pathname}${address.search}${address.hash}`);
+    }
+  }, []);
+
+  const refuseHandover = () => {
+    setHandover(null);
+    setErrors({ submit: INVALID_MAGIC_LINK.message, submitTitle: INVALID_MAGIC_LINK.title, submitAction: INVALID_MAGIC_LINK.action });
+  };
+
+  const handoverRequest = async (step: 'preview' | 'complete', code: string): Promise<Record<string, unknown>> => {
+    const apiUrl = import.meta.env.VITE_API_URL || window.location.origin;
+    try {
+      const response = await fetch(`${apiUrl}/auth/session/handover/${step}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code }),
+      });
+      const data = await response.json().catch(() => ({}));
+      return response.ok && data && typeof data === 'object' ? data : {};
+    } catch {
+      return {};
+    }
+  };
+
+  useEffect(() => {
+    if (!handoverCode) return undefined;
+    let active = true;
+    handoverRequest('preview', handoverCode).then(data => {
+      if (!active) return;
+      const account = data.account;
+      if (typeof account === 'string') setHandover(current => current && { ...current, account });
+      else refuseHandover();
+    });
+    return () => { active = false; };
+  }, [handoverCode]);
+
+  const completeHandover = async () => {
+    if (!handover || handover.busy) return;
+    setHandover({ ...handover, busy: true });
+    const data = await handoverRequest('complete', handover.code);
+    if (typeof data.token === 'string') {
+      setToken(data.token, true);
+      window.location.assign('/');
+    } else {
+      refuseHandover();
+    }
+  };
 
   useEffect(() => {
     const fetchOAuthConfig = async () => {
@@ -136,6 +207,9 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
           const config = await response.json();
           if (typeof config.guest?.turnstileSiteKey === 'string') setTurnstileSiteKey(config.guest.turnstileSiteKey);
           if (typeof config.guest?.description === 'string') setGuestDescription(config.guest.description);
+          if (typeof config.signIn?.turnstileSiteKey === 'string') {
+            setSignInTurnstile({ siteKey: config.signIn.turnstileSiteKey, action: typeof config.signIn.action === 'string' ? config.signIn.action : 'signin' });
+          }
           if (config.oauth && config.oauth.providers) {
             setOauthConfig(config.oauth.providers);
           }
@@ -150,7 +224,6 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
   }, []);
 
   useEffect(() => {
-    const token = searchParams.get('token');
     const error = searchParams.get('error');
 
     if (error) {
@@ -170,10 +243,11 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
           message: 'Unable to authenticate with GitHub. This may be due to permissions or network issues.',
           action: 'Check your GitHub account settings and try again.'
         },
-        invalid_magic_link: {
-          title: 'Invalid Magic Link',
-          message: 'This magic link is not valid or has already been used.',
-          action: 'Request a new magic link below.'
+        invalid_magic_link: INVALID_MAGIC_LINK,
+        signed_out: {
+          title: 'Signed Out',
+          message: 'You were signed out on this device. Sign in again.',
+          action: ''
         },
         expired_magic_link: {
           title: 'Expired Magic Link',
@@ -196,13 +270,6 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
       } else {
         setErrors({ submit: 'Authentication failed. Please try again.' });
       }
-    } else if (token) {
-      // Magic-link sign-in: keep them signed in on this device by default
-      // (they clicked their own link). The user is loaded by the ME query
-      // after reload.
-      setToken(token, true);
-      window.history.replaceState({}, '', '/login');
-      window.location.reload();
     }
 
     const savedUsername = localStorage.getItem('rememberedUsername');
@@ -423,7 +490,7 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
       return;
     }
 
-    if (!magicLinkCaptchaPayload) { setErrors({ submit: 'Please finish the verification first.' }); return; }
+    if (!magicLinkProof) { setErrors({ submit: 'Please finish the verification first.' }); return; }
     setMagicLinkLoading(true);
     setErrors({});
 
@@ -433,6 +500,7 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(signInTurnstile && magicLinkTurnstileToken ? { 'X-Turnstile-Token': magicLinkTurnstileToken } : {}),
         },
         body: JSON.stringify({
           email: formData.magicLinkEmail,
@@ -455,6 +523,8 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
           rateLimitError: data.message || 'Too many requests. Please try again later.',
           rateLimitRetryAfter: data.retryAfter
         });
+      } else if (response.status === 403 && data.error === 'verification_required') {
+        setErrors({ submit: 'Please complete the verification and try again.' });
       } else {
         setErrors({ submit: data.message || 'We could not send your sign-in email. Please try again shortly.' });
       }
@@ -462,6 +532,7 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
       setErrors({ submit: 'We could not reach the sign-in service. Please try again shortly.' });
     } finally {
       setMagicLinkCaptchaPayload(null);
+      setMagicLinkTurnstileToken(null);
       setCaptchaReset(value => value + 1);
       setMagicLinkLoading(false);
     }
@@ -535,6 +606,10 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
         </div>
 
         {/* Login Form */}
+        {handover ? (
+          <SessionHandover account={handover.account} replacing={getToken() !== null} busy={handover.busy}
+            onContinue={completeHandover} onCancel={() => setHandover(null)} />
+        ) : (
         <form onSubmit={handleSubmit} className="signin-card border border-stone-500/20 rounded-xl p-5 sm:p-8 lg:py-6 space-y-5 lg:space-y-4">
           {/* Social Login Buttons — only when at least one provider is actually
               configured; otherwise the whole block (and its divider) is hidden so
@@ -838,17 +913,23 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
                 {/* CAPTCHA for Magic Link — only auto-focuses when an email is
                     already entered; otherwise the email field gets focus first. */}
                 <div>
-                  <AuthCaptcha key="magic-link" action="magic-link" resetKey={captchaReset} compact
-                    onVerified={(code) => setMagicLinkCaptchaPayload(code)}
-                    className="w-full"
-                    autoFocus={hasEnteredEmail(formData.magicLinkEmail)}
-                  />
+                  {signInTurnstile ? (
+                    <TurnstileChallenge key={captchaReset} siteKey={signInTurnstile.siteKey} action={signInTurnstile.action}
+                      onToken={setMagicLinkTurnstileToken}
+                    />
+                  ) : (
+                    <AuthCaptcha key="magic-link" action="magic-link" resetKey={captchaReset} compact
+                      onVerified={(code) => setMagicLinkCaptchaPayload(code)}
+                      className="w-full"
+                      autoFocus={hasEnteredEmail(formData.magicLinkEmail)}
+                    />
+                  )}
                 </div>
 
                 <button
                   type="button"
                   onClick={handleMagicLinkRequest}
-                  disabled={magicLinkLoading || !!errors.rateLimitError || !magicLinkCaptchaPayload}
+                  disabled={magicLinkLoading || !!errors.rateLimitError || !magicLinkProof}
                   className="w-full bg-gradient-to-r from-teal-600 to-blue-600 hover:from-teal-500 hover:to-blue-500 border border-teal-400/50 hover:border-teal-300 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-teal-500/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:translate-y-0 flex items-center justify-center space-x-2"
                 >
                   {magicLinkLoading ? (
@@ -1110,6 +1191,7 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
             </div>
           )}
         </form>
+        )}
        </div>
 
         {/* Development Mode - Default Credentials */}

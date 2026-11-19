@@ -10,6 +10,8 @@ the routes in [`../index.ts`](../index.ts) call into this folder.
 flowchart LR
   routes["index.ts /auth/* routes"] --> oauth["oauth-strategies.ts, oauth-callback.ts"]
   routes --> links["email-link-handlers.ts"]
+  oauth --> handover["session-handover.ts"]
+  links --> handover
   resolvers["resolvers/sqlite-auth.ts"] --> limiter["password-login-limiter.ts"]
   resolvers --> folders["folder-access.ts"]
   oauth --> store["sqlite-auth.ts"]
@@ -26,8 +28,9 @@ flowchart LR
 | [`oauth-strategies.ts`](oauth-strategies.ts) | Registers the Passport strategies for Google, GitHub and LinkedIn (LinkedIn through `passport-openidconnect`) when their credentials are configured. |
 | [`oauth-profile-fetch.ts`](oauth-profile-fetch.ts), [`oauth-identity.ts`](oauth-identity.ts) | Fetch and validate provider profiles; only verified provider emails count. |
 | [`oauth-account.ts`](oauth-account.ts) | Links a validated OAuth identity to an existing or new local user. |
-| [`oauth-callback.ts`](oauth-callback.ts) | The shared OAuth callback: issues the JWT and redirects back to the web app. |
+| [`oauth-callback.ts`](oauth-callback.ts) | The shared OAuth callback: issues the JWT and hands it to the web app through `session-handover.ts`. |
 | [`email-link-handlers.ts`](email-link-handlers.ts) | Handlers for magic-link sign-in and password reset links (single use, purpose-bound, CAPTCHA checked). |
+| [`session-handover.ts`](session-handover.ts) | One-time codes (two minutes, single use, hash-only, in memory) that carry a new session from a sign-in redirect (`/login#handover=<code>`) to the page, which confirms with `POST /auth/session/handover/preview` and `/complete`. |
 | [`email-service.ts`](email-service.ts) | Sends those emails through nodemailer when `EMAIL_USER` / `EMAIL_PASS` are set; see [`../../EMAIL_SETUP.md`](../../EMAIL_SETUP.md). |
 | [`password-login-limiter.ts`](password-login-limiter.ts) | Bounded per-key counting of failed password logins. |
 | [`folder-access.ts`](folder-access.ts) | Who may read, create, move or delete folders and the graphs inside them. |

@@ -1,6 +1,6 @@
 # `packages/web/src/lib/__tests__/` — unit tests for `lib/`
 
-One test file per `lib/` module (34 files), named after the module it covers:
+One test file per `lib/` module (35 files), named after the module it covers:
 `edgeGeometry.test.ts` tests `../edgeGeometry.ts`, and so on. Because those
 modules are pure functions, these tests run fast in Node/jsdom with no server,
 and they pin down the geometry and saving rules the graph canvas relies on.
@@ -19,7 +19,7 @@ flowchart LR
 
 | Area | Test files |
 | --- | --- |
-| Server connection and session | `apiUrl`, `apolloErrors` (the Apollo error link), `authLink`, `authStorage`, `loginCode`, `loginFocus`, `clipboard` |
+| Server connection and session | `apiUrl`, `apolloErrors` (the Apollo error link), `sessionRevoked` (signed-out sessions across request paths), `authLink`, `authStorage`, `loginCode`, `loginFocus`, `clipboard` |
 | Saving layout and undo | `positionSaveQueue`, `recoverablePositionQueue`, `layoutPersistence`, `undoStack` |
 | Canvas geometry | `edgeGeometry`, `edgeRouteGeometry`, `edgeLabelLayout`, `edgeLabelPlacement`, `edgeLOD`, `parallelEdges`, `graphSymbolLayout`, `graphFit`, `separateCards` |
 | Layout and simulation | `physicsConfig`, `layoutAlgorithms`, `graphDataMerge`, `graphAdjacency` |

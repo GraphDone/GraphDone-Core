@@ -1,6 +1,6 @@
 {
   "name": "graphdone",
-  "version": "0.4.4-alpha",
+  "version": "0.4.5-alpha",
   "description": "Management for teams who think differently",
   "private": true,
   "workspaces": [
@@ -17,7 +17,7 @@
     "test:coverage": "turbo run test:coverage",
     "test:e2e": "playwright test",
     "test:e2e:core": "playwright test --grep=\"@core\"",
-    "test:e2e:visual": "playwright test tests/e2e/reports/visual-regression.spec.ts",
+    "test:e2e:visual": "playwright test --config tests/e2e/reports/playwright.visual.config.ts",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
     "test:all": "npm run test:unit && npm run test:e2e",
