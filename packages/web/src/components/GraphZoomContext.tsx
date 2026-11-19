@@ -283,7 +283,7 @@ export function GraphZoomContext({ graphs, currentGraphId, camera, readPositions
               kind="project"
               holdsGraphs={project.children.length > 0}
               name={project.graph.name}
-              detail={project.children.length ? `${plural(project.children.length, 'graph')} · ${plural(project.items, 'item')}` : plural(project.items, 'item')}
+              detail={project.children.length ? `${plural(project.graphCount, 'graph')} · ${plural(project.items, 'item')}` : plural(project.items, 'item')}
               viewportShort={short}
               interactive={!project.current}
               labelled

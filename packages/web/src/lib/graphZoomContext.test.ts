@@ -8,6 +8,7 @@ import {
   minZoomScale,
   neighbourRects,
   nextZoomState,
+  plural,
   Rect,
   ringCells,
   ZoomGraph,
@@ -48,6 +49,21 @@ describe('zoomContextOf', () => {
     expect(context.projects[0].children.map(c => c.name)).toEqual(['Welcome', 'Plan a launch', 'Fix bugs', 'Ideas']);
     expect(context.projects[1]).toMatchObject({ current: false, items: 6 });
     expect(context.childCount.get('gs')).toBe(4);
+  });
+
+  it('totals items and graph counts at every depth while keeping direct children for navigation', () => {
+    const context = zoomContextOf([
+      ...starter,
+      g('archive', 'Archive', 'launch', 3),
+      g('older', 'Older', 'archive', 2),
+      g('nested', 'Nested', 'move', 7),
+    ], 'welcome')!;
+    expect(context.projects.map(({items, graphCount}) => ({items, graphCount}))).toEqual([
+      {items: 32, graphCount: 6},
+      {items: 13, graphCount: 2},
+      {items: 9, graphCount: 0},
+    ]);
+    expect(context.projects[0].children.map(child => child.id)).toEqual(['launch', 'welcome', 'bugs', 'ideas']);
   });
 
   it('gives a top-level graph its top-level neighbours and no project level', () => {
@@ -219,4 +235,13 @@ describe('fitLabel', () => {
     expect(fitLabel('Plan a launch', 60, 15)).toMatch(/^Plan…$|^Pla…$|^Plan a…$/);
     expect(fitLabel('Plan a launch', 5, 15)).toBe('');
   });
+});
+
+it.each([
+  [0, '0 graphs', '0 items'],
+  [1, '1 graph', '1 item'],
+  [4, '4 graphs', '4 items'],
+])('formats zoom counts for %i', (count, graphs, items) => {
+  expect(plural(count, 'graph')).toBe(graphs);
+  expect(plural(count, 'item')).toBe(items);
 });
