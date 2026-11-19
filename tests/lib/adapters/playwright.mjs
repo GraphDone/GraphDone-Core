@@ -29,6 +29,19 @@ export async function runPlaywrightSequence({ id, title, args = [], target, time
   const cases = [];
   const errors = [];
   const outcomes = { expected: 0, unexpected: 0, flaky: 0, skipped: 0 };
+  const diagnosticText = (result) => {
+    const message = typeof result?.error === 'string' ? result.error : result?.error?.message;
+    if (message) return message;
+    if (result?.errors !== undefined && !Array.isArray(result.errors)) {
+      errors.push('Invalid Playwright result errors.');
+    }
+    const entries = Array.isArray(result?.errors) ? result.errors : [];
+    const error = entries.find((entry) => typeof entry === 'string' ? entry : entry?.message);
+    if (error) return typeof error === 'string' ? error : error.message;
+    if (result?.status === 'timedOut' || result?.timedOut) return 'Playwright attempt timed out.';
+    if (result?.status === 'interrupted' || result?.interrupted) return 'Playwright attempt was interrupted.';
+    return undefined;
+  };
   const walk = (suites = []) => {
     if (!Array.isArray(suites)) { errors.push('Invalid Playwright suite list.'); return; }
     for (const s of suites) {
@@ -39,24 +52,19 @@ export async function runPlaywrightSequence({ id, title, args = [], target, time
           if (Object.hasOwn(outcomes, t?.status)) outcomes[t.status]++;
           const results = Array.isArray(t?.results) ? t.results : [];
           const last = results.at(-1) || {};
-          const diagnosticText = (result) => {
-            const message = typeof result?.error === 'string' ? result.error : result?.error?.message;
-            if (message) return message;
-            const error = (result?.errors || []).find((entry) => typeof entry === 'string' ? entry : entry?.message);
-            if (error) return typeof error === 'string' ? error : error.message;
-            if (result?.status === 'timedOut' || result?.timedOut) return 'Playwright attempt timed out.';
-            if (result?.status === 'interrupted' || result?.interrupted) return 'Playwright attempt was interrupted.';
-            return undefined;
-          };
           // A flaky test is still a failed unified case. Prefer the terminal
           // failed attempt when it has its own diagnostic; when a successful
           // retry follows, retain the earliest actual non-passed diagnostic
           // instead of letting the pass erase the original failure.
-          const terminalDiagnostic = last.status !== 'passed' && diagnosticText(last);
-          const diagnostic = terminalDiagnostic
-            ? { error: { message: terminalDiagnostic } }
-            : results.map((result) => ({ result, message: diagnosticText(result) }))
-              .find(({ result, message }) => result?.status !== 'passed' && message);
+          let diagnostic = last.status !== 'passed' ? diagnosticText(last) : undefined;
+          if (!diagnostic) {
+            for (const result of results) {
+              if (result?.status !== 'passed') {
+                diagnostic = diagnosticText(result);
+                if (diagnostic) break;
+              }
+            }
+          }
           const skipped = t?.status === 'skipped' || last.status === 'skipped';
           const passed = t?.status === 'expected' && t.expectedStatus === 'passed' && results.length > 0 && results.every(r => r?.status === 'passed');
           let status = skipped ? 'skipped' : passed ? 'passed' : 'failed';
@@ -78,7 +86,7 @@ export async function runPlaywrightSequence({ id, title, args = [], target, time
           }
           const annotations = (Array.isArray(last.annotations) && last.annotations.length ? last.annotations : t?.annotations || [])
             .filter((a) => a && typeof a.type === 'string').map((a) => ({ type: a.type, description: String(a.description ?? '') }));
-          cases.push({ title: spec.title, project: t?.projectName, status, durationMs: last.duration, error: diagnostic?.error?.message || diagnostic?.message || (status === 'failed' ? 'Expected an executed, non-flaky passing test result.' : undefined), attachments, ...(annotations.length ? { annotations } : {}) });
+          cases.push({ title: spec.title, project: t?.projectName, status, durationMs: last.duration, error: diagnostic || (status === 'failed' ? 'Expected an executed, non-flaky passing test result.' : undefined), attachments, ...(annotations.length ? { annotations } : {}) });
         }
       }
       if (s.suites) walk(s.suites);

@@ -102,6 +102,15 @@ test('playwright: timed-out attempt remains diagnostic after a passing retry', a
   const result = await execute(t, 'playwright', report);
   assert.equal(result.cases[0].error, 'Playwright attempt timed out.');
 });
+test('playwright: malformed attempt errors become evidence errors instead of throwing', async t => {
+  const report = playwrightReport([{
+    status: 'unexpected', expectedStatus: 'passed',
+    results: [{ status: 'failed', errors: { message: 'malformed' } }],
+  }]);
+  const result = await execute(t, 'playwright', report);
+  assert.equal(result.status, 'failed');
+  assert.equal(result.evidenceErrors.some(error => error.includes('Invalid Playwright result errors.')), true);
+});
 test('playwright: listed tests with no execution results fail', async t => {
   assert.equal((await execute(t, 'playwright', playwrightReport([{ expectedStatus: 'passed', results: [] }]))).status, 'failed');
 });
