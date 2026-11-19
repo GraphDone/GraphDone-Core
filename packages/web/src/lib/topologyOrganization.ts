@@ -58,9 +58,11 @@ function compactHubRing(
   let best: Map<string, Point> | undefined;
   let bestOverflow = Infinity,
     bestArea = Infinity;
-  for (const aspect of [0.35, 0.5, 0.65, 0.8, 1, 1.25]) {
+  const phone = viewport.width < 600;
+  const aspects = phone ? [0.35, 0.5, 0.65, 0.8, 1, 1.25] : [1];
+  for (const aspect of aspects) {
     for (let turn = 0; turn <= 8; turn++) {
-      if (ring.length === 4 && turn !== 8) continue;
+      if (phone && ring.length === 4 && turn !== 8) continue;
       const units = [
         { x: 0, y: 0 },
         ...ring.map((_, index) => {
@@ -365,7 +367,7 @@ export function organizeTopology<
         previousDiameter = diameter;
       }
       const compactRing =
-        viewport.width < 600 &&
+        (viewport.width < 600 || !!options.edgeGap) &&
         kind === 'hub' &&
         levels.length === 2 &&
         levels[1].length <= 8;

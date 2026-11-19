@@ -1,4 +1,6 @@
 import { expect, it } from 'vitest';
+import { borderReach } from './edgeGeometry';
+import { computeGraphFit } from './graphFit';
 import { graphItemLayout } from './graphSymbolLayout';
 import {
   organizeTopology,
@@ -62,6 +64,27 @@ it('puts the actual hub at the center of a clear ring without duplicate-type bia
     ).positions
   ).toEqual(result.positions);
   expect({ nodes, edges }).toEqual(input);
+});
+
+it('frames a desktop hub and its eight labelled spokes at a readable card width', () => {
+  const nodes = ['hub', ...Array.from({ length: 8 }, (_, index) => `leaf-${index}`)].map(id => ({ id }));
+  const edges = nodes.slice(1).map(node => edge('hub', node.id));
+  const viewport = { width: 1376, height: 744 };
+  const dimensions = { width: 210, height: 104 };
+  const labelGap = 260;
+  const arranged = organizeTopology(nodes, edges, () => dimensions, viewport, 64, { edgeGap: () => labelGap });
+  const hub = arranged.positions.get('hub')!;
+  const ring = nodes.slice(1).map(node => arranged.positions.get(node.id)!);
+  const radii = ring.map(point => Math.hypot(point.x - hub.x, point.y - hub.y));
+  for (const point of ring) {
+    const dx = point.x - hub.x;
+    const dy = point.y - hub.y;
+    const visible = Math.hypot(dx, dy) - 2 * borderReach(dimensions, dx, dy);
+    expect(visible).toBeGreaterThanOrEqual(labelGap - 0.001);
+  }
+  expect(Math.max(...radii) - Math.min(...radii)).toBeLessThan(0.001);
+  const fit = computeGraphFit({ ...viewport, obstacles: [], cards: [hub, ...ring], dimensionsAt: () => dimensions })!;
+  expect(dimensions.width * fit.scale).toBeGreaterThanOrEqual(132);
 });
 
 it('follows cycle and chain topology instead of inventing dependency tiers', () => {
