@@ -39,27 +39,35 @@ export async function runPlaywrightSequence({ id, title, args = [], target, time
           if (Object.hasOwn(outcomes, t?.status)) outcomes[t.status]++;
           const results = Array.isArray(t?.results) ? t.results : [];
           const last = results.at(-1) || {};
+          // A flaky test is still a failed unified case. Keep the first
+          // failing attempt as the diagnostic: the final successful retry has
+          // no error and otherwise erases the original failure from the
+          // report. Attachments remain collected from every attempt below.
+          const diagnostic = results.find((result) => result?.status === 'failed' && result.error)
+            || results.find((result) => result?.error)
+            || last;
           const skipped = t?.status === 'skipped' || last.status === 'skipped';
           const passed = t?.status === 'expected' && t.expectedStatus === 'passed' && results.length > 0 && results.every(r => r?.status === 'passed');
           let status = skipped ? 'skipped' : passed ? 'passed' : 'failed';
           if (spec.ok === false || t?.status === 'flaky' || t?.status === 'unexpected') status = 'failed';
           counts[status] = (counts[status] || 0) + 1;
           const attachments = [];
-          for (const r of results) {
+          for (const [attempt, r] of results.entries()) {
             if (!r || (r.attachments !== undefined && !Array.isArray(r.attachments))) { errors.push('Invalid Playwright result attachments.'); continue; }
             for (const a of r.attachments || []) {
               if (!a?.path) continue;
-              if ((a.contentType || '').startsWith('video')) attachments.push({ type: 'video', name: spec.title, srcPath: a.path });
-              else if ((a.contentType || '').startsWith('image')) attachments.push({ type: 'image', name: a.name || spec.title, srcPath: a.path });
+              const name = results.length > 1 ? `${a.name || spec.title} (attempt ${attempt + 1})` : (a.name || spec.title);
+              if ((a.contentType || '').startsWith('video')) attachments.push({ type: 'video', name, srcPath: a.path });
+              else if ((a.contentType || '').startsWith('image')) attachments.push({ type: 'image', name, srcPath: a.path });
               else if ((a.name === 'trace' && a.contentType === 'application/zip') || a.contentType === 'application/json') {
-                try { attachments.push({ type: 'file', name: a.name || spec.title, srcPath: ownedEvidencePath(process.cwd(), a.path) }); }
+                try { attachments.push({ type: 'file', name, srcPath: ownedEvidencePath(process.cwd(), a.path) }); }
                 catch (error) { errors.push(`Rejected file attachment: ${error.message}`); }
               }
             }
           }
           const annotations = (Array.isArray(last.annotations) && last.annotations.length ? last.annotations : t?.annotations || [])
             .filter((a) => a && typeof a.type === 'string').map((a) => ({ type: a.type, description: String(a.description ?? '') }));
-          cases.push({ title: spec.title, project: t?.projectName, status, durationMs: last.duration, error: last.error?.message || (status === 'failed' ? 'Expected an executed, non-flaky passing test result.' : undefined), attachments, ...(annotations.length ? { annotations } : {}) });
+          cases.push({ title: spec.title, project: t?.projectName, status, durationMs: last.duration, error: diagnostic.error?.message || (status === 'failed' ? 'Expected an executed, non-flaky passing test result.' : undefined), attachments, ...(annotations.length ? { annotations } : {}) });
         }
       }
       if (s.suites) walk(s.suites);

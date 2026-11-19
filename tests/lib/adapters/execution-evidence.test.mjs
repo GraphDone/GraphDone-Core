@@ -64,6 +64,25 @@ test('playwright: failed attempt followed by pass is not clean acceptance', asyn
   const report = playwrightReport([{ status: 'flaky', expectedStatus: 'passed', results: [{ status: 'failed' }, { status: 'passed' }] }]);
   assert.equal((await execute(t, 'playwright', report)).status, 'failed');
 });
+test('playwright: flaky retry retains first failure diagnostic and labels every attempt attachment', async t => {
+  const report = playwrightReport([{
+    status: 'flaky', expectedStatus: 'passed',
+    results: [
+      { status: 'failed', error: { message: 'Grow failed on first attempt' }, attachments: [
+        { name: 'first-screenshot', contentType: 'image/png', path: '/tmp/first.png' },
+      ] },
+      { status: 'passed', attachments: [
+        { name: 'retry-screenshot', contentType: 'image/png', path: '/tmp/retry.png' },
+      ] },
+    ],
+  }]);
+  const result = await execute(t, 'playwright', report);
+  assert.equal(result.status, 'failed');
+  assert.equal(result.cases[0].error, 'Grow failed on first attempt');
+  assert.deepEqual(result.cases[0].attachments.map(attachment => attachment.name), [
+    'first-screenshot (attempt 1)', 'retry-screenshot (attempt 2)',
+  ]);
+});
 test('playwright: listed tests with no execution results fail', async t => {
   assert.equal((await execute(t, 'playwright', playwrightReport([{ expectedStatus: 'passed', results: [] }]))).status, 'failed');
 });
