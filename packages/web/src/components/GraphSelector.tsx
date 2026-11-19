@@ -7,6 +7,7 @@ import { useGraph } from '../contexts/GraphContext';
 import type { GraphHierarchy } from '../types/graph';
 import { useAuth } from '../contexts/AuthContext';
 import { GET_WORK_ITEMS, GET_EDGES } from '../lib/queries';
+import { plural } from '../lib/graphZoomContext';
 import { offlineEnabled, localGuest } from '../lib/offline/engine';
 import { exampleAction, starterHierarchy, systemLocked } from '../lib/workspaceRules';
 
@@ -293,7 +294,7 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
             <button
               onClick={() => toggleGraphExpand(graph.id)}
               className="min-h-11 min-w-11 flex shrink-0 items-center justify-center rounded-lg text-gray-400 hover:text-white"
-              title={`${graph.children.length} sub-graphs`}
+              title={plural(graph.children.length, 'sub-graph')}
               aria-label={`${expanded ? 'Collapse' : 'Expand'} ${graph.name}`}
               aria-expanded={expanded}
             >
@@ -314,7 +315,7 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
             <div className="min-w-0 flex-1">
               <div className="text-sm font-medium truncate">{graph.name}</div>
               <div className="text-xs text-gray-400">
-                {active ? actualNodeCount : graph.nodeCount || 0} items • {active ? actualEdgeCount : graph.edgeCount || 0} connections
+                {plural(active ? actualNodeCount : graph.nodeCount || 0, 'item')} • {plural(active ? actualEdgeCount : graph.edgeCount || 0, 'connection')}
               </div>
             </div>
             {active && <div className="w-2 h-2 shrink-0 bg-green-400 rounded-full animate-pulse shadow-lg shadow-green-400/50" />}
@@ -359,7 +360,7 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
             {currentGraph.name}
           </div>
           <div className="flex items-center gap-2 text-xs text-gray-400">
-            <span className="block truncate">{actualNodeCount} item{actualNodeCount !== 1 ? 's' : ''}, {actualEdgeCount} connection{actualEdgeCount !== 1 ? 's' : ''}</span>
+            <span className="block truncate">{plural(actualNodeCount, 'item')}, {plural(actualEdgeCount, 'connection')}</span>
           </div>
         </div>
         
@@ -483,7 +484,7 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
           {graphHierarchy.length > 0 && (
             <div className="shrink-0 border-t border-gray-600 p-3 bg-gray-700/50">
               <div className="flex items-center justify-between text-xs font-normal text-gray-400">
-                <span>Total: {availableGraphs.length} Graph{availableGraphs.length !== 1 ? 's' : ''}</span>
+                <span>Total: {plural(availableGraphs.length, 'Graph')}</span>
               </div>
             </div>
           )}

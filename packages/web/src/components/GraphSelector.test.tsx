@@ -10,7 +10,7 @@ const project = graph('gs', 'Getting started', { type: 'PROJECT', nodeCount: 0 }
 const welcome = graph('w', 'Welcome', { parentGraphId: 'gs', depth: 1, path: ['gs', 'w'], nodeCount: 4 });
 const ideas = graph('i', 'Ideas', { parentGraphId: 'gs', depth: 1, path: ['gs', 'i'], nodeCount: 5 });
 const release = graph('r', 'Release', { parentGraphId: 'i', depth: 2, path: ['gs', 'i'], nodeCount: 3, edgeCount: 2 });
-const sharedWelcome = graph('sw', 'Welcome', { createdBy: 'someone else', isShared: true });
+const sharedWelcome = graph('sw', 'Welcome', { createdBy: 'someone else', isShared: true, edgeCount: 1 });
 const available = [project, welcome, ideas, release, sharedWelcome];
 
 const selectGraph = vi.fn();
@@ -85,4 +85,12 @@ it('expands a subgraph and opens its child with its own counts', () => {
   const release = screen.getByRole('button', { name: /Release 3 items.*2 connections/ });
   fireEvent.click(release);
   expect(selectGraph).toHaveBeenCalledWith('r');
+});
+
+it('labels zero, one, and multiple selector counts', () => {
+  open();
+  const menu = within(screen.getByTestId('graph-selector-dropdown'));
+  expect(menu.getByRole('button', { name: 'Welcome 1 item • 1 connection' })).toBeTruthy();
+  expect(menu.getByRole('button', { name: /^Ideas 5 items.*0 connections$/ })).toBeTruthy();
+  expect(menu.getByTitle('1 sub-graph')).toBeTruthy();
 });

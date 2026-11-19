@@ -8,6 +8,7 @@ import {
   minZoomScale,
   neighbourRects,
   nextZoomState,
+  plural,
   Rect,
   ringCells,
   ZoomGraph,
@@ -234,4 +235,13 @@ describe('fitLabel', () => {
     expect(fitLabel('Plan a launch', 60, 15)).toMatch(/^Plan…$|^Pla…$|^Plan a…$/);
     expect(fitLabel('Plan a launch', 5, 15)).toBe('');
   });
+});
+
+it.each([
+  [0, '0 graphs', '0 items'],
+  [1, '1 graph', '1 item'],
+  [4, '4 graphs', '4 items'],
+])('formats zoom counts for %i', (count, graphs, items) => {
+  expect(plural(count, 'graph')).toBe(graphs);
+  expect(plural(count, 'item')).toBe(items);
 });
