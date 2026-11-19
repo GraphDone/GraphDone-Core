@@ -1981,11 +1981,14 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
     // UPDATE DOM ELEMENTS: Rebind data and update visual properties
     // Update node titles
-    const nodeGroups = svg.select('.nodes-group').selectAll('.node');
-    nodeGroups.each(function(d: any) {
+    const changedNodeIds = new Set(nodeMerge.changedIds);
+    const nodeGroups = svg.select('.nodes-group').selectAll<SVGGElement, any>('.node');
+    nodeGroups.filter((d: any) => changedNodeIds.has(d.id)).each(function(d: any) {
       const nodeGroup = d3.select(this);
-      // Find the updated node data by ID
-      const updatedNode = nodes.find(n => n.id === d.id);
+      // Reuse the merge index: a linear find for every rendered card makes
+      // each selective refresh quadratic (2k cards meant ~4m comparisons),
+      // and dense local-board entry legitimately triggers several refreshes.
+      const updatedNode = incomingById.get(d.id);
       if (!updatedNode) return;
 
       const dimensions = getNodeDimensions(updatedNode);
