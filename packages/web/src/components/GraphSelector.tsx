@@ -23,7 +23,7 @@ interface GraphSelectorProps {
 }
 
 export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testId = 'graph-selector' }: GraphSelectorProps) {
-  const { currentGraph, availableGraphs, graphHierarchy, selectGraph, addExampleProject } = useGraph();
+  const { currentGraph, availableGraphs, graphHierarchy, selectGraph, addExampleProject, canEditGraph, canDeleteGraph } = useGraph();
   const { currentTeam, currentUser } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['team', 'personal', 'system']));
@@ -171,35 +171,39 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
       tooltipTimer.current = fade ? window.setTimeout(() => setHoveredTooltip(null), 2500) : null;
       setHoveredTooltip({ message, x: left ? rect.left - 8 : rect.right + 8, y: rect.top + rect.height / 2, left });
     };
-    const action = (label: string, run: (graph: any) => void, locked: string, hover: string, icon: ReactNode) => {
+    const action = (label: string, run: (graph: any) => void, locked: string | undefined, hover: string, icon: ReactNode) => {
       const reasonId = `graph-locked-${label.toLowerCase()}-${graph.id}`;
       return (
         <button
           aria-label={`${label} ${graph.name}`}
-          aria-disabled={isSystemGraph || undefined}
-          aria-describedby={isSystemGraph ? reasonId : undefined}
+          aria-disabled={locked ? true : undefined}
+          aria-describedby={locked ? reasonId : undefined}
           onClick={(e) => {
             e.stopPropagation();
-            if (!isSystemGraph) {
+            if (!locked) {
               run(graph);
               setIsOpen(false);
             } else explain(e.currentTarget, locked, true);
           }}
           onMouseEnter={(e) => {
-            if (isSystemGraph) explain(e.currentTarget, locked, false);
+            if (locked) explain(e.currentTarget, locked, false);
           }}
           onMouseLeave={() => setHoveredTooltip(null)}
-          className={`p-1.5 [@media(hover:none)]:p-[15px] rounded-lg transition-all duration-200 ${isSystemGraph ? 'text-gray-600 cursor-not-allowed' : `text-gray-400 ${hover} hover:scale-110`}`}
+          className={`p-1.5 [@media(hover:none)]:p-[15px] rounded-lg transition-all duration-200 ${locked ? 'text-gray-600 cursor-not-allowed' : `text-gray-400 ${hover} hover:scale-110`}`}
         >
           {icon}
-          {isSystemGraph && <span id={reasonId} className="sr-only">{locked}</span>}
+          {locked && <span id={reasonId} className="sr-only">{locked}</span>}
         </button>
       );
     };
+    const editReason = isSystemGraph ? "🔒 System graph — can't be edited"
+      : !canEditGraph(graph.id) ? 'You need edit access to rename or change this graph.' : undefined;
+    const deleteReason = isSystemGraph ? "🔒 System graph — can't be deleted"
+      : !canDeleteGraph(graph.id) ? 'Only the graph owner or admin can delete this graph.' : undefined;
     return (
       <div className="shrink-0 flex items-center space-x-1 opacity-0 group-hover/item:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity ml-2">
-        {onEditGraph && action('Edit', onEditGraph, '🔒 System graph — can\'t be edited', 'hover:text-blue-400 hover:bg-blue-500/20', <Edit3 className="h-3.5 w-3.5" />)}
-        {onDeleteGraph && action('Delete', onDeleteGraph, '🔒 System graph — can\'t be deleted', 'hover:text-red-400 hover:bg-red-500/20', <Trash2 className="h-3.5 w-3.5" />)}
+        {onEditGraph && action('Edit', onEditGraph, editReason, 'hover:text-blue-400 hover:bg-blue-500/20', <Edit3 className="h-3.5 w-3.5" />)}
+        {onDeleteGraph && action('Delete', onDeleteGraph, deleteReason, 'hover:text-red-400 hover:bg-red-500/20', <Trash2 className="h-3.5 w-3.5" />)}
       </div>
     );
   };

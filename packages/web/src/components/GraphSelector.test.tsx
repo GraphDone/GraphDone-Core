@@ -4,6 +4,11 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { GraphSelector } from './GraphSelector';
 import { onGraphRequests, requestGraph } from '../lib/graphRequests';
 
+const access = vi.hoisted(() => ({
+  canEditGraph: vi.fn((_id: string) => true),
+  canDeleteGraph: vi.fn((_id: string) => true),
+}));
+
 const graph = (id: string, name: string, extra: Record<string, unknown> = {}) => ({
   id, name, type: 'SUBGRAPH', createdBy: 'me', parentGraphId: null, depth: 0, path: [id], nodeCount: 1, edgeCount: 0, isShared: false, ...extra,
 });
@@ -19,6 +24,7 @@ const row = ({ id, name, type, nodeCount, edgeCount, isShared }: ReturnType<type
 vi.mock('../contexts/GraphContext', () => ({
   useGraph: () => ({
     currentGraph: welcome,
+    ...access,
     availableGraphs: available,
     graphHierarchy: [row(project, [row(welcome), row(ideas)]), row(sharedWelcome)],
     selectGraph: vi.fn(),
@@ -30,7 +36,11 @@ vi.mock('./ProjectTransfer', () => ({ ProjectTransfer: () => null }));
 vi.mock('../lib/offline/engine', () => ({ offlineEnabled: false, localGuest: () => false }));
 vi.mock('@apollo/client', async original => ({ ...(await original<typeof import('@apollo/client')>()), useQuery: () => ({ data: undefined }) }));
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  access.canEditGraph.mockReset();
+  access.canDeleteGraph.mockReset();
+});
 
 function open() {
   const onDeleteGraph = vi.fn();
@@ -53,6 +63,31 @@ describe('the graph selector edit and delete buttons', () => {
     fireEvent.click(screen.getByTestId('graph-selector'));
     fireEvent.click(actions('Getting started').edit);
     expect(onEditGraph).toHaveBeenCalledWith(expect.objectContaining({ id: 'gs', type: 'PROJECT' }));
+  });
+
+  it('explains view-only access without opening edit or delete', () => {
+    access.canEditGraph.mockImplementation(id => id !== 'i');
+    access.canDeleteGraph.mockImplementation(id => id !== 'i');
+    const { onEditGraph, onDeleteGraph, actions } = open();
+    const { edit, trash } = actions('Ideas');
+    expect(edit.getAttribute('aria-disabled')).toBe('true');
+    expect(trash.getAttribute('aria-disabled')).toBe('true');
+    fireEvent.click(edit);
+    expect(screen.getByRole('tooltip').textContent).toContain('edit access');
+    fireEvent.click(trash);
+    expect(screen.getByRole('tooltip').textContent).toContain('owner or admin');
+    expect(onEditGraph).not.toHaveBeenCalled();
+    expect(onDeleteGraph).not.toHaveBeenCalled();
+  });
+
+  it('lets a graph editor edit while reserving deletion for its owner or admins', () => {
+    access.canDeleteGraph.mockImplementation(id => id !== 'i');
+    const { onEditGraph, onDeleteGraph, actions } = open();
+    const { edit, trash } = actions('Ideas');
+    fireEvent.click(trash);
+    expect(onDeleteGraph).not.toHaveBeenCalled();
+    fireEvent.click(edit);
+    expect(onEditGraph).toHaveBeenCalledWith(expect.objectContaining({ id: 'i' }));
   });
 
   it("leave the user's own Welcome deletable, so its project can be emptied", () => {
