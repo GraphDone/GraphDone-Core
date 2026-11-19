@@ -80,11 +80,15 @@ async function drag(page: Page, nodeId: string) {
   return position!;
 }
 
-function failLayout(graphId: string, nodeId: string, attempts: Array<{ x: number; y: number }>) {
+function failLayout(graphId: string, nodeId: string, attempts: Array<{ x: number; y: number }>, allowRetry?: () => Promise<boolean>) {
   return async (route: Route) => {
     const body = route.request().method() === 'POST' ? route.request().postDataJSON() : null;
     const update = body?.variables?.update;
     if (body?.operationName !== 'UpdateWorkItems' || body?.variables?.where?.id !== nodeId || body?.variables?.where?.graph?.id !== graphId || Object.keys(update || {}).sort().join(',') !== 'positionX,positionY') {
+      await route.continue();
+      return;
+    }
+    if (allowRetry && await allowRetry()) {
       await route.continue();
       return;
     }
@@ -156,7 +160,8 @@ test('latest real drag survives reload before acknowledgement and delayed Indexe
   const nodeId = graph.nodeIds[0];
   const initial = await readSaved(page, graph.graphId, nodeId);
   const attempts: Array<{ x: number; y: number }> = [];
-  const route = failLayout(graph.graphId, nodeId, attempts);
+  const retryWasClicked = () => page.evaluate(() => document.documentElement.dataset.layoutRetryClicked === 'true');
+  const route = failLayout(graph.graphId, nodeId, attempts, retryWasClicked);
   await page.route('**/api/graphql', route);
   const freshAltGesture = await releaseAltDuringGesture(page, nodeId);
   expect(errors).toEqual([]);
@@ -187,12 +192,32 @@ test('latest real drag survives reload before acknowledgement and delayed Indexe
   await expect(page.locator('.graph-container svg .node')).toHaveCount(2);
   await expect.poll(async () => { const value = await readPosition(page, nodeId); return value && rounded(value); }).toEqual(rounded(latest));
   expect(await readSaved(page, graph.graphId, nodeId)).toEqual(initial);
-  await expect(page.getByTestId('layout-save-status')).toContainText('Waiting to send 1 layout change');
-  await page.unroute('**/api/graphql', route);
-  await page.getByRole('button', { name: 'Retry layout save' }).click();
+  const status = page.getByTestId('layout-save-status');
+  await expect(status).toContainText('Waiting to send 1 layout change');
+  await expect.poll(() => attempts.length).toBeGreaterThan(2);
+  expect(rounded(attempts[attempts.length - 1])).toEqual(rounded(latest));
+  await expect(status).toContainText(/Owned layout recovery outage|The task position was not saved/);
+  const retry = status.getByRole('button', { name: 'Retry layout save' });
+  await expect(retry).toBeEnabled();
+
+  // Restoring focus after the hydration gate closes can also trigger a replay.
+  // Keep the outage active until the user actually clicks Retry.
+  await page.evaluate(() => {
+    const recordRetry = (event: MouseEvent) => {
+      const button = event.target instanceof Element && event.target.closest('button');
+      if (event.isTrusted && button && button.closest('[data-testid="layout-save-status"]') && button.textContent === 'Retry layout save') {
+        document.documentElement.dataset.layoutRetryClicked = 'true';
+        document.removeEventListener('click', recordRetry, true);
+      }
+    };
+    document.addEventListener('click', recordRetry, true);
+  });
+  await retry.click();
+  expect(await retryWasClicked()).toBe(true);
   await expect.poll(async () => rounded(await readSaved(page, graph.graphId, nodeId))).toEqual(rounded(latest));
   await expect(page.getByTestId('layout-save-status')).toHaveText('Layout saved to the server.');
   expect((await readReceipt(page, graph.graphId, nodeId)).receipt).toBeUndefined();
+  await page.unroute('**/api/graphql', route);
   await page.reload();
   await expect.poll(async () => { const value = await readPosition(page, nodeId); return value && rounded(value); }).toEqual(rounded(latest));
   const artifact = info.outputPath('layout-reload.json');
