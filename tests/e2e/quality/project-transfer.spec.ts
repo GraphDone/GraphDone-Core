@@ -59,7 +59,7 @@ test('student / engineer: portable project round trip, offline, safe Mermaid and
  const oversized='/tmp/graphdone-transfer-oversized-'+Date.now()+'.json';await writeFile(oversized,Buffer.alloc(50*1024*1024+1));
  try{await region.getByLabel('Import project JSON').setInputFiles(oversized);}finally{await unlink(oversized);}
  await expect(region.getByRole('alert')).toContainText('50 MB');
- await page.evaluate(()=>{const original=IDBObjectStore.prototype.put;IDBObjectStore.prototype.put=function(...args:any[]){IDBObjectStore.prototype.put=original;throw new DOMException('Test device full','QuotaExceededError');};});
+ await page.evaluate(expected=>{const original=IDBObjectStore.prototype.put;IDBObjectStore.prototype.put=function(...args:any[]){if(Object.keys(args[0]?.projects||{}).length>expected){IDBObjectStore.prototype.put=original;throw new DOMException('Test device full','QuotaExceededError');}return original.apply(this,args as any);};},Object.keys(after.projects).length);
  await upload(region,doc);await expect(region.getByRole('alert')).toBeVisible();expect(Object.keys((await account(page)).projects)).toHaveLength(Object.keys(after.projects).length);
  // Cloud-only project summaries count toward the account cap too.
  const savedAccount=await account(page);
