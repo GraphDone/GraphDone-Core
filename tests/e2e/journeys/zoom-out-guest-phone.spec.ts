@@ -147,8 +147,11 @@ test('JOURNEY zoom-out: pinching into a sibling opens that graph on a phone', as
   center = await visibleTileCenter(page, tile, 20);
   const readyBox = (await tile.boundingBox())!;
   expect(Math.max(readyBox.width, readyBox.height) * 51 / 40).toBeGreaterThan(0.5 * shortSide);
-  expect(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest('[data-zoom-tile]')?.getAttribute('data-zoom-tile'), center))
-    .toBe(targetId);
+  const contactHits = await page.evaluate(({ x, y }) => [-20, 0, 20].map(offset => ({
+    x: x + offset, y,
+    graphId: document.elementFromPoint(x + offset, y)?.closest('[data-zoom-tile]')?.getAttribute('data-zoom-tile'),
+  })), center);
+  expect(contactHits.map(hit => hit.graphId)).toEqual([targetId, targetId, targetId]);
 
   // An 11px first expansion stays below the 12px navigation threshold. Both
   // fingers stay down and keep spreading after the camera hides the tile.
@@ -168,6 +171,7 @@ test('JOURNEY zoom-out: pinching into a sibling opens that graph on a phone', as
   await evidence(info, 'pinch-sibling-receipt.json', JSON.stringify({
     viewport: await page.evaluate(() => ({ width: innerWidth, height: innerHeight, touchPoints: navigator.maxTouchPoints })),
     inputCenter: center,
+    contactHits,
     hitGraphId: targetId,
     originalGraphId,
     selectedGraphId: await page.evaluate(() => localStorage.getItem('currentGraphId')),
