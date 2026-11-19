@@ -47,7 +47,7 @@ test('build, arrange and update a graph entirely through its UI @graphfirst',asy
     }
     return route.continue();
   };
-  await page.route('**/api/graphql', holdRenameRefetch);
+  await page.route('**/graphql', holdRenameRefetch);
   try {
     await rename.fill(renamed);
     await rename.press('Enter');
@@ -59,7 +59,7 @@ test('build, arrange and update a graph entirely through its UI @graphfirst',asy
   } finally {
     releaseRefetch();
     await continueRefetch;
-    await page.unroute('**/api/graphql', holdRenameRefetch);
+    await page.unroute('**/graphql', holdRenameRefetch);
   }
 
   await page.getByRole('button', { name: `Quick edit ${original}`, exact: true }).click();
