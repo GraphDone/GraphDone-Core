@@ -1380,11 +1380,6 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const nodes = [
     // Real nodes from database with smart initial positioning
     ...validatedNodes.map((item, index) => {
-      // Check if this node has any connections
-      const hasConnections = validatedEdges.some(edge => 
-        edge.source.id === item.id || edge.target.id === item.id
-      );
-      
       // Snapshot-authoritative layout: a node the user has positioned
       // (saved position is not the (0,0) default) loads PINNED via fx/fy, so
       // the force simulation physically cannot drift a tidy arrangement. New

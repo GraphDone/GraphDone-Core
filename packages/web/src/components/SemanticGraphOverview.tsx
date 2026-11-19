@@ -99,34 +99,6 @@ export function SemanticGraphOverview({
   const [obstacles, setObstacles] = useState<
     Array<{ left: number; right: number; top: number; bottom: number }>
   >([]);
-  useLayoutEffect(() => {
-    const bounds = host.current?.getBoundingClientRect();
-    const measured = bounds
-      ? Array.from(
-          document.querySelectorAll<HTMLElement>(
-            '[data-graph-fit-obstacle="true"]'
-          )
-        )
-          .filter(
-            element =>
-              element.getAttribute('role') !== 'region' ||
-              element.hasAttribute('data-lod-trace')
-          )
-          .map(element => element.getBoundingClientRect())
-          .filter(rect => rect.width > 0 && rect.height > 0)
-          .map(rect => ({
-            left: rect.left - bounds.left,
-            right: rect.right - bounds.left,
-            top: rect.top - bounds.top,
-            bottom: rect.bottom - bounds.top,
-          }))
-      : [];
-    setObstacles(previous =>
-      JSON.stringify(previous) === JSON.stringify(measured)
-        ? previous
-        : measured
-    );
-  });
   const obstacleKey = JSON.stringify(obstacles);
   const [mode, setMode] = useState<'auto' | 'overview' | 'items'>(() => {
     try {const value=viewScope?localStorage.getItem(`graphdone:detail:${viewScope}`):null;return value==='items'||value==='overview'?value:'auto';}catch{return 'auto';}
@@ -219,6 +191,35 @@ export function SemanticGraphOverview({
     }
   }, [browse, onBrowse]);
   const active = mode === 'overview' || (mode === 'auto' && automatic);
+  useLayoutEffect(() => {
+    if (!active) return;
+    const bounds = host.current?.getBoundingClientRect();
+    const measured = bounds
+      ? Array.from(
+          document.querySelectorAll<HTMLElement>(
+            '[data-graph-fit-obstacle="true"]'
+          )
+        )
+          .filter(
+            element =>
+              element.getAttribute('role') !== 'region' ||
+              element.hasAttribute('data-lod-trace')
+          )
+          .map(element => element.getBoundingClientRect())
+          .filter(rect => rect.width > 0 && rect.height > 0)
+          .map(rect => ({
+            left: rect.left - bounds.left,
+            right: rect.right - bounds.left,
+            top: rect.top - bounds.top,
+            bottom: rect.bottom - bounds.top,
+          }))
+      : [];
+    setObstacles(previous =>
+      JSON.stringify(previous) === JSON.stringify(measured)
+        ? previous
+        : measured
+    );
+  });
   const [highlightedBus, setHighlightedBus] = useState<string | null>(null);
   const busReturn = useRef(false);
   const group = projection.groups.find(candidate => candidate.id === groupId);
