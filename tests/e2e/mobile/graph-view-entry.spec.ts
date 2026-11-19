@@ -1,6 +1,7 @@
 import { devices, expect, test } from '@playwright/test';
+import { resolve } from 'node:path';
 import { openGraphView } from '../../lib/journeys/workspace';
-import { touchGesture, type TouchPoint } from '../../lib/journeys/touchContacts';
+import { touchGesture, visibleTileCenter, type TouchPoint } from '../../lib/journeys/touchContacts';
 
 test.use({ ...devices['iPhone 14'], browserName: 'chromium' });
 
@@ -66,4 +67,40 @@ test('a failed check during a phone pinch releases both contacts @mobile', async
   await expect(page.locator('body')).toHaveAttribute('data-contacts', '0');
   await touchGesture(page, frames);
   await expect(page.locator('body')).toHaveAttribute('data-contacts', '0');
+});
+
+test('an obstructed sibling can be reached by panning the visible mobile canvas @mobile', async ({ page }) => {
+  await page.setContent(`
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <style>
+      body { margin: 0; }
+      header { position: fixed; inset: 0 0 auto; height: 140px; }
+      .graph-container { position: fixed; inset: 140px 0 60px; }
+      svg { width: 100%; height: 100%; touch-action: none; }
+    </style>
+    <header>Welcome</header><div class="graph-container"><svg>
+      <g id="world"><g data-zoom-tile="sibling" role="button" aria-label="Fix bugs"><rect x="65" y="-106" width="100" height="80" /></g></g>
+    </svg></div>
+  `);
+  await page.addScriptTag({ path: resolve('node_modules/d3/dist/d3.min.js') });
+  await page.evaluate(() => {
+    const svg = document.querySelector('svg')!;
+    svg.addEventListener('touchstart', event => {
+      if (event.target === svg && event.touches.length === 1) svg.dataset.backgroundTouch = 'true';
+    });
+    const d3 = (window as any).d3;
+    d3.select(svg).call(d3.zoom().touchable(true).on('zoom', ({ transform }: any) => {
+      document.getElementById('world')!.setAttribute('transform', transform.toString());
+    }));
+  });
+  const tile = page.getByRole('button', { name: 'Fix bugs' });
+  const oldBox = (await tile.boundingBox())!;
+  expect(oldBox.y + oldBox.height / 2).toBe(74);
+  expect(await page.evaluate(() => document.elementFromPoint(115, 74)?.tagName)).toBe('HEADER');
+  const center = await visibleTileCenter(page, tile, 20);
+  await expect(page.locator('svg')).toHaveAttribute('data-background-touch', 'true');
+  const hits = await page.evaluate(({ x, y }) => [-20, 0, 20].map(offset =>
+    document.elementFromPoint(x + offset, y)?.closest('[data-zoom-tile]')?.getAttribute('data-zoom-tile')
+  ), center);
+  expect(hits).toEqual(['sibling', 'sibling', 'sibling']);
 });
