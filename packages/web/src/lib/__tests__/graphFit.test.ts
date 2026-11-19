@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeGraphFit, fitRegions } from '../graphFit';
+import { collectMiniMapPositions, computeGraphFit, fitRegions } from '../graphFit';
 import { graphItemLayout, type TextMeasure } from '../graphSymbolLayout';
 
 const measure: TextMeasure = (text, size) => Array.from(text).length * size * 0.55;
@@ -103,5 +103,16 @@ describe('graph camera fit', () => {
 
   it('returns null until a card has a position', () => {
     expect(computeGraphFit({ width: 390, height: 844, obstacles: [], cards: [{ ...card('x'), x: Number.NaN }], dimensionsAt })).toBeNull();
+  });
+
+  it('publishes late frozen-simulation nodes without requiring a tick', () => {
+    const first = collectMiniMapPositions([{ id: 'old', x: 10, y: 20, type: 'TASK' }]);
+    expect(first.positions).toEqual({ old: { x: 10, y: 20 } });
+    const late = collectMiniMapPositions([
+      { id: 'old', x: 10, y: 20, type: 'TASK' },
+      { id: 'late', x: 90, y: 110, type: 'NOTE' },
+    ]);
+    expect(late.positions.late).toEqual({ x: 90, y: 110 });
+    expect(late.types.late).toBe('NOTE');
   });
 });

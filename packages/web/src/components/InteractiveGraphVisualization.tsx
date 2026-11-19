@@ -60,7 +60,7 @@ import { mergeSimulationNodes, mergeSimulationEdges } from '../lib/graphDataMerg
 import type { ObstacleBox } from '../lib/edgeLabelLayout';
 import { createParallelEdgeRoute, edgeRouteLabel, edgeRouteArrowBounds, edgeSegmentHitsBox, projectEdgeRoutePointer, type EdgeRouteGeometry, type EdgeRouteLabel } from '../lib/edgeRouteGeometry';
 import { PerfMeter, DriftMeter } from '../lib/perfMeter';
-import { computeGraphFit } from '../lib/graphFit';
+import { computeGraphFit, collectMiniMapPositions, type MiniMapSimulationNode } from '../lib/graphFit';
 import { appendNodeControlGlyph, nodeControlGlyphTransform } from '../lib/nodeControlIcons';
 import { graphItemLayout, itemTitleScale, measureGraphText, edgeLabelDimensions, GRAPH_FONT_FAMILY, ITEM_TITLE_SIZE, ITEM_TITLE_LINE, ITEM_HEADER_HEIGHT, EDGE_LABEL_SIZE, ITEM_WIRE_WIDTH } from '../lib/graphSymbolLayout';
 import { placeItemLabels } from '../lib/edgeLabelPlacement';
@@ -4413,12 +4413,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       const sim = simulationRef.current;
       const upd = (window as { updateMiniMapPositions?: (p: Record<string, { x: number; y: number }>) => void }).updateMiniMapPositions;
       if (!sim || !upd) return;
-      const simNodes = sim.nodes() as { id: string; x?: number; y?: number; type?: string }[];
-      const positions: Record<string, { x: number; y: number }> = {};
-      const types: Record<string, string> = {};
-      for (const nd of simNodes) {
-        if (nd.x !== undefined && nd.y !== undefined) { positions[nd.id] = { x: nd.x, y: nd.y }; types[nd.id] = nd.type as string; }
-      }
+      const { positions, types } = collectMiniMapPositions(sim.nodes() as MiniMapSimulationNode[]);
       {
         upd(positions);
         (window as { updateMiniMapTypes?: (t: Record<string, string>) => void }).updateMiniMapTypes?.(types);
@@ -4491,6 +4486,19 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       window.removeEventListener('graphdone:layout-organized', publish);
     };
   }, [currentGraph?.id]);
+
+  // A frozen/locked simulation may never emit another tick after late data is
+  // merged. Refresh the Mini-Map from the changed node set without reopening
+  // or rearming the panel's camera-settle window.
+  useEffect(() => {
+    if (!currentGraph || workItemsData?.workItems?.length === undefined) return;
+    const sim = simulationRef.current;
+    const upd = (window as { updateMiniMapPositions?: (p: Record<string, { x: number; y: number }>) => void }).updateMiniMapPositions;
+    if (!sim || !upd) return;
+    const { positions, types } = collectMiniMapPositions(sim.nodes() as MiniMapSimulationNode[]);
+    upd(positions);
+    (window as { updateMiniMapTypes?: (t: Record<string, string>) => void }).updateMiniMapTypes?.(types);
+  }, [currentGraph?.id, workItemsData?.workItems?.length]);
 
   // Center on specific node
   const centerOnNode = useCallback((nodeId?: string) => {
