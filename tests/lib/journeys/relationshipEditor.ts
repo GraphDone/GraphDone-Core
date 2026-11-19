@@ -137,10 +137,14 @@ const zoomOf = (page: Page) => page.evaluate(() => {
  * middle. Gestures start on empty canvas, never on a card or a wire.
  */
 export async function showPair(page: Page, aId: string, bId: string, type: string) {
+  const touch = await isTouch(page);
+  const startRadius = 20;
   for (let attempt = 0; attempt < 4; attempt++) {
     if ((await drawnRelationship(page, aId, bId, type, { seen: true })).seen?.arrow) return;
     const k = await zoomOf(page);
-    const at = await page.evaluate(({ aId, bId }) => {
+    const factor = Math.min(3, Math.max(1.3, 0.9 / k));
+    const endRadius = startRadius * factor;
+    const at = await page.evaluate(({ aId, bId, touch, startRadius, endRadius }) => {
       const id = (end: any) => end?.id ?? end;
       const ofPair = (selector: string) => (Array.from(document.querySelectorAll(`.graph-container svg ${selector}`)) as any[]).find(el => {
         const d = el.__data__; return d && [id(d.source), id(d.target)].sort().join() === [aId, bId].sort().join();
@@ -159,24 +163,28 @@ export async function showPair(page: Page, aId: string, bId: string, type: strin
       }
       if (!tip) return null;
       const middle = { x: view.x + view.width / 2, y: view.y + view.height / 2 };
+      const inCanvas = (x: number, y: number) =>
+        x >= Math.max(view.left, 0) + 40 && x <= Math.min(view.right, innerWidth) - 40 &&
+        y >= Math.max(view.top, 0) + 40 && y <= Math.min(view.bottom, innerHeight) - 40;
       const empty = (x: number, y: number) => {
-        if (x < view.x + 40 || x > view.right - 40 || y < view.y + 40 || y > view.bottom - 40) return false;
+        if (!inCanvas(x, y)) return false;
         const hit = document.elementFromPoint(x, y);
         return !!hit && svg.contains(hit) && !hit.closest('g.node, .edge, .edge-clickable, .edge-label-group, .arrow, foreignObject, [data-local-item-card]');
       };
-      const near = (c: { x: number; y: number }) => {
+      const canPinch = (x: number, y: number) =>
+        empty(x - startRadius, y) && empty(x + startRadius, y) &&
+        inCanvas(x - endRadius, y) && inCanvas(x + endRadius, y);
+      const near = (c: { x: number; y: number }, canStart = empty) => {
         for (let r = 0; r <= 180; r += 15) for (let a = 0; a < 16; a++) {
           const x = c.x + r * Math.cos(a * Math.PI / 8), y = c.y + r * Math.sin(a * Math.PI / 8);
-          if (empty(x, y)) return { x, y };
+          if (canStart(x, y)) return { x, y };
           if (r === 0) break;
         }
         return null;
       };
-      const onScreen = tip.x > view.x + 40 && tip.x < view.right - 40 && tip.y > view.y + 40 && tip.y < view.bottom - 40;
-      return { tip, middle, onScreen, nearTip: near(tip), nearMiddle: near(middle) };
-    }, { aId, bId });
+      return { tip, middle, onScreen: inCanvas(tip.x, tip.y), nearTip: near(tip, touch ? canPinch : empty), nearMiddle: near(middle) };
+    }, { aId, bId, touch, startRadius, endRadius });
     if (!at) return;
-    const touch = await isTouch(page);
     if (!at.onScreen) {
       // Drag the canvas so the arrow comes to the middle.
       const from = at.nearMiddle;
@@ -198,11 +206,20 @@ export async function showPair(page: Page, aId: string, bId: string, type: strin
       }
     } else if ((k < 0.75 || attempt < 2) && at.nearTip) {
       // Zoom in around the arrow, so it stays on screen.
-      const factor = Math.min(3, Math.max(1.3, 0.9 / k));
       if (touch) {
         const cdp = await page.context().newCDPSession(page);
-        await cdp.send('Input.synthesizePinchGesture', { x: at.nearTip.x, y: at.nearTip.y, scaleFactor: factor, gestureSourceType: 'touch' });
-        await cdp.detach();
+        const { x, y } = at.nearTip;
+        const points = (radius: number) => [{ x: x - radius, y, id: 1 }, { x: x + radius, y, id: 2 }];
+        try {
+          await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: points(startRadius) });
+          for (let step = 1; step <= 6; step++) {
+            const radius = startRadius + (endRadius - startRadius) * step / 6;
+            await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: points(radius) });
+          }
+        } finally {
+          await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+          await cdp.detach();
+        }
       } else {
         await page.mouse.move(at.nearTip.x, at.nearTip.y);
         await page.mouse.wheel(0, -Math.log2(factor) / 0.002);
