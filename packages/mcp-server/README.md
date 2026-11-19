@@ -63,9 +63,6 @@ Get comprehensive information about a node including all relationships and contr
 ### find_path
 Find the shortest path between two nodes.
 
-### detect_cycles
-Detect circular dependencies in the graph.
-
 ## Configuration
 
 Set these environment variables:

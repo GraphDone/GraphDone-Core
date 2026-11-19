@@ -1,8 +1,16 @@
 import {test,expect} from '@playwright/test';
+import { existsSync } from 'node:fs';
 import {readFile} from 'node:fs/promises';
+const fixturePath='/tmp/graphdone-operations-fixture.json';
+
+const host=process.env.TEST_URL ? new URL(process.env.TEST_URL).hostname : '';
+const localTarget=['localhost','127.0.0.1','[::1]'].includes(host);
+const requested=process.env.QC_OPERATIONS==='1' || process.env.npm_lifecycle_event==='qc:operations';
+test.skip(!requested, 'Run qc:operations or set QC_OPERATIONS=1');
+test.skip(!localTarget || !existsSync(fixturePath), 'Requires a local TEST_URL and the operations fixture');
 test('family feedback → admin review → scoped agent → public notice @operations',async({page,context,browser})=>{
  test.setTimeout(90000);page.setDefaultTimeout(15000);const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
- const fixture=JSON.parse(await readFile('/tmp/graphdone-operations-fixture.json','utf8'));
+ const fixture=JSON.parse(await readFile(fixturePath,'utf8'));
  await page.goto('/');await page.getByRole('button',{name:'Feedback and bug reports',exact:true}).click();
  let dialog=page.getByRole('dialog',{name:'Feedback and bug reports'});
  const title='Family portrait report '+Date.now();await dialog.getByLabel('Short summary').fill(title);await dialog.getByLabel('What happened, or what would help?').fill('The project selector is hard to read on a phone. Expected a readable label.');

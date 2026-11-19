@@ -1,10 +1,21 @@
 import { test,expect } from '@playwright/test';
+import { existsSync } from 'node:fs';
 import { readFile,mkdtemp,rm } from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {randomUUID} from 'node:crypto';
 const fixturePath='/tmp/graphdone-offline-fixture.json';
+
+const host=process.env.TEST_URL ? new URL(process.env.TEST_URL).hostname : '';
+const localTarget=['localhost','127.0.0.1','[::1]'].includes(host);
+test.skip(!localTarget, 'Requires TEST_URL to point to a local hosted build');
+test.beforeEach(async({request})=>{
+ const shell=await request.get('/sw.js',{timeout:5000});
+ test.skip(!shell.ok() || !(await shell.text()).includes('graphdone-shell-'), 'Requires the compiled offline app shell');
+});
+
 test('student team: offline reload, drag, quota pause, reconnect, no duplicates @offline-sync',async({page,context})=>{
+ test.skip(!existsSync(fixturePath), 'Requires the local offline sync fixture');
  test.setTimeout(300000);
  const fixture=JSON.parse(await readFile(fixturePath,'utf8'));
  fixture.projectId=randomUUID();
@@ -123,6 +134,7 @@ test('student team: offline reload, drag, quota pause, reconnect, no duplicates 
 });
 
 test('dirty work retries on the batch deadline when the browser online hint stays stale @offline-sync',async({page})=>{
+ test.skip(!existsSync(fixturePath), 'Requires the local offline sync fixture');
  test.setTimeout(90000);
  const fixture=JSON.parse(await readFile(fixturePath,'utf8')),projectId=randomUUID(),id=randomUUID(),title='Reconnect deadline '+Date.now();
  const headers={Authorization:'Bearer '+fixture.token};
