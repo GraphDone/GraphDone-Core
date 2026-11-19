@@ -3,7 +3,7 @@ import { writeFile } from 'node:fs/promises';
 import { login, TEST_USERS } from '../../lib/auth';
 import { gql } from '../../lib/graphRequest';
 import { TEST_GRAPH_PREFIX } from '../../lib/dbHealing';
-import { deleteGraphDeep } from '../../lib/seedGraph';
+import { deleteGraphDeep, waitForStarterGraph } from '../../lib/seedGraph';
 import { openGraphView } from '../../lib/journeys/workspace';
 import { auditEdgeLabels, labelProblems, layoutSpread, problemCount, type LabelProblems } from '../../lib/edgeLabelAudit';
 import { LAUNCH_CHECKLIST_SHAPE, PLAN_A_LAUNCH_SHAPE, WELCOME_SHAPE, type LabelShape } from '../../../packages/web/src/lib/labelClearanceShapes';
@@ -217,16 +217,11 @@ async function report(info: TestInfo, stages: Stage[], edgesInView = true) {
   expect(failing, `labels are not all readable:\n${summary(stages)}`).toEqual([]);
 }
 
+test.describe.configure({ timeout: 150_000 });
+
 test.beforeEach(async ({ page }) => {
   await login(page, TEST_USERS.ADMIN);
-  // The app makes a Welcome graph at the first sign-in and may switch to it;
-  // wait until it exists so it cannot replace the graph under test. (Its items
-  // may have been changed by earlier tests: only its existence matters here.)
-  await expect.poll(async () => {
-    const me = (await gql(page, '{ me { id } }')).me.id;
-    const own = await gql(page, 'query($id:String!){graphs(where:{createdBy:$id}){name}}', { id: me });
-    return own.graphs.some((graph: { name: string }) => graph.name === 'Welcome');
-  }, { timeout: 60_000 }).toBe(true);
+  await waitForStarterGraph(page);
 });
 
 for (const shape of [WELCOME_SHAPE, LAUNCH_CHECKLIST_SHAPE])
@@ -239,7 +234,6 @@ for (const shape of [WELCOME_SHAPE, LAUNCH_CHECKLIST_SHAPE])
     // chips (FOLLOW_UP) are what makes the whole graph fit.
     const crowdedPhone = info.project.name === 'journeys-iphone' && shape === LAUNCH_CHECKLIST_SHAPE;
     if (crowdedPhone) info.annotations.push({ type: 'limit', description: `no edge has both cards on screen until compact label chips (${FOLLOW_UP})` });
-    test.setTimeout(150_000);
     await report(info, await organizeAndCheck(page, owned, info, shape), !crowdedPhone);
   });
 
