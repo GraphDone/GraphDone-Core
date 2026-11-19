@@ -118,6 +118,13 @@ export const SEQUENCES = {
     'tests/e2e/journeys/zoom-out.spec.ts', '--project=journeys', '--project=journeys-ipad', '--project=journeys-iphone',
     '--workers=1', '--retries=0', '--trace=retain-on-failure',
   ], blocking: true },
+  // The phone pinch journey needs the browser-local starter workspace that is
+  // only present in the hosted offline build. Its dedicated blocking sequence
+  // is run by that build's CI step, never collected as a self-hosted skip.
+  'zoom-out-guest-phone': { adapter: 'playwright', title: 'Hosted guest phone — pinch into a sibling graph', args: [
+    'tests/e2e/journeys/zoom-out-guest-phone.spec.ts', '--project=journeys-guest-iphone',
+    '--workers=1', '--retries=0', '--trace=retain-on-failure',
+  ], blocking: true },
   // Cross-repo: ingest the newest GraphDone-Cloud live-audit findings.json (sibling
   // repo) into the unified report. Skips cleanly when absent.
   'cloud-audit': { adapter: 'cloud-audit', title: 'Cloud live audit (ingested)', blocking: false },

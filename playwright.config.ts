@@ -59,11 +59,13 @@ export default defineConfig({
     {
       name: 'journeys',
       testMatch: /journeys\/.*\.spec\.ts/,
+      testIgnore: /zoom-out-guest-phone\.spec\.ts/,
       use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 }, trace: 'retain-on-failure', screenshot: 'only-on-failure' },
     },
     {
       name: 'journeys-ipad',
       testMatch: /journeys\/.*\.spec\.ts/,
+      testIgnore: /zoom-out-guest-phone\.spec\.ts/,
       // Chromium with the device's screen, touch and user agent: WebKit cannot pinch,
       // and zooming is how a touch user reaches the + and gear controls.
       use: { ...devices['iPad Pro 11'], browserName: 'chromium', trace: 'retain-on-failure', screenshot: 'only-on-failure' },
@@ -71,8 +73,14 @@ export default defineConfig({
     {
       name: 'journeys-iphone',
       testMatch: /journeys\/.*\.spec\.ts/,
+      testIgnore: /zoom-out-guest-phone\.spec\.ts/,
       use: { ...devices['iPhone 13'], browserName: 'chromium', trace: 'retain-on-failure', screenshot: 'only-on-failure' },
     },
+    ...(process.env.JOURNEY_BACKEND === 'hosted-guest' ? [{
+      name: 'journeys-guest-iphone',
+      testMatch: /zoom-out-guest-phone\.spec\.ts/,
+      use: { ...devices['iPhone 13'], browserName: 'chromium', trace: 'retain-on-failure', screenshot: 'only-on-failure' },
+    }] : []),
 
     /* The massive resolution × feature report: every screen + key feature,
      * screenshotted + audited at every viewport, into the Playwright HTML report.
