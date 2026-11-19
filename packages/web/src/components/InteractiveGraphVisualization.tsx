@@ -5957,7 +5957,12 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
                   {
                     icon: Link2,
                     title: "Connect to Existing Work Items",
-                    description: "Link this to other work items in graph",
+                    description: (
+                      <>
+                        <span className="hidden [@media(pointer:fine)]:inline">Shift-click two items, or Alt-drag from one to another.</span>
+                        <span className="[@media(pointer:fine)]:hidden">Link this to other work items in graph</span>
+                      </>
+                    ),
                     onClick: () => handleConnectToExistingNodes(nodeMenu.node!),
                     gradient: "from-purple-500/20 via-pink-500/10 to-purple-500/5",
                     iconColor: "text-purple-400",

@@ -229,6 +229,9 @@ export const LINK_PATHS: (LinkPath & { desktopOnly?: boolean })[] = [
         else await page.mouse.click(from.box.cx, from.box.cy, { button: 'right' });
         const connect = page.getByText('Connect to Existing Work Items', { exact: true });
         await expect(connect, "the item's menu must open").toBeVisible({ timeout: 5000 });
+        const shortcut = page.getByText('Shift-click two items, or Alt-drag from one to another.', { exact: true });
+        if (touch) await expect(shortcut).toBeHidden();
+        else await expect(shortcut).toBeVisible();
         await connect.click();
       };
       await openDialog();
