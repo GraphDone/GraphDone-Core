@@ -1911,12 +1911,14 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // strips physics keys (fx/fy) to preserve live velocity, so placed nodes
     // arriving via a graph-switch or poll would otherwise come back unpinned
     // and drift. Snapshot-authoritative load must hold here too.
+    let remoteGeometryChanged = false;
     (nodeMerge.nodes as any[]).forEach((node: any) => {
         const placed = !(((node.positionX ?? 0) === 0) && ((node.positionY ?? 0) === 0));
         const presentation = presentationPositionsRef.current.get(node.id);
         const incoming = incomingById.get(node.id);
         const canonicalX = incoming?.positionX ?? node.positionX ?? 0;
         const canonicalY = incoming?.positionY ?? node.positionY ?? 0;
+        const incomingPlaced = !((canonicalX === 0) && (canonicalY === 0));
         const sameCanonical = presentation
           && canonicalX === presentation.canonicalX
           && canonicalY === presentation.canonicalY;
@@ -1928,10 +1930,35 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           node.vx = 0;
           node.vy = 0;
           node.userPinned = true;
-        } else if (placed && !node._dragging) {
-          node.fx = node.positionX;
-          node.fy = node.positionY;
-          node.userPinned = true;
+        } else {
+          // The server has authoritative coordinates only when the incoming
+          // payload differs from the repair's snapshot. Do not fall through
+          // to the merged D3 object's old positionX/Y (mergeSimulationNodes
+          // intentionally preserves those fields for live interaction).
+          const invalidatedPresentation = !!presentation && !sameCanonical;
+          if (invalidatedPresentation) {
+            presentationPositionsRef.current.delete(node.id);
+            if (!node._dragging && incoming) {
+              remoteGeometryChanged = true;
+              // Advance the live object's fetched snapshot too. The merge
+              // helper intentionally preserves position fields for local
+              // interaction, but after accepting a remote canonical change a
+              // later poll must not fall back to the obsolete A coordinate.
+              node.positionX = canonicalX;
+              node.positionY = canonicalY;
+              node.x = canonicalX;
+              node.y = canonicalY;
+              node.fx = incomingPlaced ? canonicalX : null;
+              node.fy = incomingPlaced ? canonicalY : null;
+              node.vx = 0;
+              node.vy = 0;
+            }
+          }
+          if ((invalidatedPresentation ? incomingPlaced : placed) && !node._dragging) {
+            node.fx = invalidatedPresentation ? canonicalX : node.positionX;
+            node.fy = invalidatedPresentation ? canonicalY : node.positionY;
+            node.userPinned = true;
+          }
         }
     });
     simulation.nodes(nodeMerge.nodes as any);
@@ -1979,6 +2006,11 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     const hasUnpinned = (simulation.nodes() as any[]).some((n: any) => n.fx == null || n.fy == null);
     if (hasUnpinned) {
       simulation.alpha(0.1).restart();
+    } else if (remoteGeometryChanged) {
+      // A frozen graph has no natural tick after a position-only refetch.
+      // Run one owned render tick so the card transform and edge route both
+      // consume the accepted canonical coordinates; pinned nodes do not move.
+      simulation.alpha(0.001).restart();
     }
 
   }, [nodes, validatedEdges, getNodeDimensions, publishMiniMapPositions]);
@@ -2516,7 +2548,6 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         // Locked (phone) → reject the drag so the gesture pans the canvas instead.
         .filter((event: any) => simulationRef.current === simulation && canEditCurrentGraphRef.current && !interactionLockedRef.current && !event.ctrlKey && !event.button)
         .on('start', (event, d: any) => {
-          presentationPositionsRef.current.delete(d.id);
           d._dragging = false;
           delete d._dragStart;
           delete d._connectedNodes;
@@ -2544,6 +2575,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           if (simulationRef.current !== simulation || !canEditCurrentGraphRef.current || !d._dragStart) return;
           if (!d._dragging) {
             d._dragging = true;
+            // D3 fires drag start for an ordinary press. Retire a repaired
+            // pin only after movement proves this is an explicit layout edit.
+            presentationPositionsRef.current.delete(d.id);
             simulation.alphaTarget(0.2).restart();
             d.fx = d.x;
             d.fy = d.y;
@@ -5294,8 +5328,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     reinitTrigger, // Manual trigger
     loading, // Re-init when loading completes
     edgesLoading, // Re-init when edges loading completes
-    // Track node property changes for selective updates (only titles, descriptions, types)
-    nodes.map(n => `${n.id}:${n.title}:${n.description}:${n.type}:${n.status}:${n.priority}`).join(','),
+    // Track node property changes for selective updates, including canonical
+    // coordinates so a remote position-only edit reaches the live simulation
+    // and repaints repaired cards/edge routes without a full graph rebuild.
+    nodes.map(n => `${n.id}:${n.title}:${n.description}:${n.type}:${n.status}:${n.priority}:${n.positionX}:${n.positionY}`).join(','),
     publishMiniMapPositions,
     // Track edge type/direction changes so a relationship edit or flip rebuilds
     validatedEdges.map((e: any) => {
