@@ -1,7 +1,7 @@
 import { test, expect, Page, TestInfo } from '@playwright/test';
 import { writeFile } from 'node:fs/promises';
 import { backend, openGraphView, SetupError } from '../../lib/journeys/workspace';
-import { cancelledThreeFingerPinch, touchGesture, visibleTileCenter, type TouchPoint } from '../../lib/journeys/touchContacts';
+import { cancelledThreeFingerPinch, splitSiblingContacts, touchGesture, visibleTileCenter, type TouchPoint } from '../../lib/journeys/touchContacts';
 import { readableLabels } from '../../lib/journeys/readableLabels';
 
 async function evidence(info: TestInfo, name: string, body: string | Buffer, contentType: string) {
@@ -103,36 +103,9 @@ test('JOURNEY zoom-out: pinching into a sibling opens that graph on a phone', as
   };
   await resetOverview('cross-tile contacts');
   const fixTile = () => page.getByRole('button', { name: /^Fix bugs graph, \d+ items?$/ });
-  // Start on two distinct sibling tiles whose midpoint is actual empty canvas.
-  const ids = await Promise.all([
-    fixTile().getAttribute('data-zoom-tile'),
-    page.getByRole('button', { name: /^Ideas graph, \d+ items?$/ }).getAttribute('data-zoom-tile'),
-  ]);
-  const [fixCenter, ideasCenter, splitCenter] = await page.evaluate(([fixId, ideasId]) => {
-    const svg = document.querySelector('.graph-container svg:has(g.main-graph-group)')!;
-    const points = (id: string | null) => {
-      const tile = svg.querySelector(`[data-zoom-tile="${id}"]`)!;
-      const box = tile.querySelector('.zoom-tile-bg')!.getBoundingClientRect();
-      const visible = [];
-      for (const fy of [0.5, 0.25, 0.75]) for (const fx of [0.5, 0.25, 0.75]) {
-        const x = Math.round(box.x + box.width * fx), y = Math.round(box.y + box.height * fy);
-        if (document.elementFromPoint(x, y)?.closest('[data-zoom-tile]') === tile) visible.push({ x, y });
-      }
-      return visible;
-    };
-    const first = points(fixId), second = points(ideasId);
-    for (const a of first) for (const b of second) {
-      const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-      const hit = document.elementFromPoint(mid.x, mid.y);
-      if (hit === svg || hit?.matches('rect.background') && svg.contains(hit)) return [a, b, mid];
-    }
-    throw new Error('No visible Fix bugs and Ideas contacts with a blank canvas midpoint.');
-  }, ids);
-  const checkSplit = await observePair('cross-tile contacts', ids);
-  await touchGesture(page, [[fixCenter, ideasCenter], [
-    { x: splitCenter.x + (fixCenter.x - splitCenter.x) * 1.25, y: splitCenter.y + (fixCenter.y - splitCenter.y) * 1.25 },
-    { x: splitCenter.x + (ideasCenter.x - splitCenter.x) * 1.25, y: splitCenter.y + (ideasCenter.y - splitCenter.y) * 1.25 },
-  ]]);
+  const split = await splitSiblingContacts(page, originalGraphId);
+  const checkSplit = await observePair('cross-tile contacts', split.ids);
+  await touchGesture(page, [split.contacts, split.spread]);
   await checkSplit();
   await welcomeStaysSelected();
 
@@ -223,6 +196,7 @@ test('JOURNEY zoom-out: pinching into a sibling opens that graph on a phone', as
   await evidence(info, 'pinch-sibling-receipt.json', JSON.stringify({
     viewport: await page.evaluate(() => ({ width: innerWidth, height: innerHeight })),
     inputCenter: center,
+    splitSiblingContacts: split,
     touchReceipts,
     contactHits,
     hitGraphId: targetId,
