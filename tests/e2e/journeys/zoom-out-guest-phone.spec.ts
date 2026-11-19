@@ -53,14 +53,17 @@ async function localSourcePositions(page: Page) {
 
 test('JOURNEY zoom-out: pinching into a sibling opens that graph on a phone', async ({ page }, info) => {
   test.setTimeout(240_000);
-  const touchReceipts: { phase: string; contacts: { x: number; y: number; owner: string }[]; scale: number; after: number }[] = [];
+  const touchReceipts: { phase: string; contacts: { x: number; y: number; owner: string }[]; midpointIsCanvas: boolean; scale: number; after: number }[] = [];
   const observePair = async (phase: string, expected: (string | null)[]) => {
     const handle = await page.evaluateHandle(() => {
-      const seen = { contacts: [] as { x: number; y: number; owner: string }[], scale: visualViewport?.scale ?? 1 };
+      const seen = { contacts: [] as { x: number; y: number; owner: string }[], midpointIsCanvas: false, scale: visualViewport?.scale ?? 1 };
       const start = (event: TouchEvent) => {
         if (event.touches.length !== 2) return;
         window.removeEventListener('touchstart', start, true);
         const svg = document.querySelector('.graph-container svg:has(g.main-graph-group)');
+        const [a, b] = Array.from(event.touches);
+        const midpoint = document.elementFromPoint((a.clientX + b.clientX) / 2, (a.clientY + b.clientY) / 2);
+        seen.midpointIsCanvas = !!svg && (midpoint === svg || !!midpoint?.matches('rect.background') && svg.contains(midpoint));
         seen.contacts = Array.from(event.touches, touch => {
           const target = touch.target as Element;
           const background = target === svg || target.matches('rect.background') && svg?.contains(target);
@@ -77,6 +80,7 @@ test('JOURNEY zoom-out: pinching into a sibling opens that graph on a phone', as
       info.annotations.push({ type: 'phone-touch', description: JSON.stringify(seen) });
       expect(seen.contacts.map(c => c.owner)).toEqual(expected);
       expect(seen.after, 'pinching the graph must keep whole-page magnification unchanged').toBeCloseTo(seen.scale, 3);
+      return seen;
     };
   };
   await enterWelcome(page);
@@ -104,9 +108,11 @@ test('JOURNEY zoom-out: pinching into a sibling opens that graph on a phone', as
   await resetOverview('cross-tile contacts');
   const fixTile = () => page.getByRole('button', { name: /^Fix bugs graph, \d+ items?$/ });
   const split = await splitSiblingContacts(page, originalGraphId);
+  const beforeSplit = await camera(page);
   const checkSplit = await observePair('cross-tile contacts', split.ids);
   await touchGesture(page, [split.contacts, split.spread]);
-  await checkSplit();
+  expect((await checkSplit()).midpointIsCanvas).toBe(true);
+  expect(await camera(page)).toBeGreaterThan(beforeSplit);
   await welcomeStaysSelected();
 
   await resetOverview('background');
