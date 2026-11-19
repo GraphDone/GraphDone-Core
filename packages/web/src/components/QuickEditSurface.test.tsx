@@ -115,3 +115,62 @@ describe('quick editor initial focus', () => {
     expect(trigger).toHaveFocus();
   });
 });
+
+describe('quick editor saved choices', () => {
+  it.each([
+    { field: 'status', selected: 'On Hold', initial: 'PROPOSED', saved: 'ON_HOLD', remote: 'BLOCKED', remoteLabel: 'Blocked' },
+    { field: 'type', selected: 'Research', initial: 'TASK', saved: 'RESEARCH', remote: 'BUG', remoteLabel: 'Bug' },
+  ])('shows acknowledged $field while the canvas still has older data', async ({ field, selected, initial, saved, remote, remoteLabel }) => {
+    const node = { id: 'owned-item', title: 'Original title', type: 'TASK', status: 'PROPOSED' };
+    const onCommit = vi.fn().mockResolvedValueOnce({}).mockResolvedValueOnce(null);
+    const onClose = vi.fn();
+    const { rerender } = render(<NodeQuickEdit node={node} onCommit={onCommit} onClose={onClose} />);
+    const choice = screen.getByRole('button', { name: selected });
+    await act(async () => { fireEvent.click(choice); });
+    expect(onCommit).toHaveBeenCalledWith(expect.objectContaining({ update: { [field]: saved }, prev: { [field]: initial } }));
+    expect(choice).toHaveAttribute('aria-pressed', 'true');
+
+    const remoteChoice = screen.getByRole('button', { name: remoteLabel });
+    await act(async () => { fireEvent.click(remoteChoice); });
+    expect(onCommit).toHaveBeenLastCalledWith(expect.objectContaining({ update: { [field]: remote }, prev: { [field]: saved } }));
+    expect(choice).toHaveAttribute('aria-pressed', 'true');
+    expect(remoteChoice).toHaveAttribute('aria-pressed', 'false');
+
+    rerender(<NodeQuickEdit node={{ ...node, [field]: saved }} onCommit={onCommit} onClose={onClose} />);
+    rerender(<NodeQuickEdit node={{ ...node, [field]: remote }} onCommit={onCommit} onClose={onClose} />);
+    expect(remoteChoice).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('queues a later status choice and bases undo on the last successful save', async () => {
+    let rejectFirst!: () => void;
+    const first = new Promise((_resolve, reject) => { rejectFirst = () => reject(new Error('Save rejected')); });
+    const onCommit = vi.fn().mockReturnValueOnce(first).mockResolvedValueOnce({});
+    render(<NodeQuickEdit node={{ id: 'owned-item', type: 'TASK', status: 'PROPOSED' }} onCommit={onCommit} onClose={vi.fn()} />);
+    const onHold = screen.getByRole('button', { name: 'On Hold' });
+    const blocked = screen.getByRole('button', { name: 'Blocked' });
+    await act(async () => {
+      fireEvent.click(onHold);
+      fireEvent.click(blocked);
+    });
+    expect(onCommit).toHaveBeenCalledTimes(1);
+    expect(onHold).toHaveAttribute('aria-pressed', 'false');
+    await act(async () => { rejectFirst(); });
+    expect(onCommit).toHaveBeenLastCalledWith(expect.objectContaining({ update: { status: 'BLOCKED' }, prev: { status: 'PROPOSED' } }));
+    expect(blocked).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('takes a newer remote status even if the canvas skips the acknowledged status', async () => {
+    const node = { id: 'owned-item', type: 'TASK', status: 'PROPOSED', updatedAt: '2026-11-01T12:00:00.000Z' };
+    const onCommit = vi.fn().mockResolvedValue({ updatedAt: '2026-11-01T12:00:01.000Z' });
+    const onClose = vi.fn();
+    const { rerender } = render(<NodeQuickEdit node={node} onCommit={onCommit} onClose={onClose} />);
+    const onHold = screen.getByRole('button', { name: 'On Hold' });
+    await act(async () => { fireEvent.click(onHold); });
+    expect(onHold).toHaveAttribute('aria-pressed', 'true');
+    rerender(<NodeQuickEdit node={{ ...node, status: 'BLOCKED', updatedAt: '2026-11-01T12:00:00.500Z' }} onCommit={onCommit} onClose={onClose} />);
+    expect(onHold).toHaveAttribute('aria-pressed', 'true');
+    rerender(<NodeQuickEdit node={{ ...node, status: 'COMPLETED', updatedAt: '2026-11-01T12:00:02.000Z' }} onCommit={onCommit} onClose={onClose} />);
+    expect(screen.getByRole('button', { name: 'Completed' })).toHaveAttribute('aria-pressed', 'true');
+    expect(onHold).toHaveAttribute('aria-pressed', 'false');
+  });
+});

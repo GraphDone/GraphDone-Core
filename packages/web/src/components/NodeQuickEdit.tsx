@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { X, Trash2 } from 'lucide-react';
 import {
   getTypeConfig, getStatusConfig, TYPE_OPTIONS, STATUS_OPTIONS,
@@ -21,8 +21,8 @@ export interface QuickEditCommit {
 
 interface NodeQuickEditProps {
   node: any;
-  /** Persist one field change (optimistic); parent wires the mutation + undo. */
-  onCommit: (c: QuickEditCommit) => void;
+  /** Return the work item version if the mutation confirms the change. */
+  onCommit: (c: QuickEditCommit) => Promise<{ updatedAt?: string } | null>;
   onClose: () => void;
   onOpenDetails?: () => void;
   rootTestId?: string;
@@ -31,11 +31,60 @@ interface NodeQuickEditProps {
 const TYPES = TYPE_OPTIONS.filter((t) => t.value !== 'all');
 const STATUSES = STATUS_OPTIONS.filter((s) => s.value !== 'all');
 
+function useSavedChoice(field: 'type' | 'status', source: string, updatedAt: string | undefined, onCommit: NodeQuickEditProps['onCommit']) {
+  const [confirmed, setConfirmed] = useState<{ value: string; updatedAt?: string; previousSource: string }>();
+  const sourceRef = useRef(source);
+  const lastSaved = useRef(source);
+  const lastRequested = useRef<string>();
+  const writes = useRef(Promise.resolve());
+
+  const sourceTime = Date.parse(updatedAt ?? '');
+  const confirmedTime = Date.parse(confirmed?.updatedAt ?? '');
+  const sourceChanged = confirmed && (Number.isFinite(sourceTime) && Number.isFinite(confirmedTime)
+    ? sourceTime > confirmedTime || (sourceTime === confirmedTime && source !== confirmed.previousSource)
+    : source !== confirmed.previousSource);
+  const useConfirmed = confirmed && confirmed.value !== source && !sourceChanged;
+  const value = useConfirmed ? confirmed.value : source;
+  useLayoutEffect(() => {
+    sourceRef.current = source;
+    lastSaved.current = value;
+    if (confirmed && !useConfirmed) setConfirmed(undefined);
+  }, [source, value, confirmed, useConfirmed]);
+
+  const select = (next: string) => {
+    if ((lastRequested.current ?? value) === next) return;
+    lastRequested.current = next;
+    const write = writes.current.then(async () => {
+      if (lastSaved.current === next) return;
+      const previousSource = sourceRef.current;
+      try {
+        const saved = await onCommit({
+          update: { [field]: next },
+          prev: { [field]: lastSaved.current },
+          label: `Change ${field}`,
+        });
+        if (saved) {
+          lastSaved.current = next;
+          setConfirmed({ value: next, updatedAt: saved.updatedAt, previousSource });
+        }
+      } catch {
+        return;
+      }
+    });
+    const queued = write.finally(() => {
+      if (writes.current === queued) lastRequested.current = undefined;
+    });
+    writes.current = queued;
+  };
+
+  return { value, select };
+}
+
 /**
  * Quick in-context node editor (PR #87): a compact popover anchored to a node on
  * the canvas that edits every field — title, description, type, priority,
- * status — without opening the heavy details modal. Each field saves immediately
- * (optimistic) via onCommit, which the parent turns into an updateWorkItems
+ * status — without opening the heavy details modal. Each field saves via
+ * onCommit, which the parent turns into an updateWorkItems
  * mutation + an undo entry. Positioning is handled by the parent (like the inline
  * rename box).
  */
@@ -64,7 +113,9 @@ export function NodeQuickEdit({ node, onCommit, onClose, onOpenDetails, rootTest
     setNoteText('');
   };
 
-  const typeCfg = getTypeConfig(node.type as WorkItemType);
+  const type = useSavedChoice('type', node.type, node.updatedAt, onCommit);
+  const status = useSavedChoice('status', node.status, node.updatedAt, onCommit);
+  const typeCfg = getTypeConfig(type.value as WorkItemType);
 
   const commitTitle = () => {
     const t = title.trim();
@@ -76,12 +127,6 @@ export function NodeQuickEdit({ node, onCommit, onClose, onOpenDetails, rootTest
   const commitPriority = () => {
     const p = priority / 100;
     if (Math.abs(p - (node.priority ?? 0)) > 0.001) onCommit({ update: { priority: p }, prev: { priority: node.priority ?? 0 }, label: 'Edit priority' });
-  };
-  const commitType = (value: string) => {
-    if (value !== node.type) onCommit({ update: { type: value }, prev: { type: node.type }, label: 'Change type' });
-  };
-  const commitStatus = (value: string) => {
-    if (value !== node.status) onCommit({ update: { status: value }, prev: { status: node.status }, label: 'Change status' });
   };
 
   return (
@@ -131,11 +176,11 @@ export function NodeQuickEdit({ node, onCommit, onClose, onOpenDetails, rootTest
           <span className="block text-sm text-gray-400 mb-1">Type</span>
           <div className="flex flex-wrap gap-1" data-testid="quick-type">
             {TYPES.map((t) => {
-              const active = t.value === node.type;
+              const active = t.value === type.value;
               return (
                 <button
                   key={t.value}
-                  onClick={() => commitType(t.value)}
+                  onClick={() => type.select(t.value)}
                   aria-pressed={active}
                   className={`min-h-[44px] px-3 py-2 rounded-full text-sm border transition-colors ${active ? 'text-white' : 'text-gray-300 hover:text-white border-gray-700 hover:border-gray-500'}`}
                   style={active ? { backgroundColor: `${t.hexColor}33`, borderColor: t.hexColor, color: t.hexColor } : undefined}
@@ -172,12 +217,12 @@ export function NodeQuickEdit({ node, onCommit, onClose, onOpenDetails, rootTest
           <span className="block text-sm text-gray-400 mb-1">Status</span>
           <div className="flex flex-wrap gap-1" data-testid="quick-status">
             {STATUSES.map((s) => {
-              const active = s.value === node.status;
+              const active = s.value === status.value;
               const cfg = getStatusConfig(s.value as WorkItemStatus);
               return (
                 <button
                   key={s.value}
-                  onClick={() => commitStatus(s.value)}
+                  onClick={() => status.select(s.value)}
                   aria-pressed={active}
                   className={`min-h-[44px] px-3 py-2 rounded-full text-sm border transition-colors ${active ? '' : 'text-gray-300 hover:text-white border-gray-700 hover:border-gray-500'}`}
                   style={active ? { backgroundColor: `${cfg.hexColor}33`, borderColor: cfg.hexColor, color: cfg.hexColor } : undefined}
