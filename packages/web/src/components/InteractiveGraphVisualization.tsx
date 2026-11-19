@@ -2165,7 +2165,6 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     const simulation = d3.forceSimulation(visibleNodes as any);
     simulationLayoutScopeRef.current = activeLayoutScopeRef.current;
     simulationRef.current = simulation; // Store reference for resize handling
-    publishMiniMapPositions();
     
     // RESTORE PRESERVED POSITIONS to prevent nodes jumping to origin
     if (existingPositions.size > 0) {
@@ -4092,6 +4091,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .alpha(hasUnpinnedNodes ? DEFAULT_PHYSICS.alpha.loadEnergy : 0)
       .alphaDecay(DEFAULT_PHYSICS.alpha.decay)
       .restart();
+    // Publish only after restored positions, force configuration, and the
+    // frozen/active state are all final for this dataset.
+    publishMiniMapPositions();
 
     // When the layout settles: record settle time, persist the arrangement so
     // it's durable across reloads, run a final edge-label de-overlap pass, and

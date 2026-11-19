@@ -188,4 +188,3 @@ export function collectMiniMapPositions(nodes: readonly MiniMapSimulationNode[])
   }
   return { positions, types };
 }
-
