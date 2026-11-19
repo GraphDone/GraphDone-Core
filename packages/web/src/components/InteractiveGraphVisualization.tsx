@@ -73,7 +73,7 @@ import { DEFAULT_PHYSICS, collisionRadius, linkDistance, linkMaxDistance, linkSt
 import { computeCompactLayout, isHierarchicalLayout, parseLayoutMode, LAYOUT_MODE_STORAGE_KEY, type LayoutMode } from '../lib/layoutAlgorithms';
 import { edgeBorderEndpoints, minEdgeLength, clampToMinNeighbors } from '../lib/edgeGeometry';
 import { directionStrategy, arrowVisibility, perpendicularOffset } from '../lib/edgeLOD';
-import { edgeNeedsPaintGeometry } from '../lib/edgePaintScope';
+import { edgeLabelHasCurrentPlacement, edgeNeedsPaintGeometry } from '../lib/edgePaintScope';
 import { assignParallelEdgeIndices } from '../lib/parallelEdges';
 import { isTap, touchHitSize, isCoarsePointer } from '../lib/touchInteraction';
 import { usePositionSaveQueue } from '../hooks/usePositionSaveQueue';
@@ -4020,7 +4020,11 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       linkElements.style('display', edgeDisplay);
       clickableEdges.style('display', edgeDisplay);
       arrowElements.style('display', edgeDisplay);
-      edgeLabelGroups.style('display', (d: any) => d._routeLabel ? edgeDisplay(d) : 'none');
+      // A culled label can retain its last route placement for the next
+      // avoidance pass, but labelRects is the authority that the placement is
+      // current. Never briefly reveal a discarded hit target during live pan.
+      edgeLabelGroups.style('display', (d: any) =>
+        edgeLabelHasCurrentPlacement(d._routeLabel, labelRects.has(d.id)) ? edgeDisplay(d) : 'none');
     };
     const clearCull = (updateEdges = true) => {
       nodeElements.style('display', null);

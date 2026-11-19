@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { edgeNeedsPaintGeometry } from './edgePaintScope';
+import { edgeLabelHasCurrentPlacement, edgeNeedsPaintGeometry } from './edgePaintScope';
 
 describe('edge paint geometry scope', () => {
   it('keeps visible-priority edges that touch the viewport', () => {
@@ -14,5 +14,12 @@ describe('edge paint geometry scope', () => {
 
   it('keeps offscreen geometry when viewport culling is inactive', () => {
     expect(edgeNeedsPaintGeometry({ source: { _culled: true }, target: { _culled: true } }, false)).toBe(true);
+  });
+
+  it('does not reveal a stale label route until avoidance records its new rectangle', () => {
+    const cachedRoute = { x: 40, y: 20 };
+    expect(edgeLabelHasCurrentPlacement(cachedRoute, false)).toBe(false);
+    expect(edgeLabelHasCurrentPlacement(cachedRoute, true)).toBe(true);
+    expect(edgeLabelHasCurrentPlacement(null, true)).toBe(false);
   });
 });
