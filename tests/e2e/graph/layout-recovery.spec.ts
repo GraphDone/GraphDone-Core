@@ -769,7 +769,7 @@ test('remote position-only edits repaint a repaired card and its wire across ref
 
   for (let refresh = 0; refresh < 2; refresh++) {
     const fetched = page.waitForResponse(response => {
-      if (response.request().method() !== 'POST' || !response.url().endsWith('/api/graphql')) return false;
+      if (response.request().method() !== 'POST' || !new URL(response.url()).pathname.endsWith('/graphql')) return false;
       const body = response.request().postDataJSON();
       return body?.operationName === 'GetWorkItems' && body.variables?.where?.graph?.id === graph.graphId;
     });
