@@ -53,6 +53,32 @@ async function localSourcePositions(page: Page) {
 
 test('JOURNEY zoom-out: pinching into a sibling opens that graph on a phone', async ({ page }, info) => {
   test.setTimeout(240_000);
+  const touchReceipts: { phase: string; contacts: { x: number; y: number; owner: string }[]; scale: number; after: number }[] = [];
+  const observePair = async (phase: string, expected: (string | null)[]) => {
+    const handle = await page.evaluateHandle(() => {
+      const seen = { contacts: [] as { x: number; y: number; owner: string }[], scale: visualViewport?.scale ?? 1 };
+      const start = (event: TouchEvent) => {
+        if (event.touches.length !== 2) return;
+        window.removeEventListener('touchstart', start, true);
+        const svg = document.querySelector('.graph-container svg:has(g.main-graph-group)');
+        seen.contacts = Array.from(event.touches, touch => {
+          const target = touch.target as Element;
+          const background = target === svg || target.matches('rect.background') && svg?.contains(target);
+          return { x: touch.clientX, y: touch.clientY, owner: target.closest('[data-zoom-tile]')?.getAttribute('data-zoom-tile') ?? (background ? 'canvas' : 'other') };
+        });
+      };
+      window.addEventListener('touchstart', start, { capture: true, passive: true });
+      return seen;
+    });
+    return async () => {
+      const seen = { phase, ...await handle.jsonValue(), after: await page.evaluate(() => visualViewport?.scale ?? 1) };
+      await handle.dispose();
+      touchReceipts.push(seen);
+      info.annotations.push({ type: 'phone-touch', description: JSON.stringify(seen) });
+      expect(seen.contacts.map(c => c.owner)).toEqual(expected);
+      expect(seen.after, 'pinching the graph must keep whole-page magnification unchanged').toBeCloseTo(seen.scale, 3);
+    };
+  };
   await enterWelcome(page);
   const originalGraphId = await page.evaluate(() => localStorage.getItem('currentGraphId'));
   const welcomeStaysSelected = async () => {
@@ -102,10 +128,12 @@ test('JOURNEY zoom-out: pinching into a sibling opens that graph on a phone', as
     }
     throw new Error('No visible Fix bugs and Ideas contacts with a blank canvas midpoint.');
   }, ids);
+  const checkSplit = await observePair('cross-tile contacts', ids);
   await touchGesture(page, [[fixCenter, ideasCenter], [
     { x: splitCenter.x + (fixCenter.x - splitCenter.x) * 1.25, y: splitCenter.y + (fixCenter.y - splitCenter.y) * 1.25 },
     { x: splitCenter.x + (ideasCenter.x - splitCenter.x) * 1.25, y: splitCenter.y + (ideasCenter.y - splitCenter.y) * 1.25 },
   ]]);
+  await checkSplit();
   await welcomeStaysSelected();
 
   await resetOverview('background');
@@ -122,7 +150,9 @@ test('JOURNEY zoom-out: pinching into a sibling opens that graph on a phone', as
     }
     throw new Error('no overview background point');
   });
+  const checkBackground = await observePair('background', ['canvas', 'canvas']);
   await pinch(page, background, 20, 65);
+  await checkBackground();
   await welcomeStaysSelected();
 
   await resetOverview('jitter');
@@ -150,7 +180,7 @@ test('JOURNEY zoom-out: pinching into a sibling opens that graph on a phone', as
 
   const area = await resetOverview('slow expansion into sibling');
   const tile = fixTile();
-  const tileBox = (await tile.boundingBox())!;
+  const tileBox = (await tile.locator('.zoom-tile-bg').boundingBox())!;
   const shortSide = Math.min(area.width, area.height);
   const tileSize = Math.max(tileBox.width, tileBox.height);
   // Start just below the point at which the camera hides sibling tiles. The
@@ -164,7 +194,7 @@ test('JOURNEY zoom-out: pinching into a sibling opens that graph on a phone', as
   const cameraBefore = await camera(page);
   const sourcePositions = await localSourcePositions(page);
   center = await visibleTileCenter(page, tile, 20);
-  const readyBox = (await tile.boundingBox())!;
+  const readyBox = (await tile.locator('.zoom-tile-bg').boundingBox())!;
   expect(Math.max(readyBox.width, readyBox.height) * 51 / 40).toBeGreaterThan(0.5 * shortSide);
   const contactHits = await page.evaluate(({ x, y }) => [-20, 0, 20].map(offset => ({
     x: x + offset, y,
@@ -172,6 +202,7 @@ test('JOURNEY zoom-out: pinching into a sibling opens that graph on a phone', as
   })), center);
   expect(contactHits.map(hit => hit.graphId)).toEqual([targetId, targetId, targetId]);
 
+  const checkDive = await observePair('slow expansion into sibling', [targetId, targetId]);
   // An 11px first expansion stays below the 12px navigation threshold. Both
   // fingers stay down and keep spreading after the camera hides the tile.
   await touchGesture(page, [
@@ -179,17 +210,20 @@ test('JOURNEY zoom-out: pinching into a sibling opens that graph on a phone', as
     [{ x: center.x - 25, y: center.y }, { x: center.x + 26, y: center.y }],
     ...around([31, 37, 42, 48, 54, 59, 65]),
   ], async () => {
+    await checkDive();
     await expect(page.locator('.graph-container')).toHaveAttribute('data-zoom-level', /^[01]$/);
     await expect(tile).toBeHidden();
     await welcomeStaysSelected();
   });
+  expect(await page.evaluate(() => visualViewport?.scale ?? 1)).toBeCloseTo(touchReceipts[touchReceipts.length - 1].scale, 3);
   await expect(selector(page)).toContainText('Fix bugs', { timeout: 15_000 });
   expect(await page.evaluate(() => localStorage.getItem('currentGraphId'))).toBe(targetId);
   const afterPositions = await localSourcePositions(page);
   for (const [id, position] of Object.entries(sourcePositions)) expect(afterPositions[id], `source position changed for ${id}`).toEqual(position);
   await evidence(info, 'pinch-sibling-receipt.json', JSON.stringify({
-    viewport: await page.evaluate(() => ({ width: innerWidth, height: innerHeight, touchPoints: navigator.maxTouchPoints })),
+    viewport: await page.evaluate(() => ({ width: innerWidth, height: innerHeight })),
     inputCenter: center,
+    touchReceipts,
     contactHits,
     hitGraphId: targetId,
     originalGraphId,
