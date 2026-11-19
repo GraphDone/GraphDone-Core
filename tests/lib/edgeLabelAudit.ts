@@ -100,6 +100,13 @@ export async function auditEdgeLabels(page: Page): Promise<LabelAudit> {
       }
       return opacity >= 0.5;
     };
+    const hasVisibleInk = (el: Element) => {
+      if (!painted(el)) return false;
+      const style = getComputedStyle(el);
+      const color = (value: string) => value !== 'none' && value !== 'transparent' && !/^rgba\(.*,\s*0\)$/.test(value);
+      return (color(style.fill) && Number(style.fillOpacity) > 0) ||
+        (color(style.stroke) && Number(style.strokeOpacity) > 0 && parseFloat(style.strokeWidth) > 0);
+    };
     const quad = (rect: SVGGraphicsElement): P[] => {
       const m = rect.getScreenCTM();
       const b = rect.getBBox();
@@ -182,18 +189,20 @@ export async function auditEdgeLabels(page: Page): Promise<LabelAudit> {
       label.hit = !!hitEl && hitEl.closest('.edge-label-group') === labelGroups.get(label.id);
       const control = labelGroups.get(label.id);
       const text = control?.querySelector<SVGGraphicsElement>('.edge-label');
-      if (text && text.textContent?.trim() && painted(text) && text.getBBox().width > 0) {
+      if (text && text.textContent?.trim() && hasVisibleInk(text) && text.getBBox().width > 0) {
         const ctm = text.getScreenCTM();
         if (ctm) label.textPx = parseFloat(getComputedStyle(text).fontSize) * Math.hypot(ctm.a, ctm.b);
       }
       if (control?.dataset.edgeLabelChip === 'true') {
         const icon = control.querySelector('.edge-label-icon svg');
-        const glyph = icon?.querySelector('path, circle, ellipse, line, polyline, polygon, rect');
-        const glyphBox = glyph?.getBoundingClientRect();
+        const paintedIcon = Array.from(icon?.querySelectorAll('path, circle, ellipse, line, polyline, polygon, rect') ?? []).some(glyph => {
+          const { width, height } = glyph.getBoundingClientRect();
+          return (width > 0 || height > 0) && hasVisibleInk(glyph);
+        });
         const [a, b, , d] = label.box;
         label.chip = {
           allowed: allowsChip,
-          paintedIcon: !!glyphBox && (glyphBox.width > 0 || glyphBox.height > 0) && painted(glyph ?? null),
+          paintedIcon,
           width: Math.hypot(a.x - b.x, a.y - b.y),
           height: Math.hypot(a.x - d.x, a.y - d.y),
           accessibleName: control.getAttribute('aria-label')?.trim() ?? '',
