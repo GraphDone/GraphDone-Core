@@ -327,9 +327,11 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     const trigger = Array.from(
       containerRef.current?.querySelectorAll<SVGGElement>(selector) ?? []
     ).find(element => element.dataset.nodeId === nodeId);
-    const card = trigger?.closest<SVGGElement>('.node');
-    (card?.getAttribute('data-detail') === 'compact' ? card : trigger)?.focus({ preventScroll: true });
-    return trigger;
+    const card = trigger?.closest<SVGGElement>('.node') ??
+      containerRef.current?.querySelector<SVGGElement>(`.node[data-node-id="${CSS.escape(nodeId)}"]`);
+    const target = card?.getAttribute('data-detail') === 'compact' || !trigger ? card : trigger;
+    target?.focus({ preventScroll: true });
+    return trigger ?? card ?? undefined;
   }, []);
   const closeExpandedNode = useCallback(() => {
     const returnFocusId = expandedReturnFocusIdRef.current;
@@ -2491,6 +2493,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .enter()
       .append('g')
       .attr('class', (d: WorkItem) => `node node-type-${d.type.toLowerCase()}`)
+      .attr('data-node-id', (d: WorkItem) => d.id)
       // The semantic identity is eager even when visual text descendants are
       // deferred. Screen-reader navigation therefore never depends on whether
       // this card has entered the painted viewport yet.
@@ -3232,7 +3235,6 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       hydratedNodeDetails++;
       const node = d3.select(element);
       appendNodeControls(node as unknown as typeof nodeElements);
-      node.attr('role', 'group').attr('tabindex', null);
       const layout = getNodeDimensions(d);
       renderItemTitle(element, d, layout);
       node.append('text')
