@@ -1,7 +1,7 @@
 import { devices, expect, test } from '@playwright/test';
 import { resolve } from 'node:path';
 import { openGraphView } from '../../lib/journeys/workspace';
-import { touchGesture, visibleTileCenter, splitSiblingContacts, type TouchPoint } from '../../lib/journeys/touchContacts';
+import { bareCanvasPinchCenter, touchGesture, visibleTileCenter, splitSiblingContacts, type TouchPoint } from '../../lib/journeys/touchContacts';
 
 test.use({ ...devices['iPhone 14'], browserName: 'chromium' });
 
@@ -174,3 +174,24 @@ for (const offset of [0, 480]) {
     await expect(page.locator('body')).toHaveAttribute('data-targets', pair.ids.join(','));
   });
 }
+
+test('camera calibration uses bare canvas when a sibling covers the middle of the phone @mobile', async ({ page }) => {
+  await page.setContent(`
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <style>body { margin: 0 } .graph-container { position: absolute; inset: 132px 0 87px } svg { width: 100%; height: 100%; touch-action: none }</style>
+    <div class="graph-container"><svg><g class="main-graph-group"><rect class="background" width="100%" height="100%" fill="#234"/></g>
+      <g data-zoom-tile="fix"><rect x="135" y="200" width="120" height="140"/></g>
+    </svg></div>
+  `);
+  await page.evaluate(() => {
+    window.addEventListener('touchstart', event => {
+      if (event.touches.length !== 2) return;
+      const [a, b] = Array.from(event.touches);
+      const mid = document.elementFromPoint((a.clientX + b.clientX) / 2, (a.clientY + b.clientY) / 2);
+      document.body.dataset.bare = String([a.target as Element, mid, b.target as Element].every(el => el?.matches('rect.background')));
+    }, true);
+  });
+  const center = await bareCanvasPinchCenter(page, 40, 60);
+  await touchGesture(page, [40, 60].map(gap => [{ x: center.x - gap, y: center.y }, { x: center.x + gap, y: center.y }]));
+  await expect(page.locator('body')).toHaveAttribute('data-bare', 'true');
+});

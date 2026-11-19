@@ -167,3 +167,23 @@ export async function splitSiblingContacts(page: Page, currentGraphId: string | 
   }
   throw new Error('The gap between sibling graphs could not be reached by panning.');
 }
+
+export async function bareCanvasPinchCenter(page: Page, from: number, to: number) {
+  return page.locator('.graph-container svg:has(g.main-graph-group)').evaluate((svg, distances) => {
+    const r = svg.getBoundingClientRect(), view = visualViewport;
+    const reach = Math.ceil(Math.max(...distances)) + 2;
+    const left = Math.ceil(Math.max(r.left, view?.offsetLeft ?? 0)) + reach;
+    const right = Math.floor(Math.min(r.right, (view?.offsetLeft ?? 0) + (view?.width ?? innerWidth))) - reach;
+    const top = Math.ceil(Math.max(r.top, view?.offsetTop ?? 0)) + 3;
+    const bottom = Math.floor(Math.min(r.bottom, (view?.offsetTop ?? 0) + (view?.height ?? innerHeight))) - 3;
+    const [start, end] = distances;
+    for (let y = top; y <= bottom; y += 8) for (let x = left; x <= right; x += 8) {
+      const bare = [-start, 0, start].every(dx => {
+        const hit = document.elementFromPoint(x + dx, y);
+        return hit === svg || hit?.matches('rect.background') && svg.contains(hit);
+      });
+      if (bare && [-end, end].every(dx => document.elementFromPoint(x + dx, y)?.closest('svg') === svg)) return { x, y };
+    }
+    throw new Error('The phone graph has no visible blank canvas for both camera calibration contacts and their midpoint.');
+  }, [from, to]);
+}
