@@ -86,10 +86,14 @@ async function acceptRemote(owner:string,id:string,remote:Snapshot|null,ack?:str
   a.projects[id]={base:remote,local:result.local,conflicts:result.conflicts,remote:result.conflicts.length?remote:undefined,checkedAt:Date.now()};
  });
 }
+const SYNC_INTERVAL_MS = 60_000;
 export async function syncNow(manual=false,scheduled=false,projectId?:string) {
+ await syncProjects(manual,scheduled,projectId);
+}
+async function syncProjects(manual:boolean,scheduled:boolean,projectId?:string) {
  const owner=ownerId();if(!offlineEnabled||!owner||localGuest()||(!navigator.onLine&&!scheduled))return;
  if(!navigator.locks) {await editAccount(owner,a=>{a.error='This browser cannot coordinate safe sync between tabs. Export a backup and use a current browser.';});return;}
- await navigator.locks.request(`graphdone-sync:${owner}`,{ifAvailable:!projectId},async lock=>{
+ return navigator.locks.request(`graphdone-sync:${owner}`,{ifAvailable:!projectId},async lock=>{
   if(!lock)return;
   const a=await readAccount(owner);
   // Manual retry can retry expired authentication after a fresh sign-in, but
@@ -101,14 +105,23 @@ export async function syncNow(manual=false,scheduled=false,projectId?:string) {
   // online hints can be stale; the request result is authoritative. Never use
   // this exception for clean background reads.
   if(!navigator.onLine&&!hasDirty)return;
-  if(!hasDirty && !manual && (skipBackgroundPoll() || !projects.some(([id,p])=>localStorage.getItem('currentGraphId')===id && Date.now()-p.checkedAt>60000)))return;
+  if(!hasDirty && !manual) {
+   if(skipBackgroundPoll())return;
+   const selectedId=localStorage.getItem('currentGraphId');
+   const selected=projects.find(([id])=>id===selectedId)?.[1];
+   if(!selected || selected.conflicts?.length)return;
+   // A manual read or upload may have finished between periodic checks.
+   // Wake at its actual deadline instead of skipping an entire second minute.
+   const remaining=selected.checkedAt+SYNC_INTERVAL_MS-Date.now();
+   if(remaining>0)return Math.min(remaining,SYNC_INTERVAL_MS);
+  }
   view={...view,syncing:true};listeners.forEach(f=>f());
   try {
    for(const [id] of projects.sort(([,a],[,b])=>Number(!!a.local)-Number(!!b.local))) {
     if(owner!==ownerId()||(!navigator.onLine&&!scheduled))break;
     const p=(await readAccount(owner)).projects[id];if(p.conflicts?.length)continue;
     if(!dirty(p)) {
-     if(manual||(!skipBackgroundPoll() && (localStorage.getItem('currentGraphId')===id)&&Date.now()-p.checkedAt>60000))await getProject(id,true);
+     if(manual||(!skipBackgroundPoll() && (localStorage.getItem('currentGraphId')===id)&&Date.now()-p.checkedAt>=SYNC_INTERVAL_MS))await getProject(id,true);
      continue;
     }
     const pending=await editAccount(owner,state=>{const current=state.projects[id];const request=current.request ||= makeRequest(id,current);request.attempts=request.attempts===undefined?2:request.attempts+1;return request;});
@@ -126,6 +139,7 @@ export async function syncNow(manual=false,scheduled=false,projectId?:string) {
    // A timeout may have committed. The exact request stays on disk for replay.
    await editAccount(owner,state=>{if(!state.error)state.error=e instanceof Error?e.message:'Sync unavailable';state.retryAt=Math.max(state.retryAt,Date.now()+60000);});
   } finally {view={...view,syncing:false};await publish();window.dispatchEvent(new Event('graphdone-sync-refresh'));}
+  return;
  });
 }
 export async function resolveConflict(id:string,choice:'local'|'cloud') {
@@ -199,5 +213,12 @@ if(offlineEnabled) {
   if(owner){const user=JSON.parse(getUserRaw()||'null');void readAccount(owner).then(async a=>{if(JSON.stringify(a.user)!==JSON.stringify(user))await editAccount(owner,state=>{state.user=user;});}).catch(storageError);}
   if(owner && token!==observedToken){observedToken=token;void editAccount(owner,a=>{if(a.blocked==='auth'){a.retryAt=0;a.error='';delete a.blocked;}}).then(()=>syncNow());}
  });
- setInterval(()=>{if(!document.hidden)void syncNow(false,true);},60000);
+ const poll = async () => {
+  let delay=SYNC_INTERVAL_MS;
+  try {
+   if(!document.hidden)delay=(await syncProjects(false,true))??SYNC_INTERVAL_MS;
+  } catch(error) {storageError(error);}
+  finally {window.setTimeout(poll,delay);}
+ };
+ window.setTimeout(poll,SYNC_INTERVAL_MS);
 }
