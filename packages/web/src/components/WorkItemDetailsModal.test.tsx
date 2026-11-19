@@ -11,7 +11,7 @@ import { GraphQLError } from 'graphql';
 
 const context = vi.hoisted(() => ({ ownerId: 'owner-a', graphId: 'graph-a', success: vi.fn(), error: vi.fn() }));
 vi.mock('../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: context.ownerId, name: 'Owner', role: 'ADMIN' } }) }));
-vi.mock('../contexts/GraphContext', () => ({ useGraph: () => ({ currentGraph: { id: context.graphId, name: 'Test graph' } }) }));
+vi.mock('../contexts/GraphContext', () => ({ useGraph: () => ({ currentGraph: { id: context.graphId, name: 'Test graph' }, canEditGraph: () => true }) }));
 vi.mock('../contexts/NotificationContext', () => ({ useNotifications: () => ({ showSuccess: context.success, showError: context.error, showWarning: vi.fn() }) }));
 
 function workItem(id: string, title: string) {

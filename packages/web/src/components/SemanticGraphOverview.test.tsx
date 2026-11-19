@@ -75,7 +75,7 @@ it('restores Auto hysteresis history when inspection returns to the same camera'
   render(<Fixture />);
   const before = ids();
   expect(before).toHaveLength(1);
-  fireEvent.click(screen.getByRole('button', { name: '1 groups · 4 items' }));
+  fireEvent.click(screen.getByRole('button', { name: '1 group · 4 items' }));
   fireEvent.click(screen.getByRole('button', { name: /^System 4 items/ }));
   fireEvent.click(screen.getByRole('button', { name: 'Node 0 TASK · ACTIVE' }));
   expect(summaries()).toHaveLength(0);
@@ -85,6 +85,15 @@ it('restores Auto hysteresis history when inspection returns to the same camera'
   expect(ids()).toEqual(before);
   act(() => changeScale(0.46));
   expect(summaries()).toHaveLength(2);
+});
+
+it('uses singular accessible and visible counts for one group and one item', () => {
+  render(<Fixture />);
+  act(() => replaceItems(items.slice(0, 1)));
+  const button = screen.getByRole('button', { name: '1 group · 1 item' });
+  expect(button).toHaveTextContent('1 group');
+  expect(button).toHaveTextContent('1 item');
+  expect(button).not.toHaveTextContent(/groups|items/);
 });
 
 it('moves focus to the visible descendant and back to its parent as the cut changes', () => {

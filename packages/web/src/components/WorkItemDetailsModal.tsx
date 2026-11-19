@@ -186,7 +186,8 @@ export function WorkItemDetailsModal({
   onDelete,
   undoStack,
 }: NodeDetailsModalProps) {
-  const { currentGraph } = useGraph();
+  const { currentGraph, canEditGraph } = useGraph();
+  const canConnectItems = !!currentGraph && canEditGraph(currentGraph.id);
   const { currentUser } = useAuth();
   const { showSuccess, showError, showWarning } = useNotifications();
   const [editedNode, setEditedNode] = useState<WorkItem | null>(null);
@@ -368,7 +369,7 @@ export function WorkItemDetailsModal({
 
   // Connect to selected nodes
   const handleConnectSelected = async () => {
-    if (selectedNodesForConnection.length === 0) return;
+    if (!canConnectItems || selectedNodesForConnection.length === 0) return;
     
     const count = selectedNodesForConnection.length;
     const isPlural = count > 1;
@@ -1231,7 +1232,7 @@ export function WorkItemDetailsModal({
                   <GitBranch className="h-8 w-8 text-gray-500 mx-auto" />
                 </div>
                 <p className="text-gray-400 text-xs font-medium mb-1">No connections yet</p>
-                <p className="text-gray-500 text-xs">Use Connect button to link nodes</p>
+                {canConnectItems && <p className="text-gray-500 text-xs">Use Connect button to link nodes</p>}
               </div>
             ) : (
 
@@ -1334,7 +1335,7 @@ export function WorkItemDetailsModal({
             </h3>
             <div className="space-y-2">
               {/* Enhanced Connect Dropdown */}
-              <div className="relative" ref={connectDropdownRef}>
+              {canConnectItems && <div className="relative" ref={connectDropdownRef}>
                 <button
                   ref={connectButtonRef}
                   type="button"
@@ -1411,7 +1412,7 @@ export function WorkItemDetailsModal({
                     </div>
                   </div>
                 )}
-              </div>
+              </div>}
 
               {/* Enhanced Disconnect Dropdown */}
               <div className="relative" ref={disconnectDropdownRef}>
