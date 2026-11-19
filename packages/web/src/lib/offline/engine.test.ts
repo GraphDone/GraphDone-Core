@@ -76,6 +76,36 @@ describe('importing a backup with projects and their graphs', () => {
       expect(row).not.toHaveProperty('type');
     }
   });
+
+  it('remaps only declared portable metadata node references and preserves semantic paths', async () => {
+    const source = snapshot('system');
+    source.nodes.push({ ...source.nodes[0], id: 'service', title: '支払 / Paiements', metadata: JSON.stringify({ lod: { groupPath: ['システム / System', '支払 / Paiements'] } }) });
+    source.nodes[0].metadata = JSON.stringify({
+      lod: { groupPath: ['システム / System'] },
+      graphdone: { portable: { version: 1, nodeRefs: { sourceItem: 'service' } } },
+      unrelated: { value: 'service' },
+    });
+
+    await importOffline(backup(source));
+    const copy = Object.values(fixture.account!.projects)[0].local!;
+    const importedSystem = copy.nodes.find(node => node.title === 'system task')!;
+    const importedService = copy.nodes.find(node => node.title === '支払 / Paiements')!;
+    const metadata = JSON.parse(importedSystem.metadata);
+    expect(metadata.lod.groupPath).toEqual(['システム / System']);
+    expect(metadata.graphdone.portable).toEqual({ version: 1, nodeRefs: { sourceItem: importedService.id } });
+    expect(metadata.unrelated.value).toBe('service');
+  });
+
+  it.each([
+    { version: 2, nodeRefs: { sourceItem: 'service' } },
+    { version: 1, nodeRefs: { sourceItem: 'missing' } },
+    { version: 1, nodeRefs: { sourceItem: 42 } },
+  ])('rejects malformed or unresolved declared metadata references atomically: %j', async portable => {
+    const source = snapshot('system');
+    source.nodes[0].metadata = JSON.stringify({ graphdone: { portable } });
+    await expect(importOffline(backup(source))).rejects.toThrow(/portable metadata reference/i);
+    expect(fixture.account!.projects).toEqual({});
+  });
 });
 
 it('fetches a fresh project when manual refresh overlaps a cache read', async () => {

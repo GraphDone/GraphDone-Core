@@ -148,6 +148,15 @@ export async function exportProject(id:string,format:'json'|'mermaid') {
  const snapshot=await getProject(id);
  downloadText(format==='json'?JSON.stringify(projectDocument(snapshot),null,2):projectMermaid(snapshot),projectFilename(snapshot.project.name,format==='json'?'json':'mmd'),format==='json'?'application/json':'text/plain');
 }
+function remapPortableMetadata(metadata:string,ids:Map<string,string>):string {
+ let value:any;try{value=JSON.parse(metadata);}catch{return metadata;}
+ const portable=value?.graphdone?.portable;if(portable===undefined)return metadata;
+ const fail=():never=>{throw Error('A portable metadata reference is malformed, unsupported, or points to a task missing from this project. Nothing was imported.');};
+ if(!portable||typeof portable!=='object'||Array.isArray(portable)||portable.version!==1||!portable.nodeRefs||typeof portable.nodeRefs!=='object'||Array.isArray(portable.nodeRefs))fail();
+ const entries=Object.entries(portable.nodeRefs);if(entries.length>50)fail();
+ for(const [key,sourceId] of entries){if(!key||key.length>100||typeof sourceId!=='string')fail();const source=sourceId as string;if(!ids.has(source))fail();portable.nodeRefs[key]=ids.get(source);}
+ const remapped=JSON.stringify(value);if(remapped.length>10000)fail();return remapped;
+}
 export async function importOffline(file:File) {
  if(file.size>50*1024*1024)throw Error('Backup is too large (50 MB maximum).');
  let data:any;try{data=JSON.parse(await file.text());}catch{throw Error('This file is not valid JSON. Mermaid files are diagrams; import a GraphDone JSON export to restore work.');}
@@ -169,7 +178,7 @@ export async function importOffline(file:File) {
  const hierarchy=localGuest(),newIds=snapshots.map(()=>crypto.randomUUID()),projectIds=new Map(snapshots.map((s,i)=>[s.project.id,newIds[i]]));
  const copies:Snapshot[]=snapshots.map((s,i)=>{
   const ids=new Map(s.nodes.map(n=>[n.id,crypto.randomUUID()])),{type,parent_id,...project}=s.project,parent=hierarchy&&parent_id!=null?projectIds.get(parent_id)!:null;
-  return {project:{...project,...(hierarchy&&type!=null?{type}:{}),...(parent?{parent_id:parent}:{}),id:newIds[i],owner_id:owner,sync_version:0,name:parent?s.project.name:`${s.project.name.slice(0,105)} (imported)`},nodes:s.nodes.map(n=>({...n,id:ids.get(n.id)!})),edges:s.edges.map(e=>({...e,id:crypto.randomUUID(),source_id:ids.get(e.source_id),target_id:ids.get(e.target_id)})),notes:s.notes.map(n=>({...n,id:crypto.randomUUID(),work_item_id:ids.get(n.work_item_id)||null}))};
+  return {project:{...project,...(hierarchy&&type!=null?{type}:{}),...(parent?{parent_id:parent}:{}),id:newIds[i],owner_id:owner,sync_version:0,name:parent?s.project.name:`${s.project.name.slice(0,105)} (imported)`},nodes:s.nodes.map(n=>({...n,id:ids.get(n.id)!,metadata:remapPortableMetadata(n.metadata,ids)})),edges:s.edges.map(e=>({...e,id:crypto.randomUUID(),source_id:ids.get(e.source_id),target_id:ids.get(e.target_id)})),notes:s.notes.map(n=>({...n,id:crypto.randomUUID(),work_item_id:ids.get(n.work_item_id)||null}))};
  });
  if(!copies.length)throw Error('This file contains no projects to import.');
  if(owner!==ownerId())throw Error('Account changed. Please import again.');
