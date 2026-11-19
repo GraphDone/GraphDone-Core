@@ -63,13 +63,10 @@ Agent lessons and procedures live outside `docs/`, in [`.agents/`](../.agents/RE
 - [VM Setup (Multipass)](./guides/vm-setup.md) - Run GraphDone in a throwaway VM
 - More: [`docs/testing/`](./testing/) (test architecture, PR + OAuth testing) · [`docs/security/`](./security/) (TLS, OAuth) · [`docs/deployment/`](./deployment/)
 
-### 🤖 AI Agents Documentation
-> **Start here**: [Simple AI Agent Reality Check](./simple-agent-reality.md) - **What we're actually building**
+### AI agents
 
-**Implementation Guides**:
-- [Simple AI Agent Reality Check](./simple-agent-reality.md) - 🎯 **THE PLAN**: Smart chia pet with Ollama
-- [AI Agents Technical Spec](./ai-agents-tech-spec.md) - 📚 Complete technical implementation (advanced)
-- [Agent Planning Scenarios](./agent-planning-scenarios.md) - 🎪 Interactive planning examples (future)
+- [Core and hosted product strategy](./product/CORE_HOSTED_STRATEGY.md)
+- [Agent setup and use](../packages/mcp-server/README.md)
 
 ### 🔒 Security & Production
 > **CRITICAL FOR RELEASE**: [TLS Implementation Plan](./security/tls-implementation-plan.md) - **Required before production**
@@ -111,7 +108,7 @@ Agent lessons and procedures live outside `docs/`, in [`.agents/`](../.agents/RE
 - **Graph-native collaboration** - Work flows through natural dependencies
 - **Spherical priority model** - Ideas migrate from periphery to center
 - **Democratic prioritization** - Community validation guides resource allocation
-- **Human-AI coordination** - Smart chia pets that help with planning (see AI docs above)
+- **Human-AI coordination** - People and agents share work items, dependencies, and progress
 
 ## 🔗 Quick Links
 

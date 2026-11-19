@@ -27,7 +27,7 @@ flowchart LR
 | `example-resume` sequence (CI) | `example-resume` | An example project a closed browser left unfinished is finished, once, at the next sign-in in a fresh browser. Its own sequence: it waits out the app's 30 s check that no other browser is still writing the example. |
 | `agent-connection` sequence (CI) | `agent-collaboration` | A person creates an agent token, the agent works through the API, and the handoff shows up for the person. |
 | `qc:*` scripts only | `graph-first-journey`, `graph-layout`, `modal-header`, `reported-controls`, `signup-delivery`, `turnstile-guest`, `hosted-usage`, `project-transfer` | Build a graph only through its UI; cards don't stack at 12/50/200 nodes; modals stay below the header; account menu, templates, minimap; signup outcomes; Turnstile guest entry; usage-limit warnings; portable project JSON round trip as a guest. |
-| Opt-in, need outside fixtures | `real-agent-journey` (`QC_REAL_AGENTS=1`), `operator-login` (`OPERATOR_CREDENTIAL_FILE`), `cloud-agent-connection` (`QC_AGENT_FIXTURE`), `offline-sync`, `operations` | Real Claude/Codex runs (see [`tests/agents/`](../../agents/README.md)); a real operator login; hosted-build agent setup on a local Worker; offline sync and feedback flows that read a fixture file from `/tmp` and call a local sync Worker. |
+| Opt-in, need outside fixtures | `real-agent-journey` (`QC_REAL_AGENTS=1`), `operator-login` (`OPERATOR_CREDENTIAL_FILE`), `cloud-agent-connection` (`QC_AGENT_FIXTURE`), `offline-sync`, `operations` | Real Claude/Codex runs (see [`tests/agents/`](../../agents/README.md)); a real operator login; hosted-build agent setup on a local Worker; offline or operations testing with a local hosted build. The offline sync cases for registered users and the operations case also read fixtures from `/tmp`. |
 
 `graph-details`, `new-user-modes` and `persona-lifecycle` also run against a local
 hosted-build backend when `QC_BACKEND=cloud`; they refuse non-local targets.
@@ -38,6 +38,9 @@ hosted-build backend when `QC_BACKEND=cloud`; they refuse non-local targets.
 TEST_URL=http://localhost:3127 npm run qc:new-user      # most of the new-user set, headed
 TEST_URL=http://localhost:3127 node tests/run-unified.mjs --sequence new-user
 ```
+
+Use `qc:operations` or set `QC_OPERATIONS=1` for a direct Playwright run.
+The offline guest cases only need the compiled offline app and a local `TEST_URL`.
 
 Every spec except `cloud-agent-connection` has its own `qc:` script in
 `package.json` (for example `qc:personas`, `qc:offline`, `qc:project-transfer`).
