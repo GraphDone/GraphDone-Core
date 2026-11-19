@@ -92,18 +92,40 @@ async function settle(page: Page) {
   return { level, scale: await camera(page), labels: await readableLabels(page) };
 }
 
-async function pinch(page: Page, center: { x: number; y: number }, from: number, to: number) {
+type TouchPoint = { x: number; y: number };
+
+async function touchGesture(page: Page, frames: [TouchPoint, TouchPoint][]) {
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
-  const points = (distance: number) => [
-    { x: Math.round(center.x - distance), y: Math.round(center.y), id: 1, radiusX: 2, radiusY: 2, force: 1 },
-    { x: Math.round(center.x + distance), y: Math.round(center.y), id: 2, radiusX: 2, radiusY: 2, force: 1 },
-  ];
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: points(from) });
-  for (let step = 1; step <= 8; step++) {
-    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: points(from + (to - from) * step / 8) });
+  const points = ([a, b]: [TouchPoint, TouchPoint]) => [a, b].map((point, index) =>
+    ({ x: Math.round(point.x), y: Math.round(point.y), id: index + 1, radiusX: 2, radiusY: 2, force: 1 }));
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: points(frames[0]) });
+  for (const frame of frames.slice(1)) {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: points(frame) });
     await page.waitForTimeout(30);
   }
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await cdp.detach();
+  await page.waitForTimeout(400);
+}
+
+async function pinch(page: Page, center: TouchPoint, from: number, to: number) {
+  await touchGesture(page, Array.from({ length: 9 }, (_, step) => {
+    const distance = from + (to - from) * step / 8;
+    return [{ x: center.x - distance, y: center.y }, { x: center.x + distance, y: center.y }];
+  }));
+}
+
+async function cancelledThreeFingerPinch(page: Page, center: TouchPoint) {
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+  const point = (x: number, y: number, id: number) => ({ x: Math.round(x), y: Math.round(y), id, radiusX: 2, radiusY: 2, force: 1 });
+  const two = [point(center.x - 20, center.y, 1), point(center.x + 20, center.y, 2)];
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: two });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [...two, point(center.x, center.y + 30, 3)] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [
+    point(center.x - 65, center.y, 1), point(center.x + 65, center.y, 2), point(center.x, center.y + 30, 3),
+  ] });
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await cdp.detach();
   await page.waitForTimeout(400);
@@ -125,23 +147,90 @@ async function localSourcePositions(page: Page) {
 
 test('JOURNEY zoom-out: pinching into a sibling opens that graph on a phone', async ({ page }, info) => {
   test.skip(info.project.name !== 'journeys-iphone' || backend !== 'hosted-guest', 'real Chromium phone touch and browser-local starter workspace');
-  test.setTimeout(120_000);
+  test.setTimeout(240_000);
   await enterWelcome(page);
-  const sourcePositions = await localSourcePositions(page);
   const originalGraphId = await page.evaluate(() => localStorage.getItem('currentGraphId'));
-  const area = (await page.locator('.graph-container').boundingBox())!;
+  const welcomeStaysSelected = async () => {
+    await expect(selector(page)).toContainText('Welcome');
+    expect(await page.evaluate(() => localStorage.getItem('currentGraphId'))).toBe(originalGraphId);
+  };
+  const resetOverview = async () => {
+    await page.evaluate(id => localStorage.removeItem(`graphdone:camera:${id}`), originalGraphId);
+    await page.reload();
+    await openGraphView(page);
+    await expect(selector(page)).toContainText('Welcome');
+    const area = (await page.locator('.graph-container').boundingBox())!;
+    const canvasCenter = { x: area.x + area.width / 2, y: area.y + area.height / 2 };
+    await pinch(page, canvasCenter, 120, 40);
+    if (await page.locator('.graph-container').getAttribute('data-zoom-level') !== '2') {
+      const scale = await camera(page);
+      await pinch(page, canvasCenter, 50, 50 * 0.16 / scale);
+    }
+    await expect(page.locator('.graph-container')).toHaveAttribute('data-zoom-level', '2');
+    return area;
+  };
+  await resetOverview();
+  const fixTile = () => page.getByRole('button', { name: /^Fix bugs graph, \d+ items?$/ });
+  const tileCenter = async (tile: ReturnType<typeof fixTile>) => {
+    const box = (await tile.boundingBox())!;
+    return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  };
 
-  // A two-finger pinch inward reaches the sibling overview without a mouse.
-  await pinch(page, { x: area.x + area.width / 2, y: area.y + area.height / 2 }, 120, 40);
-  await expect(page.locator('.graph-container')).toHaveAttribute('data-zoom-level', '2');
+  // Contacts split across sibling tiles have a background centroid and must
+  // remain a canvas pinch, never whichever per-tile listener happens to fire.
+  const fixCenter = await tileCenter(fixTile());
+  const ideasCenter = await tileCenter(page.getByRole('button', { name: /^Ideas graph, \d+ items?$/ }));
+  const splitCenter = { x: (fixCenter.x + ideasCenter.x) / 2, y: (fixCenter.y + ideasCenter.y) / 2 };
+  expect(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest('[data-zoom-tile]'), splitCenter)).toBeNull();
+  await touchGesture(page, [[fixCenter, ideasCenter], [
+    { x: splitCenter.x + (fixCenter.x - splitCenter.x) * 1.25, y: splitCenter.y + (fixCenter.y - splitCenter.y) * 1.25 },
+    { x: splitCenter.x + (ideasCenter.x - splitCenter.x) * 1.25, y: splitCenter.y + (ideasCenter.y - splitCenter.y) * 1.25 },
+  ]]);
+  await welcomeStaysSelected();
 
-  const tile = page.getByRole('button', { name: /^Fix bugs graph, \d+ items?$/ });
-  const target = (await tile.boundingBox())!;
-  const center = { x: target.x + target.width / 2, y: target.y + target.height / 2 };
+  await resetOverview();
+  const background = await page.evaluate(() => {
+    const box = document.querySelector('.graph-container')!.getBoundingClientRect();
+    for (const fy of [0.2, 0.5, 0.8]) for (const fx of [0.2, 0.5, 0.8]) {
+      const x = box.x + box.width * fx, y = box.y + box.height * fy;
+      if (!document.elementFromPoint(x, y)?.closest('[data-zoom-tile]')) return { x, y };
+    }
+    throw new Error('no overview background point');
+  });
+  await pinch(page, background, 20, 65);
+  await welcomeStaysSelected();
+
+  await resetOverview();
+  let center = await tileCenter(fixTile());
+  const around = (distances: number[]) => distances.map(distance => [
+    { x: center.x - distance, y: center.y }, { x: center.x + distance, y: center.y },
+  ] as [TouchPoint, TouchPoint]);
+  await touchGesture(page, around([20, 23, 19, 22])); // sensor jitter
+  await welcomeStaysSelected();
+
+  await resetOverview();
+  center = await tileCenter(fixTile());
+  await touchGesture(page, around([40, 32, 24, 16])); // inward pinch
+  await welcomeStaysSelected();
+
+  await resetOverview();
+  center = await tileCenter(fixTile());
+  await touchGesture(page, around([20, 24, 16, 65])); // outward, then reversed: cancelled
+  await welcomeStaysSelected();
+
+  await resetOverview();
+  center = await tileCenter(fixTile());
+  await cancelledThreeFingerPinch(page, center);
+  await welcomeStaysSelected();
+
+  await resetOverview();
+  const tile = fixTile();
+  center = await tileCenter(tile);
   expect(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest('[data-zoom-tile]')?.getAttribute('data-zoom-tile'), center))
     .toBe(await tile.getAttribute('data-zoom-tile'));
   const targetId = await tile.getAttribute('data-zoom-tile');
   const cameraBefore = await camera(page);
+  const sourcePositions = await localSourcePositions(page);
 
   // The reverse gesture dives into the tile under its fixed centroid, just as
   // a wheel zoom or tap does. It is navigation only: source coordinates stay put.

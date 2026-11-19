@@ -114,8 +114,9 @@ function Tile({ id, openId = id, rect, k, name, detail, viewportShort, interacti
     const el = ref.current;
     if (!el || !interactive || kind !== 'graph') return;
     // Zooming in over a tile that already fills much of the screen opens it:
-    // the person is diving into that graph. D3 owns the wheel/touch gesture on
-    // the SVG, so observe it here without preventing the camera movement.
+    // the person is diving into that graph. D3 owns the wheel gesture on the
+    // SVG, so observe it here without preventing the camera movement. Touch is
+    // owned once per gesture by GraphZoomContext below, not once per tile.
     let opened = false; // one gesture opens the graph once
     const openWhenLarge = () => {
       if (opened || sizeRef.current < 0.42 * viewportShort) return;
@@ -125,36 +126,8 @@ function Tile({ id, openId = id, rect, k, name, detail, viewportShort, interacti
     const wheel = (event: WheelEvent) => {
       if (event.deltaY < 0) openWhenLarge();
     };
-    let previousTouchDistance = 0;
-    let initialTouchDistance = 0;
-    let initialTouchSize = 0;
-    const touchDistance = (event: TouchEvent) => event.touches.length > 1
-      ? Math.hypot(event.touches[0].clientX - event.touches[1].clientX, event.touches[0].clientY - event.touches[1].clientY)
-      : 0;
-    const touchstart = (event: TouchEvent) => {
-      previousTouchDistance = touchDistance(event);
-      if (previousTouchDistance) {
-        initialTouchDistance = previousTouchDistance;
-        initialTouchSize = sizeRef.current;
-      }
-    };
-    const touchmove = (event: TouchEvent) => {
-      const distance = touchDistance(event);
-      if (!opened && distance > previousTouchDistance && initialTouchDistance &&
-          initialTouchSize * distance / initialTouchDistance >= 0.42 * viewportShort) {
-        opened = true;
-        openRef.current(openId);
-      }
-      previousTouchDistance = distance;
-    };
     el.addEventListener('wheel', wheel, { passive: true });
-    el.addEventListener('touchstart', touchstart, { passive: true });
-    el.addEventListener('touchmove', touchmove, { passive: true });
-    return () => {
-      el.removeEventListener('wheel', wheel);
-      el.removeEventListener('touchstart', touchstart);
-      el.removeEventListener('touchmove', touchmove);
-    };
+    return () => el.removeEventListener('wheel', wheel);
   }, [openId, interactive, kind, viewportShort]);
   const radius = 14 / k;
   // A top-level graph with no graphs inside is shown beside the projects but is
@@ -272,6 +245,62 @@ export function GraphZoomContext({ graphs, currentGraphId, camera, readPositions
   }
   const level: ZoomLevel = layout ? zoomLevelOf(state.current, overview) : 0;
   const minScale = layout && viewport.w > 0 ? minZoomScale(layout.span, viewport) : 0.1;
+
+  const onOpenRef = useRef(onOpen);
+  onOpenRef.current = onOpen;
+  useEffect(() => {
+    const svg = ref.current?.ownerSVGElement;
+    if (!svg) return;
+    type PinchSession = { ids: [number, number]; graphId: string; initialGap: number; previousGap: number; initialSize: number };
+    let session: PinchSession | null = null;
+    const touchById = (touches: TouchList, id: number) => Array.from(touches).find(touch => touch.identifier === id);
+    const gap = (a: Touch, b: Touch) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    const cancel = () => { session = null; };
+    const start = (event: TouchEvent) => {
+      if (event.touches.length !== 2) { cancel(); return; }
+      const [a, b] = Array.from(event.touches);
+      const x = (a.clientX + b.clientX) / 2;
+      const y = (a.clientY + b.clientY) / 2;
+      const tile = document.elementFromPoint(x, y)?.closest<SVGGElement>('[data-zoom-tile][role="button"]');
+      const graphId = tile?.dataset.zoomTile;
+      const bounds = tile?.getBoundingClientRect();
+      const initialGap = gap(a, b);
+      if (!graphId || !bounds || !initialGap) { cancel(); return; }
+      session = { ids: [a.identifier, b.identifier], graphId, initialGap, previousGap: initialGap, initialSize: Math.max(bounds.width, bounds.height) };
+    };
+    const move = (event: TouchEvent) => {
+      if (!session) return;
+      if (event.touches.length !== 2) { cancel(); return; }
+      const a = touchById(event.touches, session.ids[0]);
+      const b = touchById(event.touches, session.ids[1]);
+      if (!a || !b) { cancel(); return; }
+      const currentGap = gap(a, b);
+      // A real zoom-in grows steadily. Small sensor jitter is tolerated, but a
+      // direction reversal ends this navigation candidate while D3 keeps zooming.
+      if (currentGap < session.previousGap - 4) { cancel(); return; }
+      session.previousGap = currentGap;
+      const meaningful = currentGap >= session.initialGap + 12 && currentGap >= session.initialGap * 1.1;
+      if (meaningful && session.initialSize * currentGap / session.initialGap >= 0.42 * Math.min(viewport.w, viewport.h)) {
+        const graphId = session.graphId;
+        cancel();
+        onOpenRef.current(graphId);
+      }
+    };
+    // Keep the session above React's tile lifecycle: the tile disappears as
+    // the pinch crosses back into item view, but the same two contacts must
+    // still finish their SVG-owned gesture. Capture also sees a third contact
+    // that lands outside the original tile and cancels it.
+    window.addEventListener('touchstart', start, { capture: true, passive: true });
+    window.addEventListener('touchmove', move, { capture: true, passive: true });
+    window.addEventListener('touchend', cancel, { capture: true, passive: true });
+    window.addEventListener('touchcancel', cancel, { capture: true, passive: true });
+    return () => {
+      window.removeEventListener('touchstart', start, { capture: true });
+      window.removeEventListener('touchmove', move, { capture: true });
+      window.removeEventListener('touchend', cancel, { capture: true });
+      window.removeEventListener('touchcancel', cancel, { capture: true });
+    };
+  }, [viewport.w, viewport.h]);
 
   const onLevelRef = useRef(onLevel);
   onLevelRef.current = onLevel;
