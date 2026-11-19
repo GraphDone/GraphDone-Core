@@ -83,8 +83,18 @@ export function makeRequest(id:string,p:Project):PendingRequest {
  for(const ch of delta) {const n=new TextEncoder().encode(JSON.stringify(ch)).length;if(selected.length>=25||size+n>26000)break;selected.push(ch);size+=n;}
  if(delta.length&&!selected.length)throw Error('A change is too large to upload. Shorten its description or metadata.');
  const sent=p.local?structuredClone(p.base||{project:p.local.project,nodes:[],edges:[],notes:[]}):null;
- if(sent && p.local) {sent.project.name=p.local.project.name;for(const c of selected){sent[c.table]=sent[c.table].filter(r=>r.id!==c.id);if(c.action==='put')sent[c.table].push(c.value!);}}
- return {requestId:crypto.randomUUID(),attempts:0,projectId:id,version:p.base?.project.sync_version??-1,name:p.local?.project.name,deleteProject:!p.local,changes:p.local?selected:[],sent};
+ if(sent && p.local) {sent.project.name=p.local.project.name;for(const c of selected){sent[c.table]=sent[c.table].filter(r=>r.id!==c.id);if(c.action==='put')sent[c.table].push(structuredClone(c.value!));}}
+ return {requestId:crypto.randomUUID(),attempts:0,projectId:id,version:p.base?.project.sync_version??-1,name:p.local?.project.name,deleteProject:!p.local,changes:p.local?structuredClone(selected):[],sent};
+}
+
+export function acknowledgedBase(project:Project, request:PendingRequest, remote:Snapshot|null):Snapshot|null {
+ const {sent}=request;
+ const legacyWrites=request.changes.filter(change=>change.value&&sent?.[change.table].includes(change.value));
+ if(!legacyWrites.length)return sent;
+ const remoteDifferences=changes(sent,remote);
+ return legacyWrites.some(write=>remoteDifferences.some(diff=>diff.table===write.table&&diff.id===write.id))
+  ? project.base
+  : sent;
 }
 
 /** Backups are untrusted files. Reject malformed renderable values before they

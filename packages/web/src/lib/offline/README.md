@@ -39,6 +39,13 @@ tags. Signed-in accounts stay flat and keep only the name: `/api/sync` has no
 parent, description or tags column yet and would drop them on the next sync
 (#277).
 
+A pending upload keeps its original request body and the snapshot it sent in
+IndexedDB. Later edits stay in the editable snapshot. An acknowledged retry
+uses the original sent snapshot as its merge basis so later edits can upload
+separately. If an older stored request shared editable rows and its
+acknowledgement disagrees, the merge uses the last confirmed server snapshot
+and keeps competing edits available for review.
+
 The `/api/sync` service is part of the hosted build, not of
 [`packages/server/`](../../../../server/README.md); in development Vite proxies
 it to port 8797. The status UI is `components/OfflineStatus.tsx` and
