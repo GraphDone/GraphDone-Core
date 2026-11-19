@@ -15,7 +15,10 @@ interface UpdateGraphModalProps {
 export function UpdateGraphModal({ isOpen, onClose, graphToEdit }: UpdateGraphModalProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   useModalA11y(panelRef, { isOpen, label: 'Edit graph' });
-  const { updateGraph, availableGraphs } = useGraph();
+  const { updateGraph, availableGraphs, canEditGraph } = useGraph();
+  const editAllowed = !!graphToEdit && canEditGraph(graphToEdit.id);
+  const editAllowedRef = useRef(editAllowed);
+  editAllowedRef.current = editAllowed;
   const { currentTeam } = useAuth();
   const { showSuccess, showError } = useNotifications();
   const [loading, setLoading] = useState(false);
@@ -49,7 +52,11 @@ export function UpdateGraphModal({ isOpen, onClose, graphToEdit }: UpdateGraphMo
     }
   }, [graphToEdit, isOpen]);
 
-  if (!isOpen || !graphToEdit) return null;
+  useEffect(() => {
+    if (isOpen && graphToEdit && !editAllowed) onClose();
+  }, [editAllowed, graphToEdit, isOpen, onClose]);
+
+  if (!isOpen || !graphToEdit || !editAllowed) return null;
 
   const graphTypes = [
     {
@@ -148,6 +155,7 @@ export function UpdateGraphModal({ isOpen, onClose, graphToEdit }: UpdateGraphMo
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!editAllowedRef.current) return;
     
     if (!formData.name.trim()) {
       showError('Validation Error', 'Please enter a graph name');
@@ -166,6 +174,7 @@ export function UpdateGraphModal({ isOpen, onClose, graphToEdit }: UpdateGraphMo
 
     setLoading(true);
     try {
+      if (!editAllowedRef.current) return;
       await updateGraph(graphToEdit.id, {
         name: formData.name.trim(),
         description: formData.description.trim() || undefined,

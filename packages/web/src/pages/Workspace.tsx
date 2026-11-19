@@ -30,6 +30,7 @@ import { UndoStack } from '../lib/undoStack';
 import { useNotifications } from '../contexts/NotificationContext';
 
 export function Workspace() {
+  const { currentGraph, availableGraphs, getBreadcrumb, ascendTo, canEditGraph, canDeleteGraph } = useGraph();
   const { usage: cloudUsage } = useHostedUsage();
   const cloudPaused = !offlineEnabled && !!cloudUsage && cloudUsage.status !== 'AVAILABLE';
   const [showAgentConnection, setShowAgentConnection] = useState(false);
@@ -41,16 +42,18 @@ export function Workspace() {
   const [showGraphSelectionModal, setShowGraphSelectionModal] = useState(false);
   const [graphToEdit, setGraphToEdit] = useState<any>(null);
   const [graphToDelete, setGraphToDelete] = useState<Graph | null>(null);
-  const openCreateGraph = () => setShowCreateGraphModal(true);
-  const openEditGraph = (graph: Graph) => {
+  const openCreateGraph = useCallback(() => setShowCreateGraphModal(true), []);
+  const openEditGraph = useCallback((graph: Graph) => {
+    if (!canEditGraph(graph.id)) return;
     setGraphToEdit(graph);
     setShowUpdateGraphModal(true);
-  };
-  const openDeleteGraph = (graph: Graph) => {
+  }, [canEditGraph]);
+  const openDeleteGraph = useCallback((graph: Graph) => {
+    if (!canDeleteGraph(graph.id)) return;
     setGraphToDelete(graph);
     setShowDeleteGraphModal(true);
-  };
-  useEffect(() => onGraphRequests({ create: openCreateGraph, edit: openEditGraph, delete: openDeleteGraph }), []);
+  }, [canDeleteGraph]);
+  useEffect(() => onGraphRequests({ create: openCreateGraph, edit: openEditGraph, delete: openDeleteGraph }), [openCreateGraph, openDeleteGraph, openEditGraph]);
   const { viewMode, setViewMode } = useViewMode();
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== 'undefined' && window.matchMedia(COMPACT_WORKSPACE_QUERY).matches
@@ -75,8 +78,17 @@ export function Workspace() {
     try { window.localStorage.setItem(LAYOUT_MODE_STORAGE_KEY, next); } catch { /* storage unavailable */ }
     (window as any).triggerLayoutMode?.(next);
   };
-  const { currentGraph, availableGraphs, getBreadcrumb, ascendTo, canEditGraph } = useGraph();
   const { currentTeam, currentUser } = useAuth();
+  useEffect(() => {
+    if (graphToEdit && !canEditGraph(graphToEdit.id)) {
+      setShowUpdateGraphModal(false);
+      setGraphToEdit(null);
+    }
+    if (graphToDelete && !canDeleteGraph(graphToDelete.id)) {
+      setShowDeleteGraphModal(false);
+      setGraphToDelete(null);
+    }
+  }, [canDeleteGraph, canEditGraph, graphToDelete, graphToEdit]);
   const [undoStack] = useState(() => new UndoStack(36));
   const { showSuccess, showError } = useNotifications();
   useEffect(() => { undoStack.clear(); }, [currentGraph?.id, currentUser?.id, undoStack]);

@@ -28,7 +28,7 @@ vi.mock('./engine', () => ({
   },
 }));
 vi.mock('../authStorage', () => ({ getUserRaw: () => JSON.stringify({ id: 'owner', role: 'USER' }) }));
-vi.mock('../../contexts/GraphContext', () => ({ useGraph: () => ({ currentGraph: { id: fixture.graphId, name: fixture.graphId }, availableGraphs: fixture.graphs, deleteGraph: vi.fn() }) }));
+vi.mock('../../contexts/GraphContext', () => ({ useGraph: () => ({ currentGraph: { id: fixture.graphId, name: fixture.graphId }, availableGraphs: fixture.graphs, deleteGraph: vi.fn(), canDeleteGraph: () => true }) }));
 vi.mock('../../contexts/NotificationContext', () => ({ useNotifications: () => ({ showSuccess: fixture.showSuccess, showError: fixture.showError }) }));
 
 import { offlineLink } from './link';
