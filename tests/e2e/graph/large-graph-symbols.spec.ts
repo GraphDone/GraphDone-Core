@@ -258,9 +258,22 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
         .evaluate(element => ({
           attempts: Number(element.getAttribute('data-label-attempts')),
           checks: Number(element.getAttribute('data-label-checks')),
+          candidates: Number(element.getAttribute('data-label-candidates')),
+          nodeObstacles: Number(element.getAttribute('data-label-node-obstacles')),
+          nodeDimensions: Number(element.getAttribute('data-label-node-dimensions')),
+          edgeDisplayPasses: Number(element.getAttribute('data-item-edge-display-passes')),
         }));
+      const nonCulledCards = await page.locator('.graph-container .node').evaluateAll(
+        nodes => nodes.filter(node => (node as SVGElement).style.display !== 'none').length
+      );
       expect(work.attempts).toBeLessThanOrEqual(128);
       expect(work.checks).toBeLessThanOrEqual(200000);
+      expect(work.candidates).toBeGreaterThan(0);
+      expect(work.candidates).toBeLessThan(5000);
+      expect(work.nodeObstacles).toBeLessThanOrEqual(work.nodeDimensions);
+      expect(work.nodeDimensions).toBe(nonCulledCards);
+      expect(work.nodeDimensions).toBeLessThan(SIZE);
+      expect(work.edgeDisplayPasses).toBe(1);
       await expect(
         page.getByRole('button', {
           name: new RegExp(

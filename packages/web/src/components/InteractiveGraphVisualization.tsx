@@ -3879,12 +3879,17 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         return [{ x: (rect.x + rect.width / 2 - viewportRect.x - camera.x) / liveK, y: (rect.y + rect.height / 2 - viewportRect.y - camera.y) / liveK, width: rect.width / liveK, height: rect.height / liveK }];
       });
       const intersectsViewport = (box: ObstacleBox) => Math.abs(box.x - labelViewport!.x) <= (box.width + labelViewport!.width) / 2 + 8 && Math.abs(box.y - labelViewport!.y) <= (box.height + labelViewport!.height) / 2 + 8;
-      nodeLabelObstacles = (simulation.nodes() as any[]).map(n => ({ x: n.x || 0, y: n.y || 0, ...getNodeDimensions(n) })).filter(intersectsViewport);
+      const paintedNodes = (simulation.nodes() as any[])
+        .filter(n => !cullActive || !n._culled);
+      nodeLabelObstacles = paintedNodes
+        .map(n => ({ x: n.x || 0, y: n.y || 0, ...getNodeDimensions(n) }))
+        .filter(intersectsViewport);
       const drawnEdges = visibleEdges.filter((edge: any) => edgeDisplay(edge) !== 'none');
       routeSegments = drawnEdges.flatMap((edge: any) => edge._route?.segments ?? []).filter(segment => edgeSegmentHitsBox(segment, labelViewport!, 8));
       routeObstacles = drawnEdges.map((edge: any) => edgeRouteArrowBounds(edge._route, arrowVisibility(liveK, edge._pTotal || 1).scale)).filter(intersectsViewport);
       const chips = compactRelationshipLabel(container.clientWidth, isCoarsePointer(), liveK);
-      const candidates = edgeLabelGroups.data().map((d: any) => {
+      const paintedLabelGroups = edgeLabelGroups.filter((d: any) => edgeNeedsPaintGeometry(d, cullActive));
+      const candidates = paintedLabelGroups.data().map((d: any) => {
         d._labelScale = Math.max(1, 1 / liveK);
         const dimensions = chips ? PHONE_RELATIONSHIP_CHIP : d._labelDims;
         return {
@@ -3893,15 +3898,20 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           t: d.labelT ?? 0.5, offset: (d._routeLabel?.offset < 0 ? -1 : 1) * (26 * d._labelScale + 3), dragged: !!d.labelTUser,
         };
       });
+      const candidateIds = new Set(candidates.map(candidate => candidate.id));
+      for (const id of labelRects.keys()) if (!candidateIds.has(id)) labelRects.delete(id);
       const placeOptions = { viewport: labelViewport, obstacles: nodeLabelObstacles.concat(uiLabelObstacles.filter(intersectsViewport), routeObstacles), segments: routeSegments };
       const result = placeItemLabelsWithRetry(candidates, placeOptions);
-      edgeLabelGroups.each(function(d: any) {
+      paintedLabelGroups.each(function(d: any) {
         const placement = result.placements.get(d.id) ?? null;
         d._labelBlocked = !placement;
         applyLabel(this, d, placement, chips);
       });
       g.attr('data-label-attempts', result.attempts);
       g.attr('data-label-checks', result.checks);
+      g.attr('data-label-candidates', candidates.length);
+      g.attr('data-label-node-obstacles', nodeLabelObstacles.length);
+      g.attr('data-label-node-dimensions', paintedNodes.length);
       setItemLabelCount(result.placements.size);
     };
 
@@ -4004,24 +4014,26 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       }
       return null;
     };
+    let edgeDisplayPasses = 0;
     const applyEdgeDisplays = () => {
+      g.attr('data-edge-display-passes', ++edgeDisplayPasses);
       linkElements.style('display', edgeDisplay);
       clickableEdges.style('display', edgeDisplay);
       arrowElements.style('display', edgeDisplay);
       edgeLabelGroups.style('display', (d: any) => d._routeLabel ? edgeDisplay(d) : 'none');
     };
-    const clearCull = () => {
+    const clearCull = (updateEdges = true) => {
       nodeElements.style('display', null);
       cullActive = false;
-      applyEdgeDisplays();
+      if (updateEdges) applyEdgeDisplays();
     };
-    const applyViewportCull = () => {
+    const applyViewportCull = (updateEdges = true) => {
       if (itemPresentation.isOverview()) return;
       const svgEl = svg.node();
       if (!svgEl) return;
       const t = d3.zoomTransform(svgEl);
       if (t.k < CULL_MIN_SCALE) {
-        if (cullActive) clearCull();
+        if (cullActive) clearCull(updateEdges);
         return;
       }
       cullActive = true;
@@ -4037,14 +4049,17 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         if (visible) updateNodePresentationFor(this, d);
         return visible ? null : 'none';
       });
-      applyEdgeDisplays();
+      if (updateEdges) applyEdgeDisplays();
     };
 
     simulation.on('tick', () => {
       if (simulationRef.current !== simulation) return;
       const tickStart = performance.now();
       cullCounter++;
-      if (cullEnabled && cullCounter % 5 === 0) applyViewportCull();
+      // A normal item tick immediately reconciles edge displays while routing.
+      // Dot mode skips that routing pass, so it must retain the cull-owned
+      // display update (and its hit-target visibility).
+      if (cullEnabled && cullCounter % 5 === 0) applyViewportCull(dotModeRef.current);
 
       // 1) Nodes first
       nodeElements
@@ -4295,13 +4310,15 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         if (resuming) nodePresentationScales = new WeakMap();
         const scale = d3.zoomTransform(svg.node()!).k;
         itemPresentationScaleRef.current = scale;
-        if (cullEnabled) applyViewportCull();
+        const displayPassesBefore = edgeDisplayPasses;
+        if (cullEnabled) applyViewportCull(false);
         updateNodePresentation();
         updateEdgePositions(true);
         updateZoomPresentation(scale);
         g.attr('data-presentation-kind', 'items');
         g.attr('data-item-presentation-scale', scale);
         g.attr('data-item-presentation-passes', ++itemPresentationPasses);
+        g.attr('data-item-edge-display-passes', edgeDisplayPasses - displayPassesBefore);
       },
       presentOverview: () => {
         itemPresentationScaleRef.current = d3.zoomTransform(svg.node()!).k;
