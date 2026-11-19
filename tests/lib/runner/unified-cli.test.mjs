@@ -35,6 +35,20 @@ function assertSmokeGateRuns(sequence, { out, xvfb }) {
   assert.equal(entries[0].display, xvfb ? 'xvfb' : '');
 }
 
+test('relationship-edit as a hosted guest leaves out the self-hosted second-tab path instead of skipping it', t => {
+  const report = { suites: [{ specs: [{ title: 'fixture', ok: true,
+    tests: [{ status: 'expected', expectedStatus: 'passed', results: [{ status: 'passed' }] }],
+  }] }], stats: { expected: 1, unexpected: 0, flaky: 0, skipped: 0 }, errors: [] };
+  for (const [backend, inverted] of [['selfhost', []], ['hosted-guest', ['--grep-invert=relationship-edit second-tab']]]) {
+    const { dir, run } = fixture(t);
+    writeFileSync(join(dir, 'bin/npx'), `#!${process.execPath}\nconst fs=require('node:fs'); fs.writeFileSync('bin/argv.json', JSON.stringify(process.argv.slice(2))); process.stdout.write(${JSON.stringify(JSON.stringify(report))});\n`, { mode: 0o700 });
+    const result = run(['--sequence', 'relationship-edit'], { JOURNEY_BACKEND: backend });
+    assert.equal(result.status, 0, result.stdout);
+    const args = JSON.parse(readFileSync(join(dir, 'bin/argv.json')));
+    assert.deepEqual(args.filter(arg => arg.startsWith('--grep')), inverted, backend);
+  }
+});
+
 test('required performance and mobile gates select their bounded suites without retries', () => {
   assert.deepEqual(SEQUENCES['perf-budgets'].args, ['tests/perf/graph-perf.spec.ts', '--project=perf', '--workers=1', '--retries=0', '--trace=retain-on-failure']);
   assert.equal(SEQUENCES['perf-budgets'].blocking, true);
@@ -61,8 +75,8 @@ function fixture(t) {
   execFileSync('git', ['add', '.'], { cwd: dir });
   execFileSync('git', ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'fixture'], { cwd: dir, env: { ...process.env, GIT_TRACE2_EVENT: join(dir, 'bin/git-trace.jsonl') } });
   t.after(() => rmSync(dir, { recursive: true, force: true }));
-  const run = args => spawnSync(process.execPath, ['tests/run-unified.mjs', ...args], {
-    cwd: dir, env: { ...process.env, PATH: `${join(dir, 'bin')}:${process.env.PATH}` }, encoding: 'utf8', timeout: 10000,
+  const run = (args, env = {}) => spawnSync(process.execPath, ['tests/run-unified.mjs', ...args], {
+    cwd: dir, env: { ...process.env, PATH: `${join(dir, 'bin')}:${process.env.PATH}`, ...env }, encoding: 'utf8', timeout: 10000,
   });
   return { dir, run };
 }
@@ -74,7 +88,7 @@ test('disposable Git fixture commits do not spawn background maintenance', t => 
   assert.deepEqual(events.filter(event => event.event === 'child_start' && event.argv?.includes('maintenance')), []);
 });
 
-for (const sequence of ['new-user', 'agent-connection', 'inspector-readability', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'devices', 'perf-budgets']) {
+for (const sequence of ['new-user', 'example-resume', 'agent-connection', 'inspector-readability', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'devices', 'perf-budgets', 'relationship-edit', 'zoom-out', 'zoom-out-guest-phone', 'organize-labels']) {
   test(`CLI forwards failure-only tracing without retries for ${sequence}`, t => {
     const { dir, run } = fixture(t);
     const report = { suites: [{ specs: [{ title: 'fixture', ok: true,
@@ -88,6 +102,13 @@ for (const sequence of ['new-user', 'agent-connection', 'inspector-readability',
       assert.ok(!args.includes('tests/e2e/graph/semantic-lod.spec.ts'));
       assert.ok(!args.includes('tests/e2e/auth/router-navigation.spec.ts'));
       assert.ok(!args.includes('tests/e2e/graph/inspector-readability.spec.ts'));
+      assert.ok(!args.includes('tests/e2e/quality/example-resume.spec.ts'));
+    }
+    if (sequence === 'example-resume') {
+      assert.deepEqual(args.filter(arg => arg.endsWith('.spec.ts')), ['tests/e2e/quality/example-resume.spec.ts']);
+      assert.ok(!args.includes('--headed'));
+      assert.equal(SEQUENCES[sequence].blocking, true);
+      assertSmokeGateRuns(sequence, { out: 'ci-example-resume', xvfb: false });
     }
     if (sequence === 'agent-connection') {
       assert.deepEqual(args.filter(arg => arg.endsWith('.spec.ts')), ['tests/e2e/quality/agent-collaboration.spec.ts']);
@@ -102,6 +123,43 @@ for (const sequence of ['new-user', 'agent-connection', 'inspector-readability',
       assert.equal(SEQUENCES[sequence].blocking, true);
       for (const profile of ['pr', 'full']) assert.ok(PROFILES[profile].includes(sequence));
       assertSmokeGateRuns(sequence, { out: 'ci-inspector-readability', xvfb: true });
+    }
+    if (sequence === 'organize-labels') {
+      assert.deepEqual(args.filter(arg => arg.endsWith('.spec.ts')), ['tests/e2e/journeys/organize-labels.spec.ts']);
+      assert.deepEqual(args.filter(arg => arg.startsWith('--project=')), ['--project=journeys', '--project=journeys-iphone']);
+      assert.equal(SEQUENCES[sequence].blocking, true);
+      for (const profile of ['pr', 'full']) assert.ok(PROFILES[profile].includes(sequence));
+      assertSmokeGateRuns(sequence, { out: 'ci-organize-labels', xvfb: false });
+    }
+    if (sequence === 'relationship-edit') {
+      assert.deepEqual(args.filter(arg => arg.endsWith('.spec.ts')), ['tests/e2e/journeys/relationship-edit.spec.ts']);
+      assert.deepEqual(args.filter(arg => arg.startsWith('--project=')), ['--project=journeys', '--project=journeys-ipad', '--project=journeys-iphone']);
+      assert.ok(!args.some(arg => arg.startsWith('--repeat-each')));
+      assert.equal(SEQUENCES[sequence].blocking, true);
+      for (const profile of ['pr', 'full']) assert.ok(PROFILES[profile].includes(sequence));
+      assertSmokeGateRuns(sequence, { out: 'ci-relationship-edit', xvfb: false });
+      // ...and once more as a hosted guest, on the hosted build, in one shard.
+      const { ci } = smokeGateRuns();
+      const guest = ci.jobs['smoke-gate-shard'].steps.filter(step => step.env?.JOURNEY_BACKEND === 'hosted-guest');
+      assert.equal(guest.length, 1);
+      assert.equal(guest[0].if, 'matrix.guest && !cancelled()');
+      assert.match(guest[0].run, /VITE_OFFLINE_SYNC=true VITE_HOSTED_USAGE=true .* vite build --outDir \/tmp\/graphdone-guest\)/);
+      assert.match(guest[0].run, /\nnode tests\/run-unified\.mjs --sequence relationship-edit --out test-artifacts\/ci-relationship-edit-guest\n/);
+      assert.match(guest[0].run, /\nnode tests\/run-unified\.mjs --sequence zoom-out-guest-phone --out test-artifacts\/ci-zoom-out-guest-phone\n/);
+      assert.equal(ci.jobs['smoke-gate-shard'].strategy.matrix.include.filter(shard => shard.guest).length, 1);
+    }
+    if (sequence === 'zoom-out') {
+      assert.deepEqual(args.filter(arg => arg.endsWith('.spec.ts')), ['tests/e2e/journeys/zoom-out.spec.ts']);
+      assert.deepEqual(args.filter(arg => arg.startsWith('--project=')), ['--project=journeys', '--project=journeys-ipad', '--project=journeys-iphone']);
+      assert.equal(SEQUENCES[sequence].blocking, true);
+      for (const profile of ['pr', 'full']) assert.ok(PROFILES[profile].includes(sequence));
+      assertSmokeGateRuns(sequence, { out: 'ci-zoom-out', xvfb: false });
+    }
+    if (sequence === 'zoom-out-guest-phone') {
+      assert.deepEqual(args.filter(arg => arg.endsWith('.spec.ts')), ['tests/e2e/journeys/zoom-out-guest-phone.spec.ts']);
+      assert.deepEqual(args.filter(arg => arg.startsWith('--project=')), ['--project=journeys-guest-iphone']);
+      assert.equal(SEQUENCES[sequence].blocking, true);
+      for (const profile of Object.values(PROFILES)) assert.ok(!profile.includes(sequence));
     }
     if (sequence === 'large-symbols') {
       assert.ok(args.includes('tests/e2e/graph/large-graph-symbols.spec.ts'));
@@ -131,8 +189,10 @@ for (const sequence of ['new-user', 'agent-connection', 'inspector-readability',
     assert.deepEqual(args.filter(arg => arg.startsWith('--trace=')), ['--trace=retain-on-failure']);
     assert.deepEqual(args.filter(arg => arg.startsWith('--retries=')), ['--retries=0']);
     // The device matrix only reads (it opens screens and dialogs, never saves),
-    // so its 120+ independent cases may share the stack four at a time.
-    assert.deepEqual(args.filter(arg => arg.startsWith('--workers=')), [sequence === 'devices' ? '--workers=4' : '--workers=1']);
+    // so its 120+ independent cases may share the stack four at a time. Each
+    // relationship-edit trial works in its own new graph, two at a time.
+    const workers = { devices: '--workers=4', 'relationship-edit': '--workers=2' }[sequence] ?? '--workers=1';
+    assert.deepEqual(args.filter(arg => arg.startsWith('--workers=')), [workers]);
   });
 }
 
@@ -329,10 +389,32 @@ test('every Smoke Gate shard warms up with THE GATE, and the summary job keeps t
     assert.deepEqual(first, ['smoke', 'ci-smoke'], `${shard.name} must start with THE GATE on its fresh database`);
   }
   assert.equal(runs.smoke.length, shards.length);
+  // Every sequence the single Smoke Gate job ran before #274 (its schematic-visual
+  // and toolchain steps are checked above), plus organize-labels, relationship-edit
+  // (#262) and zoom-out (#277), so a sequence dropped from every shard fails here.
+  // Change this list on purpose only.
+  assert.deepEqual(Object.keys(runs).sort(), [
+    'agent-connection', 'example-resume', 'inspector-readability', 'item-wires', 'large-symbols', 'layout-recovery',
+    'living-graph-effects', 'mobile', 'nested-lod', 'new-user', 'organize-labels', 'perf-budgets', 'relationship-edit',
+    'router-navigation', 'semantic-lod', 'smoke', 'zoom-out',
+  ]);
   for (const [sequence, entries] of Object.entries(runs)) {
     if (sequence !== 'smoke') assert.equal(entries.length, 1, `${sequence} runs in exactly one shard`);
   }
   assert.equal(ci.jobs['smoke-gate'].name, 'Smoke Gate');
   assert.deepEqual(ci.jobs['smoke-gate'].needs, ['smoke-gate-shard']);
   assert.ok(ci.jobs['ci-success'].needs.includes('smoke-gate'));
+});
+
+test('the journeys measurement gets time in proportion to its repeats', () => {
+  const limit = env => JSON.parse(execFileSync(process.execPath, ['--input-type=module', '-e',
+    "const { SEQUENCES } = await import(process.argv[1]); console.log(JSON.stringify([SEQUENCES.journeys.timeoutMs, SEQUENCES.journeys.args.find(a => a.startsWith('--repeat-each'))]))",
+    join(root, 'tests/sequences/unified.config.mjs')], { env: { PATH: process.env.PATH, ...env }, encoding: 'utf8' }));
+  // Six minutes per repeat: a fixed 15 minutes stopped 20 repeats before any result was written.
+  assert.deepEqual(limit({}), [60 * 60_000, '--repeat-each=10']);
+  assert.deepEqual(limit({ JOURNEY_REPEAT: '20' }), [120 * 60_000, '--repeat-each=20']);
+  assert.deepEqual(limit({ JOURNEY_REPEAT: '20', JOURNEY_TIMEOUT_MINUTES: '30' }), [30 * 60_000, '--repeat-each=20']);
+  // Run-once gates keep the adapter's default limit.
+  assert.equal(SEQUENCES['relationship-edit'].timeoutMs, undefined);
+  assert.match(readFileSync(join(root, 'tests/run-unified.mjs'), 'utf8'), /runPlaywrightSequence\(\{[^}]*timeoutMs: def\.timeoutMs/);
 });

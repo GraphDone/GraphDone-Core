@@ -40,6 +40,8 @@ async function readSaved(page: Page, graphId: string, nodeId: string) {
 async function readReceipt(page: Page, graphId: string, nodeId: string) {
   const owner = (await gql(page, '{me{id}}')).me.id as string;
   return page.evaluate(async ({ owner, graphId, nodeId }) => {
+    const databases = await indexedDB.databases();
+    if (!databases.some(db => db.name === 'graphdone-offline')) return { receipt: undefined, credentialFound: false };
     const account = await new Promise<any>((resolve, reject) => {
       const open = indexedDB.open('graphdone-offline', 1);
       open.onerror = () => reject(open.error);
@@ -78,11 +80,15 @@ async function drag(page: Page, nodeId: string) {
   return position!;
 }
 
-function failLayout(graphId: string, nodeId: string, attempts: Array<{ x: number; y: number }>) {
+function failLayout(graphId: string, nodeId: string, attempts: Array<{ x: number; y: number }>, allowRetry?: () => Promise<boolean>) {
   return async (route: Route) => {
     const body = route.request().method() === 'POST' ? route.request().postDataJSON() : null;
     const update = body?.variables?.update;
     if (body?.operationName !== 'UpdateWorkItems' || body?.variables?.where?.id !== nodeId || body?.variables?.where?.graph?.id !== graphId || Object.keys(update || {}).sort().join(',') !== 'positionX,positionY') {
+      await route.continue();
+      return;
+    }
+    if (allowRetry && await allowRetry()) {
       await route.continue();
       return;
     }
@@ -154,7 +160,8 @@ test('latest real drag survives reload before acknowledgement and delayed Indexe
   const nodeId = graph.nodeIds[0];
   const initial = await readSaved(page, graph.graphId, nodeId);
   const attempts: Array<{ x: number; y: number }> = [];
-  const route = failLayout(graph.graphId, nodeId, attempts);
+  const retryWasClicked = () => page.evaluate(() => document.documentElement.dataset.layoutRetryClicked === 'true');
+  const route = failLayout(graph.graphId, nodeId, attempts, retryWasClicked);
   await page.route('**/api/graphql', route);
   const freshAltGesture = await releaseAltDuringGesture(page, nodeId);
   expect(errors).toEqual([]);
@@ -185,12 +192,32 @@ test('latest real drag survives reload before acknowledgement and delayed Indexe
   await expect(page.locator('.graph-container svg .node')).toHaveCount(2);
   await expect.poll(async () => { const value = await readPosition(page, nodeId); return value && rounded(value); }).toEqual(rounded(latest));
   expect(await readSaved(page, graph.graphId, nodeId)).toEqual(initial);
-  await expect(page.getByTestId('layout-save-status')).toContainText('Waiting to send 1 layout change');
-  await page.unroute('**/api/graphql', route);
-  await page.getByRole('button', { name: 'Retry layout save' }).click();
+  const status = page.getByTestId('layout-save-status');
+  await expect(status).toContainText('Waiting to send 1 layout change');
+  await expect.poll(() => attempts.length).toBeGreaterThan(2);
+  expect(rounded(attempts[attempts.length - 1])).toEqual(rounded(latest));
+  await expect(status).toContainText(/Owned layout recovery outage|The task position was not saved/);
+  const retry = status.getByRole('button', { name: 'Retry layout save' });
+  await expect(retry).toBeEnabled();
+
+  // Restoring focus after the hydration gate closes can also trigger a replay.
+  // Keep the outage active until the user actually clicks Retry.
+  await page.evaluate(() => {
+    const recordRetry = (event: MouseEvent) => {
+      const button = event.target instanceof Element && event.target.closest('button');
+      if (event.isTrusted && button && button.closest('[data-testid="layout-save-status"]') && button.textContent === 'Retry layout save') {
+        document.documentElement.dataset.layoutRetryClicked = 'true';
+        document.removeEventListener('click', recordRetry, true);
+      }
+    };
+    document.addEventListener('click', recordRetry, true);
+  });
+  await retry.click();
+  expect(await retryWasClicked()).toBe(true);
   await expect.poll(async () => rounded(await readSaved(page, graph.graphId, nodeId))).toEqual(rounded(latest));
   await expect(page.getByTestId('layout-save-status')).toHaveText('Layout saved to the server.');
   expect((await readReceipt(page, graph.graphId, nodeId)).receipt).toBeUndefined();
+  await page.unroute('**/api/graphql', route);
   await page.reload();
   await expect.poll(async () => { const value = await readPosition(page, nodeId); return value && rounded(value); }).toEqual(rounded(latest));
   const artifact = info.outputPath('layout-reload.json');
@@ -264,7 +291,8 @@ test('a killed owned browser process recovers committed layout receipts from its
     await expect(owned.page.getByTestId('graph-selector')).toBeVisible();
     await expect.poll(async () => rounded(await readSaved(page, graph.graphId, nodeId))).toEqual(rounded(latest));
     await expect.poll(async () => { const value = await readPosition(owned!.page, nodeId); return value && rounded(value); }).toEqual(rounded(latest));
-    expect((await readReceipt(owned.page, graph.graphId, nodeId)).receipt).toBeUndefined();
+    const restoredPage = owned.page;
+    await expect.poll(async () => (await readReceipt(restoredPage, graph.graphId, nodeId)).receipt).toBeUndefined();
     await owned.page.reload();
     await expect.poll(async () => { const value = await readPosition(owned!.page, nodeId); return value && rounded(value); }).toEqual(rounded(latest));
     await info.attach('layout-process-restart.json', { contentType: 'application/json', body: JSON.stringify({ graphId: graph.graphId, nodeId, initial, first, latest, attempts, signal: 'SIGKILL', unloads, independentReadback: await readSaved(page, graph.graphId, nodeId) }) });
@@ -392,15 +420,26 @@ test('revoked graph writes and deleted graphs retain scoped recovery until expli
     const changed = await session.run('MATCH (g:Graph {id:$id,createdBy:$owner}) SET g.createdBy=$revoked RETURN g.id AS id', { id: graph.graphId, owner, revoked });
     expect(changed.records.map(record => record.get('id'))).toEqual([graph.graphId]);
     await page.unroute('**/api/graphql', route);
+    let positionWrites = 0;
+    page.on('request', request => {
+      if (!request.url().endsWith('/api/graphql') || request.method() !== 'POST') return;
+      const body = request.postDataJSON();
+      if (body?.operationName === 'UpdateWorkItems' && body.variables?.where?.id === nodeId) positionWrites++;
+    });
     await page.reload();
     await expect(page.getByTestId('layout-save-status')).toContainText('The task position was not saved');
     await expect(page.getByTestId('layout-save-status')).toContainText('Waiting to send 1 layout change');
     expect(await readSaved(page, graph.graphId, nodeId)).toEqual(initial);
     expect((await readReceipt(page, graph.graphId, nodeId)).receipt).toBeDefined();
+    await expect(page.getByRole('button', { name: 'Retry layout save' })).toBeDisabled();
+    await expect.poll(async () => rounded((await readPosition(page, nodeId))!)).toEqual(rounded(initial));
+    expect(positionWrites, 'A read-only graph must retain its receipt without attempting a position write').toBe(0);
     const restored = await session.run('MATCH (g:Graph {id:$id,createdBy:$revoked}) SET g.createdBy=$owner RETURN g.id AS id', { id: graph.graphId, owner, revoked });
     expect(restored.records.map(record => record.get('id'))).toEqual([graph.graphId]);
     await gql(page, 'mutation($id:ID!){deleteEdges(where:{OR:[{source:{id:$id}},{target:{id:$id}}]}){nodesDeleted}}', { id: nodeId });
     await gql(page, 'mutation($id:ID!,$graph:ID!){deleteWorkItems(where:{id:$id,graph:{id:$graph}}){nodesDeleted}}', { id: nodeId, graph: graph.graphId });
+    await page.reload();
+    await expect.poll(() => positionWrites, { message: 'Restored editing access retries the retained receipt' }).toBeGreaterThan(0);
     await page.getByRole('button', { name: 'Retry layout save' }).click();
     await expect(page.getByTestId('layout-save-status')).toContainText('The task position was not saved');
     expect((await readReceipt(page, graph.graphId, nodeId)).receipt).toBeDefined();
@@ -553,6 +592,8 @@ test('pending layout keeps semantic overview labels fixed during pan and zoom @l
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 900 });
     await expect.poll(() => page.evaluate(() => (window as any).__layoutMetrics?.()?.cameraReady)).toBe(true);
+    await zoom(1.2);
+    await expect(page.locator('.graph-container')).toHaveAttribute('data-zoom-level', '1');
     const status = page.getByTestId('layout-save-status');
     const connections = page.locator('.semantic-overview').getByRole('button', { name: /relationships, .*not drawn:/ });
     const statusBox = (await status.boundingBox())!;
@@ -568,7 +609,10 @@ test('pending layout keeps semantic overview labels fixed during pan and zoom @l
   }
   await page.setViewportSize({ width: 390, height: 500 });
   await expect.poll(() => page.evaluate(() => (window as any).__layoutMetrics?.()?.cameraReady)).toBe(true);
+  await zoom(1.2);
+  await expect(page.locator('.graph-container')).toHaveAttribute('data-zoom-level', '1');
   const dock = page.locator('.semantic-overview [data-graph-status-dock]');
+  await expect(dock).toBeVisible();
   expect(await dock.evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true);
   const dockBox = (await dock.boundingBox())!;
   const cameraBeforeScroll = await camera();
@@ -579,4 +623,178 @@ test('pending layout keeps semantic overview labels fixed during pan and zoom @l
   await page.getByRole('button', { name: 'Discard unsent layout' }).click();
   await expect(page.getByTestId('layout-save-status')).toHaveCount(0);
   expect((await readReceipt(page, graph.graphId, nodeId)).receipt).toBeUndefined();
+});
+
+test('viewing an unplaced read-only graph never queues or sends positions @layout-recovery', async ({ page, ownedGraphIds }) => {
+  test.setTimeout(90000);
+  await login(page, TEST_USERS.ADMIN);
+  const graph = await ownedGraphIds.seed({ size: 4, spacing: 0, namePrefix: 'Read-only layout' });
+  const viewer = (await gql(page, '{me{id}}')).me.id;
+  await gql(page, 'mutation($id:ID!,$acl:String!){updateGraphs(where:{id:$id},update:{permissions:$acl}){graphs{id}}}', {
+    id: graph.graphId, acl: JSON.stringify({ owner: 'fixture-owner', admins: [], editors: [], viewers: [viewer], teamPermission: 'VIEW' }),
+  });
+  const writes: string[] = [];
+  page.on('request', request => {
+    if (request.method() !== 'POST' || !request.url().endsWith('/api/graphql')) return;
+    const body = request.postDataJSON();
+    if (body?.operationName === 'UpdateWorkItems' && body.variables?.where?.graph?.id === graph.graphId) writes.push(body.operationName);
+  });
+  await openGraph(page, graph.graphId, 4);
+  await expect.poll(async () => {
+    const position = await readPosition(page, graph.nodeIds[0]);
+    return !!position && Math.hypot(position.x, position.y) > 1;
+  }).toBe(true);
+  await page.mouse.move(700, 450);
+  await page.mouse.wheel(0, 350);
+  await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pagehide')));
+  await expect.poll(() => page.evaluate(() => (window as any).__layoutMetrics?.()?.cameraReady)).toBe(true);
+  for (const id of graph.nodeIds) expect(await readSaved(page, graph.graphId, id)).toEqual({ x: 0, y: 0 });
+  expect(writes).toEqual([]);
+  await page.reload();
+  await expect(page.locator('.graph-container svg .node')).toHaveCount(4, { timeout: 30000 });
+  for (const id of graph.nodeIds) {
+    expect(await readSaved(page, graph.graphId, id)).toEqual({ x: 0, y: 0 });
+    expect((await readReceipt(page, graph.graphId, id)).receipt).toBeUndefined();
+  }
+  expect(writes).toEqual([]);
+  await expect(page.getByText('Layout needs attention', { exact: true })).toHaveCount(0);
+});
+
+test('permission loss cancels an active drag and leaves earlier edits recoverable @layout-recovery', async ({ page, ownedGraphIds }) => {
+  test.setTimeout(90000);
+  await login(page, TEST_USERS.ADMIN);
+  const graph = await ownedGraphIds.seed({ size: 2, spacing: 340, edgeFactor: 0, namePrefix: 'Layout permission transition' });
+  const [pendingId, draggedId] = graph.nodeIds;
+  const viewer = (await gql(page, '{me{id}}')).me.id;
+  const updateAccess = async (editable: boolean) => {
+    await gql(page, 'mutation($id:ID!,$acl:String!){updateGraphs(where:{id:$id},update:{permissions:$acl}){graphs{id}}}', {
+      id: graph.graphId, acl: JSON.stringify({ owner: editable ? viewer : 'fixture-owner', admins: [], editors: [], viewers: [viewer], teamPermission: 'VIEW' }),
+    });
+    await page.evaluate(() => window.dispatchEvent(new Event('graphdone-sync-refresh')));
+  };
+
+  await openGraph(page, graph.graphId);
+  const organize = page.getByRole('button', { name: 'Organize around connections', exact: true });
+  await expect(organize).toBeEnabled();
+  const canonical = await readSaved(page, graph.graphId, draggedId);
+  const attempts: Array<{ x: number; y: number }> = [];
+  const route = failLayout(graph.graphId, pendingId, attempts);
+  await page.route('**/api/graphql', route);
+  const pending = await drag(page, pendingId);
+  await expect.poll(() => attempts.length).toBeGreaterThan(0);
+  await expect.poll(async () => {
+    const { receipt } = await readReceipt(page, graph.graphId, pendingId);
+    return receipt && rounded(receipt);
+  }).toEqual(rounded(pending));
+
+  const card = page.locator('.graph-container svg .node').filter({ has: page.locator(`[data-node-id="${draggedId}"]`) }).locator('.node-bg');
+  await expect(card).toBeInViewport({ ratio: 1 });
+  const box = (await card.boundingBox())!;
+  const center = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  await page.mouse.move(center.x, center.y);
+  await page.mouse.down();
+  try {
+    await page.mouse.move(center.x + 80, center.y + 55, { steps: 8 });
+    await expect.poll(async () => rounded((await readPosition(page, draggedId))!)).not.toEqual(rounded(canonical));
+    await updateAccess(false);
+    await expect(organize).toBeDisabled();
+    await page.mouse.move(center.x + 110, center.y + 75, { steps: 6 });
+  } finally {
+    await page.mouse.up();
+  }
+  await expect.poll(async () => {
+    const position = await readPosition(page, draggedId);
+    return position && rounded(position);
+  }).toEqual(rounded(canonical));
+  expect(await readSaved(page, graph.graphId, draggedId)).toEqual(canonical);
+  expect((await readReceipt(page, graph.graphId, draggedId)).receipt).toBeUndefined();
+  expect(rounded((await readReceipt(page, graph.graphId, pendingId)).receipt)).toEqual(rounded(pending));
+
+  await page.unroute('**/api/graphql', route);
+  await updateAccess(true);
+  await expect(organize).toBeEnabled();
+  await expect.poll(async () => rounded(await readSaved(page, graph.graphId, pendingId)), { timeout: 15000 }).toEqual(rounded(pending));
+  await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pagehide')));
+  expect(await readSaved(page, graph.graphId, draggedId)).toEqual(canonical);
+  expect((await readReceipt(page, graph.graphId, draggedId)).receipt).toBeUndefined();
+});
+
+test('opening an overlapping saved layout preserves its coordinates and still places a new item @layout-recovery', async ({ page, ownedGraphIds }) => {
+  test.setTimeout(90000);
+  await login(page, TEST_USERS.ADMIN);
+  const graph = await ownedGraphIds.seed({ size: 3, spacing: 20, edgeFactor: 0, namePrefix: 'Saved layout navigation' });
+  const [first, second, unplaced] = graph.nodeIds;
+  await gql(page, 'mutation($id:ID!,$graph:ID!){updateWorkItems(where:{id:$id,graph:{id:$graph}},update:{positionX:0,positionY:0}){workItems{id}}}', { id: unplaced, graph: graph.graphId });
+  const original = await Promise.all([first, second].map(id => readSaved(page, graph.graphId, id)));
+  const writes: string[] = [];
+  page.on('request', request => {
+    if (request.method() !== 'POST' || !request.url().endsWith('/api/graphql')) return;
+    const body = request.postDataJSON();
+    if (body?.variables?.where?.graph?.id === graph.graphId && typeof body.variables.update?.positionX === 'number') writes.push(body.variables.where.id);
+  });
+  await openGraph(page, graph.graphId, 3);
+  await expect.poll(() => page.evaluate(() => (window as any).__layoutMetrics?.()?.cameraReady)).toBe(true);
+  await expect.poll(() => readSaved(page, graph.graphId, unplaced), { timeout: 30000 }).not.toEqual({ x: 0, y: 0 });
+  await page.reload();
+  await expect(page.locator('.graph-container svg .node')).toHaveCount(3);
+  await expect.poll(() => page.evaluate(() => (window as any).__layoutMetrics?.()?.cameraReady)).toBe(true);
+  expect(await Promise.all([first, second].map(id => readSaved(page, graph.graphId, id)))).toEqual(original);
+  expect(writes.filter(id => id !== unplaced)).toEqual([]);
+  await page.getByRole('button', { name: 'Organize around connections', exact: true }).click();
+  await expect.poll(() => Promise.all([first, second].map(id => readSaved(page, graph.graphId, id)))).not.toEqual(original);
+});
+
+test('remote position-only edits repaint a repaired card and its wire across refetches @layout-recovery', async ({ page, ownedGraphIds }) => {
+  await login(page, TEST_USERS.ADMIN);
+  const graph = await ownedGraphIds.seed({ size: 2, spacing: 20, edgeFactor: 0.5, namePrefix: 'Remote layout refresh' });
+  await openGraph(page, graph.graphId);
+  await expect.poll(() => page.evaluate(() => (window as any).__layoutMetrics?.()?.cameraReady)).toBe(true);
+  const cards = page.locator('.graph-container svg .node');
+  const positions = await cards.evaluateAll(elements => elements.map(element => {
+    const node = (element as any).__data__;
+    const matrix = (element as SVGGraphicsElement).transform.baseVal.consolidate()!.matrix;
+    return { id: node.id as string, savedX: node.positionX, savedY: node.positionY, x: matrix.e, y: matrix.f };
+  }));
+  const repaired = positions.find(card => Math.abs(card.x - card.savedX) > 1 || Math.abs(card.y - card.savedY) > 1);
+  expect(repaired, 'Fixture must exercise a saved card visually moved to avoid overlap').toBeDefined();
+  const card = cards.filter({ has: page.locator(`[data-node-id="${repaired!.id}"]`) });
+  const wire = page.locator('.graph-container .edges-group path.edge');
+  await expect(wire).toHaveCount(1);
+  const originalRoute = await wire.getAttribute('d');
+  expect(originalRoute).toBeTruthy();
+
+  const remote = { x: 563, y: 324 };
+  await gql(page, 'mutation($id:ID!,$graph:ID!,$x:Float!,$y:Float!){updateWorkItems(where:{id:$id,graph:{id:$graph}},update:{positionX:$x,positionY:$y}){workItems{id}}}', { id: repaired!.id, graph: graph.graphId, ...remote });
+  expect(await readSaved(page, graph.graphId, repaired!.id)).toEqual(remote);
+
+  for (let refresh = 0; refresh < 2; refresh++) {
+    const fetched = page.waitForResponse(response => {
+      if (response.request().method() !== 'POST' || !new URL(response.url()).pathname.endsWith('/graphql')) return false;
+      const body = response.request().postDataJSON();
+      return body?.operationName === 'GetWorkItems' && body.variables?.where?.graph?.id === graph.graphId;
+    });
+    await page.evaluate(() => window.dispatchEvent(new Event('graphdone-sync-refresh')));
+    const reply = await (await fetched).json();
+    expect(reply.data.workItems.find((item: { id: string }) => item.id === repaired!.id))
+      .toMatchObject({ positionX: remote.x, positionY: remote.y });
+    await expect.poll(() => card.evaluate(element => {
+      const matrix = (element as SVGGraphicsElement).transform.baseVal.consolidate()!.matrix;
+      return { x: matrix.e, y: matrix.f };
+    })).toEqual(remote);
+    await expect(wire).not.toHaveAttribute('d', originalRoute!);
+    await expect.poll(() => page.evaluate(id => {
+      const group = Array.from(document.querySelectorAll<SVGGElement>('.graph-container g.node'))
+        .find(element => (element as any).__data__.id === id)!;
+      const cardBounds = group.querySelector<SVGGraphicsElement>('.node-bg')!.getBoundingClientRect();
+      const path = document.querySelector<SVGPathElement>('.graph-container .edges-group path.edge')!;
+      return [0, path.getTotalLength()].some(distance => {
+        const point = path.getPointAtLength(distance).matrixTransform(path.getScreenCTM()!);
+        const dx = Math.max(cardBounds.left - point.x, 0, point.x - cardBounds.right);
+        const dy = Math.max(cardBounds.top - point.y, 0, point.y - cardBounds.bottom);
+        const border = Math.min(Math.abs(point.x - cardBounds.left), Math.abs(point.x - cardBounds.right),
+          Math.abs(point.y - cardBounds.top), Math.abs(point.y - cardBounds.bottom));
+        return Math.hypot(dx, dy) <= 2 && border <= 2;
+      });
+    }, repaired!.id)).toBe(true);
+  }
 });

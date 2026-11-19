@@ -159,6 +159,8 @@ export interface GraphContextType {
   
   // Hierarchy management
   moveGraph: (graphId: string, newParentId?: string) => Promise<void>;
+  /** Adds the example projects new workspaces get (#277); resolves with the graph it opened. */
+  addExampleProject: () => Promise<Graph>;
   getGraphPath: (graphId: string) => Graph[];
   getGraphChildren: (graphId: string) => Graph[];
   // Altium-style drill-in navigation
@@ -173,6 +175,7 @@ export interface GraphContextType {
   
   // Utilities
   canEditGraph: (graphId: string) => boolean;
+  canEditGraphNow: (graphId: string, ownerId: string) => boolean;
   canDeleteGraph: (graphId: string) => boolean;
   canShareGraph: (graphId: string) => boolean;
   refreshGraphs: () => Promise<void>;

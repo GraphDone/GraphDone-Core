@@ -6,6 +6,7 @@ import {
   ownedGraphIdsFixture,
   type OwnedGraphs,
 } from '../../lib/ownedGraphIdsFixture';
+import { isExampleWrite } from '../../../packages/web/src/lib/exampleOperations';
 
 const test = base.extend<{ ownedGraphIds: OwnedGraphs }>({
   ownedGraphIds: [ownedGraphIdsFixture, { timeout: 60000 }],
@@ -50,6 +51,42 @@ const inspectText = async (root: Locator) => {
 };
 
 for (const width of [1440, 390]) {
+  test(`inspector title fits beside its actions at ${width} @inspector-readability`, async ({ page, ownedGraphIds }) => {
+    test.setTimeout(60000);
+    await page.setViewportSize({ width, height: 900 });
+    await login(page, TEST_USERS.ADMIN);
+    const title = 'Station 01 · Survey platform access 1';
+    const fixture = await ownedGraphIds.seed({
+      size: 1,
+      edgeFactor: 0,
+      namePrefix: 'Inspector title',
+      titleForIndex: () => title,
+    });
+    await page.evaluate(id => {
+      localStorage.setItem('currentGraphId', id);
+      localStorage.setItem('graphdone:viewMode', 'graph');
+    }, fixture.graphId);
+    await page.goto('/');
+    await expect.poll(() => page.evaluate(() => (window as any).__layoutMetrics?.()?.cameraReady)).toBe(true);
+    await page.locator('.graph-container g.node').click();
+
+    const inspector = page.getByTestId('node-inspector');
+    const heading = inspector.getByText(title, { exact: true });
+    await expect(heading).toBeVisible();
+    const bounds = await heading.evaluate(element => ({
+      titleWidth: element.clientWidth,
+      panelWidth: element.closest('[data-testid="node-inspector"]')!.clientWidth,
+      height: element.clientHeight,
+      scrollHeight: element.scrollHeight,
+    }));
+    expect(bounds.titleWidth, 'the item title should occupy most of the inspector width')
+      .toBeGreaterThanOrEqual(bounds.panelWidth * 0.6);
+    expect(bounds.scrollHeight, 'the whole ordinary title should be visible').toBe(bounds.height);
+    await expect(inspector.getByRole('button', { name: `Connect ${title} to another item` })).toBeVisible();
+    await expect(inspector.getByRole('button', { name: 'Edit', exact: true })).toBeVisible();
+    await expect(inspector.getByRole('button', { name: 'Close', exact: true })).toBeVisible();
+  });
+
   test(`inspector code and nested preview remain readable at ${width} @inspector-readability`, async ({
     page,
     ownedGraphIds,
@@ -136,7 +173,7 @@ for (const width of [1440, 390]) {
     page.on('pageerror', error => errors.push(error.message));
     await page.route('**/api/graphql', async route => {
       const body = route.request().postDataJSON();
-      if (/^\s*mutation\b/.test(body?.query ?? '')) {
+      if (/^\s*mutation\b/.test(body?.query ?? '') && !isExampleWrite(body?.operationName)) {
         writes.push(body.operationName ?? 'mutation');
         await route.abort('blockedbyclient');
       } else await route.continue();

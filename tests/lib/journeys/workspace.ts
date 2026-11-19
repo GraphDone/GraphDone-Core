@@ -7,14 +7,15 @@ import { gql } from '../graphRequest';
  * saved truth, whichever backend serves it. Journeys never seed through an API:
  * they start where a real person starts and use the same controls.
  *
- *   JOURNEY_BACKEND=selfhost      sign in as the admin test user, new graph (default)
+ *   JOURNEY_BACKEND=selfhost      sign in as the admin test user and create a new graph
+ *                                 with the visible graph selector (default; on every device)
  *   JOURNEY_BACKEND=hosted-guest  "Continue as Guest" on the hosted build; work is
  *                                 saved in the browser's local workspace
  */
 export type Backend = 'selfhost' | 'hosted-guest';
 export const backend = (process.env.JOURNEY_BACKEND || 'selfhost') as Backend;
 
-export type StoredEdge = { id: string; source: string; target: string; type: string };
+export type StoredEdge = { id: string; source: string; target: string; type: string; weight: number };
 export type Item = { id: string; title: string };
 
 /** Failures before the journey's own action are setup failures; reports keep them apart. */
@@ -31,7 +32,7 @@ export async function enterWorkspace(page: Page): Promise<{ graphId?: string }> 
     return {};
   }
   await login(page, TEST_USERS.ADMIN);
-  await page.getByTestId('graph-selector').click();
+  await page.locator('[data-testid="graph-selector"]:visible, [data-testid="graph-selector-mobile"]:visible').first().click();
   await page.getByRole('button', { name: 'Create New Graph', exact: true }).click();
   const create = page.getByRole('dialog', { name: 'Create new graph' });
   await create.getByRole('button', { name: 'Continue', exact: true }).click();
@@ -44,12 +45,13 @@ export async function enterWorkspace(page: Page): Promise<{ graphId?: string }> 
 }
 
 /** Phones open on the List view; a person taps "Graph" in the bottom bar. */
-async function openGraphView(page: Page) {
+export async function openGraphView(page: Page) {
   const graph = page.locator('.graph-container');
-  const nav = page.getByTestId('mobile-bottom-nav');
-  await graph.or(nav).first().waitFor({ timeout: 20000 });
-  if (!(await graph.isVisible()) && (await nav.isVisible())) {
-    await nav.getByRole('button', { name: 'Graph', exact: true }).click();
+  const graphTab = page.getByTestId('mobile-bottom-nav').getByRole('button', { name: 'Graph', exact: true });
+  await graph.or(graphTab).filter({ visible: true }).first().waitFor({ timeout: 20000 });
+  // On reload the selected Graph tab is visible before its canvas mounts.
+  if (!(await graph.isVisible()) && await graphTab.isVisible() && await graphTab.getAttribute('aria-pressed') !== 'true') {
+    await graphTab.click({ timeout: 10000 });
   }
   await expect(graph).toBeVisible({ timeout: 20000 });
 }
@@ -93,12 +95,12 @@ export async function storedEdges(page: Page, graphId?: string): Promise<StoredE
       open.onsuccess = () => {
         const all = open.result.transaction('accounts').objectStore('accounts').getAll();
         all.onsuccess = () => resolve(all.result.flatMap((a: any) => Object.values(a.projects || {})
-          .flatMap((p: any) => (p.local?.edges || []).map((e: any) => ({ id: e.id, source: e.source_id, target: e.target_id, type: e.type })))));
+          .flatMap((p: any) => (p.local?.edges || []).map((e: any) => ({ id: e.id, source: e.source_id, target: e.target_id, type: e.type, weight: e.weight })))));
       };
     }));
   }
-  const data = await gql(page, 'query($id:ID!){edges(where:{source:{graph:{id:$id}}}){id type source{id} target{id}}}', { id: graphId });
-  return data.edges.map((e: any) => ({ id: e.id, source: e.source.id, target: e.target.id, type: e.type }));
+  const data = await gql(page, 'query($id:ID!){edges(where:{source:{graph:{id:$id}}}){id type weight source{id} target{id}}}', { id: graphId });
+  return data.edges.map((e: any) => ({ id: e.id, source: e.source.id, target: e.target.id, type: e.type, weight: e.weight }));
 }
 
 /** Connections the canvas actually draws, by endpoint id. */

@@ -127,6 +127,8 @@ export interface ObstacleBox {
   y: number;
   width: number;
   height: number;
+  /** Turn about the centre in degrees (a placed label); none is axis-aligned. */
+  rotation?: number;
 }
 
 export interface ChooseTInput extends PlacementInput {

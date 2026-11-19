@@ -1,6 +1,7 @@
 import type { RequestHandler } from 'express';
 import { generateToken } from '../utils/auth.js';
 import { sqliteAuthStore } from './sqlite-auth.js';
+import { redirectWithHandover } from './session-handover.js';
 
 export const oauthLoginCallback: RequestHandler = async (req, res) => {
   const authenticated = req.user as { id?: string; authVersion?: number } | undefined;
@@ -12,9 +13,7 @@ export const oauthLoginCallback: RequestHandler = async (req, res) => {
       return;
     }
     const token = generateToken(user.id, user.email, user.role, user.authVersion);
-    res.setHeader('Cache-Control', 'no-store');
-    res.setHeader('Referrer-Policy', 'no-referrer');
-    res.redirect(`${process.env.CLIENT_URL || 'http://localhost:3127'}/login?token=${encodeURIComponent(token)}`);
+    redirectWithHandover(res, { token, account: user.email || user.username });
   } catch {
     res.status(401).json({ error: 'Authentication failed' });
   }

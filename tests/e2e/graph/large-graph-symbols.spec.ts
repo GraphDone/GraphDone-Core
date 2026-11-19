@@ -15,6 +15,7 @@ import {
 import { inspectItemSymbols } from '../../lib/itemSymbolVisual';
 import { inspectOverviewBus } from '../../lib/overviewBusInspection';
 import { inspectSchematicOverview } from '../../lib/schematicOverview';
+import { isExampleWrite } from '../../../packages/web/src/lib/exampleOperations';
 
 const SIZE = 2000;
 const test = base.extend<{
@@ -96,7 +97,7 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
     errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.route('**/api/graphql', async route => {
-    if (/^\s*mutation\b/.test(route.request().postDataJSON()?.query ?? '')) {
+    if (/^\s*mutation\b/.test(route.request().postDataJSON()?.query ?? '') && !isExampleWrite(route.request().postDataJSON()?.operationName)) {
       writes.push(route.request().postDataJSON().operationName ?? 'mutation');
       await route.abort();
     } else await route.continue();
@@ -257,9 +258,22 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
         .evaluate(element => ({
           attempts: Number(element.getAttribute('data-label-attempts')),
           checks: Number(element.getAttribute('data-label-checks')),
+          candidates: Number(element.getAttribute('data-label-candidates')),
+          nodeObstacles: Number(element.getAttribute('data-label-node-obstacles')),
+          nodeDimensions: Number(element.getAttribute('data-label-node-dimensions')),
+          edgeDisplayPasses: Number(element.getAttribute('data-item-edge-display-passes')),
         }));
+      const nonCulledCards = await page.locator('.graph-container .node').evaluateAll(
+        nodes => nodes.filter(node => (node as SVGElement).style.display !== 'none').length
+      );
       expect(work.attempts).toBeLessThanOrEqual(128);
       expect(work.checks).toBeLessThanOrEqual(200000);
+      expect(work.candidates).toBeGreaterThan(0);
+      expect(work.candidates).toBeLessThan(5000);
+      expect(work.nodeObstacles).toBeLessThanOrEqual(work.nodeDimensions);
+      expect(work.nodeDimensions).toBe(nonCulledCards);
+      expect(work.nodeDimensions).toBeLessThan(SIZE);
+      expect(work.edgeDisplayPasses).toBe(1);
       await expect(
         page.getByRole('button', {
           name: new RegExp(
@@ -498,34 +512,57 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
     ).size
   ).toBeGreaterThanOrEqual(107);
   // The calibration runs in a blank page of the same browser, so it measures
-  // this machine, not the app's own styles or pending work.
+  // this machine, not the app's own styles or pending work. The extra page does
+  // not hide the app's page headless or headed under xvfb (checked with
+  // Chromium 153). On a desktop its window can cover the app's, and a page
+  // that goes hidden saves item positions at once (a write this test forbids).
+  // Bringing the page back afterwards cannot undo that, so the app's page
+  // records any hide from here on and the test stops with the reason instead
+  // of a puzzling write.
+  await page.evaluate(() => {
+    const w = window as Window & { __graphHidden?: boolean };
+    w.__graphHidden = false;
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') w.__graphHidden = true;
+    });
+  });
   const runnerSpeed = async () => {
     const probe = await page.context().newPage();
+    let calibrationMs: number;
     try {
       await probe.setContent('<!doctype html><html><body></body></html>');
-      return await probe.evaluate(measureRunnerSpeed);
+      calibrationMs = await probe.evaluate(measureRunnerSpeed);
     } finally {
-      await probe.close();
+      await probe.close().catch(() => {}); // never hide the probe's own error
     }
+    await page.bringToFront();
+    expect(
+      await page.evaluate(
+        () => (window as Window & { __graphHidden?: boolean }).__graphHidden
+      ),
+      'The app page went hidden (in a headed run the calibration page can cover it), which makes the app save item positions: run this sequence headless'
+    ).toBe(false);
+    return calibrationMs;
   };
   // Dense local zoom has a 5 s budget on a reference-speed runner. Shared CI
   // runners are sometimes slow for a whole job (run 42756334084: the sequence
   // took 408 s instead of ~283 s and this zoom 5.9 s), so the budget scales with
-  // a fixed workload timed in the page just before each zoom: never below 5 s,
-  // at most twice that. RUNNER_REFERENCE_MS is the 75th percentile of the
-  // workload on normal GitHub-hosted runners: 36 samples from 12 runners of
+  // a fixed workload timed in a blank page of the same browser just before
+  // each zoom: never below 5 s, at most twice that. RUNNER_REFERENCE_MS is the
+  // slowest normal GitHub-hosted runner seen: 36 samples from 12 runners of
   // this sequence (run 42764510479) took 98-255 ms, in hardware classes near
-  // 100, 160, 210 and 250 ms; p75 = 251 ms. So every normal runner gets a
-  // plain 5 s, and only one measurably slower than the slowest normal class
-  // gets more. The same runs zoomed in 1.1-3.1 s.
+  // 100, 160, 210 and 250 ms. So every sampled runner gets a plain 5 s, and
+  // only one slower than all of them gets more. The same runs zoomed in
+  // 1.1-3.1 s.
   const DENSE_ZOOM_BUDGET_MS = 5000;
-  const RUNNER_REFERENCE_MS = 251;
+  const RUNNER_REFERENCE_MS = 255;
   const denseTimings: {
     scale: number;
     ms: number;
     wallMs: number;
     calibrationMs: number;
     budgetMs: number;
+    zoomError?: string;
   }[] = [];
   const denseEvidence = async () => {
     const path = info.outputPath('two-thousand-dense-local-calibration.json');
@@ -560,12 +597,13 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
         // The zoom gave up (its own cap): keep the calibration evidence.
         denseTimings.push({
           scale,
-          ms: Number.NaN,
+          ms: Number.NaN, // written as null; zoomError says why
+          zoomError: String(error),
           wallMs: Date.now() - started,
           calibrationMs,
           budgetMs,
         });
-        await denseEvidence();
+        await denseEvidence().catch(() => {}); // never hide the zoom's own error
         throw error;
       });
     denseTimings.push({
@@ -575,7 +613,8 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
       calibrationMs,
       budgetMs,
     });
-    if (ms >= budgetMs) await denseEvidence();
+    // never let an evidence write replace the budget failure below
+    if (ms >= budgetMs) await denseEvidence().catch(() => {});
     expect(
       ms,
       `Dense local zoom must finish within 5 s on a reference-speed runner (${Math.round(budgetMs)} ms here: workload ${Math.round(calibrationMs)} ms vs reference ${RUNNER_REFERENCE_MS} ms)`

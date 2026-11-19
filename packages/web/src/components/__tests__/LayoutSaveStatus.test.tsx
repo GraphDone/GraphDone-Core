@@ -9,7 +9,7 @@ const state: NonNullable<Queue['state']> = {
   storageError: '', cleanupError: '', sendError: '', acknowledged: false, networkBacked: true, positions: new Map(),
 };
 const queue = (values: Partial<typeof state>): Queue => ({
-  state: { ...state, ...values }, queue: vi.fn(), flush: vi.fn(), discard: vi.fn(), error: undefined, saving: false,
+  state: { ...state, ...values }, queue: vi.fn(), flush: vi.fn(), discard: vi.fn(), error: undefined, saving: false, canWrite: true,
 });
 
 describe('layout save status', () => {

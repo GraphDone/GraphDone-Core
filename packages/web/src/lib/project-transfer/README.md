@@ -20,7 +20,7 @@ flowchart LR
 
 | Path | What it is |
 | --- | --- |
-| [`format.ts`](format.ts) | `projectDocument` (snapshot to JSON), `parseProjectDocument` (validates and normalises an imported file), `projectMermaid`, `projectFilename`, `downloadText`. |
+| [`format.ts`](format.ts) | `projectDocument` (snapshot to JSON), `parseProjectDocument` (validates and normalises an imported file), `projectMermaid`, `projectFilename`, `downloadText`. The import engine remaps only explicitly declared version-1 portable metadata node references when it assigns fresh IDs. |
 | [`format.test.ts`](format.test.ts) | Round trips without sync state or credentials, empty and cyclic projects, the full supported size, safe Mermaid labels and ids, safe filenames. |
 | [`schema.test.ts`](schema.test.ts) | The published JSON Schema accepts the documented example and a real export, and rejects other versions. |
 

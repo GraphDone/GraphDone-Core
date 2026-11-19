@@ -34,6 +34,7 @@ import {
 } from '../lib/semanticRelationships';
 import { SemanticRelationshipBrowser } from './SemanticRelationshipBrowser';
 import { routeSchematicConnections } from '../lib/schematicRouting';
+import { boundsOf, plural, type Rect } from '../lib/graphZoomContext';
 import { organizeOverview } from '../lib/overviewOrganization';
 import {
   projectSemanticTrace,
@@ -47,6 +48,7 @@ interface Props {
   camera: { x: number; y: number; scale: number };
   readPositions: () => readonly { id: string; x: number; y: number }[];
   onActiveChange: (active: boolean) => void;
+  onFrameChange?: (frame: Rect | null) => void;
   onInspect: (id: string, beginSession: boolean) => void;
   selectedId?: string;
   onBrowse: () => void;
@@ -67,6 +69,7 @@ export function SemanticGraphOverview({
   camera,
   readPositions,
   onActiveChange,
+  onFrameChange,
   onInspect,
   onBack,
   selectedId,
@@ -96,34 +99,6 @@ export function SemanticGraphOverview({
   const [obstacles, setObstacles] = useState<
     Array<{ left: number; right: number; top: number; bottom: number }>
   >([]);
-  useLayoutEffect(() => {
-    const bounds = host.current?.getBoundingClientRect();
-    const measured = bounds
-      ? Array.from(
-          document.querySelectorAll<HTMLElement>(
-            '[data-graph-fit-obstacle="true"]'
-          )
-        )
-          .filter(
-            element =>
-              element.getAttribute('role') !== 'region' ||
-              element.hasAttribute('data-lod-trace')
-          )
-          .map(element => element.getBoundingClientRect())
-          .filter(rect => rect.width > 0 && rect.height > 0)
-          .map(rect => ({
-            left: rect.left - bounds.left,
-            right: rect.right - bounds.left,
-            top: rect.top - bounds.top,
-            bottom: rect.bottom - bounds.top,
-          }))
-      : [];
-    setObstacles(previous =>
-      JSON.stringify(previous) === JSON.stringify(measured)
-        ? previous
-        : measured
-    );
-  });
   const obstacleKey = JSON.stringify(obstacles);
   const [mode, setMode] = useState<'auto' | 'overview' | 'items'>(() => {
     try {const value=viewScope?localStorage.getItem(`graphdone:detail:${viewScope}`):null;return value==='items'||value==='overview'?value:'auto';}catch{return 'auto';}
@@ -216,6 +191,35 @@ export function SemanticGraphOverview({
     }
   }, [browse, onBrowse]);
   const active = mode === 'overview' || (mode === 'auto' && automatic);
+  useLayoutEffect(() => {
+    if (!active) return;
+    const bounds = host.current?.getBoundingClientRect();
+    const measured = bounds
+      ? Array.from(
+          document.querySelectorAll<HTMLElement>(
+            '[data-graph-fit-obstacle="true"]'
+          )
+        )
+          .filter(
+            element =>
+              element.getAttribute('role') !== 'region' ||
+              element.hasAttribute('data-lod-trace')
+          )
+          .map(element => element.getBoundingClientRect())
+          .filter(rect => rect.width > 0 && rect.height > 0)
+          .map(rect => ({
+            left: rect.left - bounds.left,
+            right: rect.right - bounds.left,
+            top: rect.top - bounds.top,
+            bottom: rect.bottom - bounds.top,
+          }))
+      : [];
+    setObstacles(previous =>
+      JSON.stringify(previous) === JSON.stringify(measured)
+        ? previous
+        : measured
+    );
+  });
   const [highlightedBus, setHighlightedBus] = useState<string | null>(null);
   const busReturn = useRef(false);
   const group = projection.groups.find(candidate => candidate.id === groupId);
@@ -384,6 +388,15 @@ export function SemanticGraphOverview({
       obstacleKey,
     ]
   );
+  useLayoutEffect(() => {
+    if (!onFrameChange) return;
+    const cards = placed.map(({ x, y, width, height }) => ({ x, y, w: width, h: height }));
+    const bends = wiring?.routes.flatMap(route =>
+      route.points.map(({ x, y }) => ({ x, y, w: 0, h: 0 }))
+    ) ?? [];
+    onFrameChange(boundsOf([...cards, ...bends], 12));
+  }, [placed, wiring, onFrameChange]);
+  useLayoutEffect(() => () => onFrameChange?.(null), [onFrameChange]);
   const emphasized = wiring?.routes.find(route => route.id === highlightedBus);
   const drawnConnections = (wiring?.routes ?? []).reduce(
     (count, bus) => count + bus.edgeIds.length,
@@ -534,6 +547,8 @@ export function SemanticGraphOverview({
         ].join(' / ')
       : 'No visible summary';
   };
+  const groupCount = plural(projection.groups.length, 'group');
+  const itemCount = plural(items.length, 'item');
   return (
     <div
       ref={host}
@@ -576,7 +591,7 @@ export function SemanticGraphOverview({
         {!active && itemDetailControl ? itemDetailControl : <>
         <button
           ref={groupListButton}
-          aria-label={`${projection.groups.length} groups · ${items.length} items`}
+          aria-label={`${groupCount} · ${itemCount}`}
           className="flex md:block items-center justify-center gap-2 rounded-xl bg-slate-900/95 border border-slate-600 px-3 py-1 min-h-11 md:w-32 md:h-14 max-w-full text-slate-100 shadow-lg"
           onClick={() => {
             returnFocus.current = document.activeElement as HTMLElement;
@@ -585,11 +600,11 @@ export function SemanticGraphOverview({
             setGroupId(null);
           }}
         >
-          <span className="md:block">{projection.groups.length} groups</span>
+          <span className="md:block">{groupCount}</span>
           <span className="md:hidden" aria-hidden="true">
             ·
           </span>
-          <span className="md:block">{items.length} items</span>
+          <span className="md:block">{itemCount}</span>
         </button>
         </>}
         {mode === 'overview' && effectiveExpanded.size > 0 && (

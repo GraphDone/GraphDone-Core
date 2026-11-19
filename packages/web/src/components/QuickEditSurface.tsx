@@ -10,11 +10,13 @@ export function QuickEditSurface({
   y,
   onClose,
   children,
+  label = 'Edit work item',
 }: {
   x: number;
   y: number;
   onClose: () => void;
   children: ReactNode;
+  label?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [bounds, setBounds] = useState({
@@ -25,7 +27,7 @@ export function QuickEditSurface({
     sheet: false,
   });
   useDialog(true, onClose);
-  useModalA11y(ref, { isOpen: true, label: 'Edit work item' });
+  useModalA11y(ref, { isOpen: true, label });
 
   useLayoutEffect(() => {
     const place = () => {

@@ -311,7 +311,7 @@ LINKEDIN_CALLBACK_URL=https://localhost:4128/auth/linkedin/callback
 
 **Code:**
 - OAuth strategies: `packages/server/src/auth/oauth-strategies.ts`
-- OAuth routes: `packages/server/src/routes/auth.ts`
+- OAuth routes: `packages/server/src/index.ts` (`/auth/*`), callback in `packages/server/src/auth/oauth-callback.ts`
 - Mock server: `tests/lib/mock-oauth-server.ts`
 - Test fixtures: `tests/fixtures/oauth-profiles.ts`
 - LinkedIn tests: `tests/e2e/oauth-linkedin.spec.ts`

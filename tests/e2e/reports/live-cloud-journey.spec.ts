@@ -2,7 +2,7 @@ import { test, expect, Page, TestInfo } from '@playwright/test';
 
 /**
  * LIVE Cloudflare user journey — drives the real production SPA
- * (https://graphdone-cloud.pages.dev) exactly as a guest user would, on both
+ * (https://graphdone.com) exactly as a guest user would, on both
  * desktop and a phone, recording web-friendly .webm video (the 'live-journey'
  * Playwright project sets video:'on') plus a labelled screenshot per step.
  *
@@ -11,41 +11,12 @@ import { test, expect, Page, TestInfo } from '@playwright/test';
  * produces media, but the load-bearing invariant — a guest sees a graph render
  * with real nodes on the live site — is asserted hard.
  *
- * Guest entry uses the proven recipe from GraphDone-Cloud/scripts/verify-live.mjs:
- * mint a guest token from the live Worker, seed it into localStorage, reload.
  * Output feeds the unified report (npm run test:unified) and the live dashboard.
  */
 
-const LIVE = process.env.TEST_URL || 'https://graphdone-cloud.pages.dev';
-const API = process.env.LIVE_API_URL || 'https://graphdone-api.valpatel.workers.dev/api/graphql';
-
+const LIVE = process.env.TEST_URL || 'https://graphdone.com';
 const NODE_SEL = '.graph-container svg .node';
 const EDGE_SEL = '.graph-container svg .edge';
-
-async function mintGuest(page: Page): Promise<{ token: string; graphId: string | null }> {
-  let token = '';
-  for (let i = 0; i < 5 && !token; i++) {
-    try {
-      const r = await page.request.post(API, {
-        headers: { 'content-type': 'application/json' },
-        data: { query: 'mutation{guestLogin{token}}' },
-      });
-      token = (await r.json())?.data?.guestLogin?.token || '';
-    } catch { /* retry */ }
-    if (!token) await page.waitForTimeout(2000);
-  }
-  let graphId: string | null = null;
-  if (token) {
-    try {
-      const r = await page.request.post(API, {
-        headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token },
-        data: { query: '{graphs{id name}}' },
-      });
-      graphId = (await r.json())?.data?.graphs?.[0]?.id || null;
-    } catch { /* graph optional; app can auto-select */ }
-  }
-  return { token, graphId };
-}
 
 async function countNodes(page: Page): Promise<number> {
   return page.locator(NODE_SEL).count().catch(() => 0);
@@ -82,33 +53,17 @@ function makeShooter(page: Page, testInfo: TestInfo) {
 }
 
 async function enterAsGuest(page: Page, shot: (l: string) => Promise<void>) {
-  // 1. Authentic landing: the real sign-in screen a first-time visitor sees.
-  await page.goto(LIVE + '/', { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(2500);
+  await page.goto(LIVE, { waitUntil: 'domcontentloaded' });
+  const guest = { name: 'Continue as Guest', exact: true };
+  const start = page.getByRole('button', guest);
+  await expect(start).toBeVisible();
   await shot('signin-landing');
-
-  // 2. Best-effort: show the real "Continue as Guest" affordance + dialog.
-  try {
-    const guestBtn = page.getByRole('button', { name: /continue as guest/i }).first();
-    if (await guestBtn.isVisible({ timeout: 4000 })) {
-      await guestBtn.click({ timeout: 3000 });
-      await page.waitForTimeout(1200);
-      await shot('guest-dialog');
-    }
-  } catch { /* affordance may differ on the deployed build — injection below is authoritative */ }
-
-  // 3. Authoritative entry (verify-live recipe): mint + seed + reload.
-  const { token, graphId } = await mintGuest(page);
-  expect(token, 'live Worker minted a guest token').toBeTruthy();
-  await page.evaluate(({ t, gid }) => {
-    localStorage.setItem('authToken', t);
-    localStorage.setItem('currentUser', JSON.stringify({
-      id: '0303535c-21ad-4917-acab-ee26db864d18', role: 'GUEST', email: 'g@guest.local',
-      username: 'guest', name: 'Guest', isActive: true, isEmailVerified: true,
-    }));
-    if (gid) localStorage.setItem('currentGraphId', gid);
-  }, { t: token, gid: graphId });
-  await page.reload({ waitUntil: 'domcontentloaded' });
+  await start.click();
+  const confirm = page.getByRole('dialog').getByRole('button', guest);
+  await expect(confirm).toBeVisible();
+  await shot('guest-dialog');
+  await confirm.click();
+  await expect(page.getByRole('button', { name: 'New work item', exact: true })).toBeVisible();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -199,13 +154,9 @@ test.describe('live cloud user journey — mobile @live', () => {
     console.log(`[live-journey mobile] horizontal-overflow=${overflow}px errors=${errors.length}`);
 
     // Drive the bottom nav: Graph, then the "More" sheet.
-    await tryStep('mobile-graph-view', async () => {
-      const nav = page.getByTestId('mobile-bottom-nav');
-      const graphBtn = nav.getByText('Graph', { exact: true });
-      if (await graphBtn.isVisible({ timeout: 3000 })) await graphBtn.click();
-      else throw new Error('no bottom-nav Graph button');
-      await page.waitForTimeout(4000);
-    });
+    await page.getByTestId('mobile-bottom-nav').getByRole('button', { name: 'Graph', exact: true }).click();
+    await expect(page.locator(NODE_SEL).first()).toBeVisible();
+    await shot('mobile-graph-view');
 
     await tryStep('mobile-more-sheet', async () => {
       const nav = page.getByTestId('mobile-bottom-nav');

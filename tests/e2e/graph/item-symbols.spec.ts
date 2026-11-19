@@ -11,6 +11,7 @@ import {
   inspectItemSymbols,
   readItemSymbols,
 } from '../../lib/itemSymbolVisual';
+import { isExampleWrite } from '../../../packages/web/src/lib/exampleOperations';
 
 const test = base.extend<{ ownedGraphIds: OwnedGraphs }>({
   ownedGraphIds: [ownedGraphIdsFixture, { timeout: 60000 }],
@@ -68,7 +69,8 @@ for (const { width, diagonal } of [
       page.on('pageerror', error => errors.push(error.message));
       await page.route('**/api/graphql', async route => {
         if (
-          /^\s*mutation\b/.test(route.request().postDataJSON()?.query ?? '')
+          /^\s*mutation\b/.test(route.request().postDataJSON()?.query ?? '') &&
+          !isExampleWrite(route.request().postDataJSON()?.operationName)
         ) {
           writes.push(
             route.request().postDataJSON().operationName ?? 'mutation'

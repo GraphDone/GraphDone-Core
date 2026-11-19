@@ -38,6 +38,11 @@ for (const path of LINK_PATHS) {
     info.annotations.push({ type: 'saved-after-ms', description: String(Date.now() - started) });
     const between = (await storedEdges(page, graphId)).filter(e => linked([e], a.id, b.id));
     expect(between, 'exactly one connection is saved').toHaveLength(1);
+    if (path.expectedType) {
+      expect(between[0], 'the chosen relationship type and direction are saved').toMatchObject({
+        type: path.expectedType, source: a.id, target: b.id,
+      });
+    }
     await expect.poll(async () => linked(await drawnEdges(page), a.id, b.id),
       { message: 'the connection must be drawn', timeout: 5000 }).toBe(true);
     if (countBefore !== null) {

@@ -26,9 +26,26 @@ flowchart LR
 | --- | --- |
 | [`link.ts`](link.ts) | Start here. `offlineLink`, the first link in [`../apollo.ts`](../apollo.ts). Handles `graphs`, `workItems`, `workItem`, `edges`, their create/update/delete mutations, `restoreWorkItem`, `me` and `guestLogin`; everything else is forwarded. Shapes rows as the server's GraphQL types would. |
 | [`engine.ts`](engine.ts) | Account and project state: `listProjects`, `getProject`, `syncNow` (one tab at a time via Web Locks), `resolveConflict`, `prepareOffline`, backup `exportOffline` / `importOffline`, `exportProject`. `useOffline` exposes status to the UI. |
-| [`model.ts`](model.ts) | Pure data model: `Snapshot` (project, nodes, edges, notes), change detection, the three-way `merge`, upload requests and backup validation. |
+| [`model.ts`](model.ts) | Pure data model: `Snapshot` (project, nodes, edges, notes), change detection, the three-way `merge`, upload requests and backup validation, and the graph hierarchy (`graphType`, `graphPath`, `createsCycle`). |
 | [`store.ts`](store.ts) | IndexedDB `graphdone-offline` (one record per account) and a `BroadcastChannel` so open tabs see each other's writes. |
-| `link.test.ts`, `model.test.ts` | Vitest tests: the link answering GraphQL from a fixture account, and merge rules (no lost edits, conflicts kept until a person chooses). |
+| `link.test.ts`, `model.test.ts`, `engine.test.ts`, `engine.scheduler.test.ts`, `engine.sessionRevoked.test.ts` | Vitest tests: the link answering GraphQL from a fixture account (including graphs inside projects and the whole starter workspace), merge rules (no lost edits, conflicts kept until a person chooses), backup import keeping or rejecting a hierarchy, foreground refresh timing and allowance limits, and a signed-out sync answer clearing the session while keeping local work. |
+
+Each graph is a project row. A guest's row also keeps `type`, `parent_id`
+(the project it sits in), `description` and `tags` (JSON text, like an item's);
+the link shapes `parentGraphId`, `depth` and `path` from that chain, moves
+graphs without cycles, and will not delete a project that still has graphs.
+Rows without these fields read as top-level projects with no description or
+tags. Signed-in accounts stay flat and keep only the name: `/api/sync` has no
+parent, description or tags column yet and would drop them on the next sync
+(#277).
+
+A pending upload keeps its original request body and the snapshot it sent in
+IndexedDB. Later edits stay in the editable snapshot. An acknowledged retry
+uses the original sent snapshot as its merge basis so later edits can upload
+separately. Older stored requests may share editable rows. If such a request
+and its acknowledgement disagree, the merge keeps the local values for the
+affected fields and flags changes in both copies for review. Other rows
+continue to reconcile normally.
 
 The `/api/sync` service is part of the hosted build, not of
 [`packages/server/`](../../../../server/README.md); in development Vite proxies

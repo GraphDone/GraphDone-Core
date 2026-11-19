@@ -2,8 +2,9 @@ import {COMPACT_WORKSPACE_QUERY} from '../hooks/useCompactWorkspace';
 import { offlineEnabled } from '../lib/offline/engine';
 import { skipBackgroundPoll, useHostedUsage } from '../lib/hostedUsage';
 import { WorkspaceViewTabs } from '../components/WorkspaceViewTabs';
+import { onGraphRequests } from '../lib/graphRequests';
 import { AgentConnection } from '../components/AgentConnection';
-import type { WorkItem } from '../types/graph';
+import type { Graph, WorkItem } from '../types/graph';
 import { useState, useEffect, useCallback } from 'react';
 import { Plus, Share2, Users, Network, Orbit, Database, AlertTriangle, Map, X, Minimize2, Maximize2, Edit3, Trash2, FolderPlus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { createPortal } from 'react-dom';
@@ -29,6 +30,7 @@ import { UndoStack } from '../lib/undoStack';
 import { useNotifications } from '../contexts/NotificationContext';
 
 export function Workspace() {
+  const { currentGraph, availableGraphs, getBreadcrumb, ascendTo, canEditGraph, canDeleteGraph } = useGraph();
   const { usage: cloudUsage } = useHostedUsage();
   const cloudPaused = !offlineEnabled && !!cloudUsage && cloudUsage.status !== 'AVAILABLE';
   const [showAgentConnection, setShowAgentConnection] = useState(false);
@@ -39,6 +41,19 @@ export function Workspace() {
   const [showDeleteGraphModal, setShowDeleteGraphModal] = useState(false);
   const [showGraphSelectionModal, setShowGraphSelectionModal] = useState(false);
   const [graphToEdit, setGraphToEdit] = useState<any>(null);
+  const [graphToDelete, setGraphToDelete] = useState<Graph | null>(null);
+  const openCreateGraph = useCallback(() => setShowCreateGraphModal(true), []);
+  const openEditGraph = useCallback((graph: Graph) => {
+    if (!canEditGraph(graph.id)) return;
+    setGraphToEdit(graph);
+    setShowUpdateGraphModal(true);
+  }, [canEditGraph]);
+  const openDeleteGraph = useCallback((graph: Graph) => {
+    if (!canDeleteGraph(graph.id)) return;
+    setGraphToDelete(graph);
+    setShowDeleteGraphModal(true);
+  }, [canDeleteGraph]);
+  useEffect(() => onGraphRequests({ create: openCreateGraph, edit: openEditGraph, delete: openDeleteGraph }), [openCreateGraph, openDeleteGraph, openEditGraph]);
   const { viewMode, setViewMode } = useViewMode();
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== 'undefined' && window.matchMedia(COMPACT_WORKSPACE_QUERY).matches
@@ -63,8 +78,17 @@ export function Workspace() {
     try { window.localStorage.setItem(LAYOUT_MODE_STORAGE_KEY, next); } catch { /* storage unavailable */ }
     (window as any).triggerLayoutMode?.(next);
   };
-  const { currentGraph, availableGraphs, getBreadcrumb, ascendTo, canEditGraph } = useGraph();
   const { currentTeam, currentUser } = useAuth();
+  useEffect(() => {
+    if (graphToEdit && !canEditGraph(graphToEdit.id)) {
+      setShowUpdateGraphModal(false);
+      setGraphToEdit(null);
+    }
+    if (graphToDelete && !canDeleteGraph(graphToDelete.id)) {
+      setShowDeleteGraphModal(false);
+      setGraphToDelete(null);
+    }
+  }, [canDeleteGraph, canEditGraph, graphToDelete, graphToEdit]);
   const [undoStack] = useState(() => new UndoStack(36));
   const { showSuccess, showError } = useNotifications();
   useEffect(() => { undoStack.clear(); }, [currentGraph?.id, currentUser?.id, undoStack]);
@@ -163,14 +187,7 @@ export function Workspace() {
               
               {/* Graph Selector - Full Featured */}
               <div className="flex-1 min-w-0">
-                <GraphSelector
-                  onCreateGraph={() => setShowCreateGraphModal(true)}
-                  onEditGraph={(graph) => {
-                    setGraphToEdit(graph);
-                    setShowUpdateGraphModal(true);
-                  }}
-                  onDeleteGraph={(graph) => setShowDeleteGraphModal(true)}
-                />
+                <GraphSelector onCreateGraph={openCreateGraph} onEditGraph={openEditGraph} onDeleteGraph={openDeleteGraph} />
               </div>
             </div>
           </div>
@@ -231,7 +248,7 @@ export function Workspace() {
       {breadcrumb.length > 1 && (
         <div
           data-testid="graph-breadcrumb"
-          className="bg-gray-800/30 backdrop-blur-sm border-b border-gray-700/20 px-4 sm:px-6 lg:px-8 py-2 flex items-center gap-1 text-sm overflow-x-auto"
+          className="bg-gray-800/30 backdrop-blur-sm border-b border-gray-700/20 px-4 sm:px-6 lg:px-8 py-2 flex items-center gap-1 text-sm overflow-x-auto short:hidden"
         >
           <button
             onClick={() => ascendTo(breadcrumb[breadcrumb.length - 2].id)}
@@ -439,7 +456,7 @@ export function Workspace() {
            </button>
            {inspectorNode && (
              <div className={`absolute z-40 inset-x-3 bottom-3 md:inset-x-auto md:top-3 md:right-3 ${showMiniMap ? 'md:bottom-56' : 'md:bottom-3'}`}>
-               <NodeInspector maxHeight={isMobile ? undefined : '100%'} node={inspectorNode} onClose={() => setInspectorNode(null)} onEdit={() => { setQuickEditRequest(inspectorNode); setInspectorNode(null); }} onConnect={viewMode === 'graph' ? () => { setConnectRequest(inspectorNode); setInspectorNode(null); } : undefined} />
+               <NodeInspector maxHeight={isMobile ? undefined : '100%'} node={inspectorNode} onClose={() => setInspectorNode(null)} onEdit={() => { setQuickEditRequest(inspectorNode); setInspectorNode(null); }} onConnect={viewMode === 'graph' && currentGraph && canEditGraph(currentGraph.id) ? () => { setConnectRequest(inspectorNode); setInspectorNode(null); } : undefined} />
              </div>
            )}
           </div>
@@ -484,6 +501,7 @@ export function Workspace() {
       {/* Mini-Map Toggle Button - Shows when mini-map is hidden (desktop only) */}
       {viewMode === 'graph' && currentGraph && !showMiniMap && !isMobile && createPortal(
         <button
+          data-graph-fit-obstacle="true"
           onClick={() => setShowMiniMap(true)}
           className="fixed bottom-4 right-4 bg-gray-800/90 backdrop-blur-sm border border-gray-600 rounded-lg p-3 shadow-xl hover:bg-gray-700/90 transition-all duration-200 z-50"
           title="Show Mini-Map"
@@ -531,10 +549,14 @@ export function Workspace() {
       )}
 
       {/* Delete Graph Modal */}
-      {showDeleteGraphModal && currentGraph && (
+      {showDeleteGraphModal && (graphToDelete || currentGraph) && (
         <DeleteGraphModal
           isOpen={showDeleteGraphModal}
-          onClose={() => setShowDeleteGraphModal(false)}
+          graph={graphToDelete}
+          onClose={() => {
+            setShowDeleteGraphModal(false);
+            setGraphToDelete(null);
+          }}
         />
       )}
     </div>

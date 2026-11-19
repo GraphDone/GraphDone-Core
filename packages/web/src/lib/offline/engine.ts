@@ -1,7 +1,8 @@
 import { useSyncExternalStore } from 'react';
 import { getToken,getUserRaw } from '../authStorage';
 import { cloudFailure, skipBackgroundPoll } from '../hostedUsage';
-import { changes,dirty,makeRequest,merge,Snapshot,Row,validateBackupSnapshot,ambiguousRetriedCreation } from './model';
+import { handleSessionRevoked, isSessionRevoked } from '../sessionRevoked';
+import { changes,dirty,makeRequest,merge,mergeAcknowledged,Snapshot,Row,validateBackupSnapshot,validateBackupProjects,ambiguousRetriedCreation,OFFLINE_PROJECT_LIMIT } from './model';
 import { readAccount,editAccount,channel } from './store';
 import { PROJECT_FORMAT,parseProjectDocument,projectDocument,projectMermaid,projectFilename,downloadText } from '../project-transfer/format';
 export const offlineEnabled=import.meta.env.VITE_OFFLINE_SYNC==='true';
@@ -35,7 +36,7 @@ async function request(owner:string,path:string,body?:any) {
   // shared exhaustion still waits for the service reset. Denied work never reaches D1.
   if(response.status===429&&data.code==='PERSONAL_LIMIT')retry=Math.min(retry,Date.now()+3600000);
   await editAccount(owner,a=>{a.retryAt=retry;a.blocked=validation?'validation':response.status===401||response.status===403?'auth':undefined;if(validation&&body?.projectId&&a.projects[body.projectId])delete a.projects[body.projectId].request;a.error=response.status===401?'Sign in again to upload. Your local work is retained.':data.message||data.error||'Sync paused. Your local work is retained.';});
-  cloudFailure(data.code);throw Error(data.message||data.error||'Sync paused');
+  cloudFailure(data.code);if(isSessionRevoked(data.code))handleSessionRevoked(token);throw Error(data.message||data.error||'Sync paused');
  }
  return {data,status:response.status};
 }
@@ -57,11 +58,17 @@ export async function listProjects(force=false):Promise<Row[]> {
 }
 export async function getProject(id:string,force=false):Promise<Snapshot> {
  const owner=ownerId();if(!owner)throw Error('Sign in first.');
- return once(`project:${owner}:${id}`,async()=>{
+ const key=`project:${owner}:${id}`;
+ const refreshKey=`${key}:refresh`;
+ const refreshing=loading.get(refreshKey);
+ if(refreshing)return refreshing;
+ const earlierRead=loading.get(key);
+ return once(force?refreshKey:key,async()=>{
+  if(force && earlierRead)await earlierRead.catch(()=>{});
   let p=(await readAccount(owner)).projects[id];
   if((!p||force)&&await canConnect(owner)) {
    try {const {data}=await request(owner,`/project?id=${encodeURIComponent(id)}`);await acceptRemote(owner,id,data.snapshot);p=(await readAccount(owner)).projects[id];}
-   catch(e){if(!p?.local)throw e;}
+   catch(e){if(force || !p?.local)throw e;}
   }
   if(!p?.local)throw Error('This project is not available on this device yet. Reconnect and open it to download an offline copy.');
   return p.local;
@@ -74,33 +81,46 @@ async function acceptRemote(owner:string,id:string,remote:Snapshot|null,ack?:str
   // Never replace an unresolved conflict through background refresh.
   if(p.conflicts?.length)return;
   if(p.request&&!ack)return; // resolve uncertain acknowledgement before pulling
-  const base=ack&&p.request?.requestId===ack?p.request.sent:p.base;
-  const result=merge(base,p.local,remote);
+  const result=ack&&p.request?.requestId===ack?mergeAcknowledged(p,p.request,remote):merge(p.base,p.local,remote);
   a.projects[id]={base:remote,local:result.local,conflicts:result.conflicts,remote:result.conflicts.length?remote:undefined,checkedAt:Date.now()};
  });
 }
-export async function syncNow(manual=false,scheduled=false) {
+const SYNC_INTERVAL_MS = 60_000;
+export async function syncNow(manual=false,scheduled=false,projectId?:string) {
+ await syncProjects(manual,scheduled,projectId);
+}
+async function syncProjects(manual:boolean,scheduled:boolean,projectId?:string) {
  const owner=ownerId();if(!offlineEnabled||!owner||localGuest()||(!navigator.onLine&&!scheduled))return;
  if(!navigator.locks) {await editAccount(owner,a=>{a.error='This browser cannot coordinate safe sync between tabs. Export a backup and use a current browser.';});return;}
- await navigator.locks.request(`graphdone-sync:${owner}`,{ifAvailable:true},async lock=>{
+ return navigator.locks.request(`graphdone-sync:${owner}`,{ifAvailable:!projectId},async lock=>{
   if(!lock)return;
   const a=await readAccount(owner);
   // Manual retry can retry expired authentication after a fresh sign-in, but
   // cannot bypass a quota recheck deadline by repeatedly pressing a button.
   if(a.retryAt>Date.now())return;
-  const hasDirty=Object.values(a.projects).some(dirty);
+  const projects=Object.entries(a.projects).filter(([id])=>!projectId || id===projectId);
+  const hasDirty=projects.some(([,project])=>dirty(project));
   // A scheduled dirty upload is also the bounded connectivity probe. Browser
   // online hints can be stale; the request result is authoritative. Never use
   // this exception for clean background reads.
   if(!navigator.onLine&&!hasDirty)return;
-  if(!hasDirty && !manual && (skipBackgroundPoll() || !Object.entries(a.projects).some(([id,p])=>localStorage.getItem('currentGraphId')===id && Date.now()-p.checkedAt>60000)))return;
+  if(!hasDirty && !manual) {
+   if(skipBackgroundPoll())return;
+   const selectedId=localStorage.getItem('currentGraphId');
+   const selected=projects.find(([id])=>id===selectedId)?.[1];
+   if(!selected || selected.conflicts?.length)return;
+   // A manual read or upload may have finished between periodic checks.
+   // Wake at its actual deadline instead of skipping an entire second minute.
+   const remaining=selected.checkedAt+SYNC_INTERVAL_MS-Date.now();
+   if(remaining>0)return Math.min(remaining,SYNC_INTERVAL_MS);
+  }
   view={...view,syncing:true};listeners.forEach(f=>f());
   try {
-   for(const [id] of Object.entries(a.projects).sort(([,a],[,b])=>Number(!!a.local)-Number(!!b.local))) {
+   for(const [id] of projects.sort(([,a],[,b])=>Number(!!a.local)-Number(!!b.local))) {
     if(owner!==ownerId()||(!navigator.onLine&&!scheduled))break;
     const p=(await readAccount(owner)).projects[id];if(p.conflicts?.length)continue;
     if(!dirty(p)) {
-     if(manual||(!skipBackgroundPoll() && (localStorage.getItem('currentGraphId')===id)&&Date.now()-p.checkedAt>60000))await getProject(id,true);
+     if(manual||(!skipBackgroundPoll() && (localStorage.getItem('currentGraphId')===id)&&Date.now()-p.checkedAt>=SYNC_INTERVAL_MS))await getProject(id,true);
      continue;
     }
     const pending=await editAccount(owner,state=>{const current=state.projects[id];const request=current.request ||= makeRequest(id,current);request.attempts=request.attempts===undefined?2:request.attempts+1;return request;});
@@ -118,6 +138,7 @@ export async function syncNow(manual=false,scheduled=false) {
    // A timeout may have committed. The exact request stays on disk for replay.
    await editAccount(owner,state=>{if(!state.error)state.error=e instanceof Error?e.message:'Sync unavailable';state.retryAt=Math.max(state.retryAt,Date.now()+60000);});
   } finally {view={...view,syncing:false};await publish();window.dispatchEvent(new Event('graphdone-sync-refresh'));}
+  return;
  });
 }
 export async function resolveConflict(id:string,choice:'local'|'cloud') {
@@ -140,6 +161,15 @@ export async function exportProject(id:string,format:'json'|'mermaid') {
  const snapshot=await getProject(id);
  downloadText(format==='json'?JSON.stringify(projectDocument(snapshot),null,2):projectMermaid(snapshot),projectFilename(snapshot.project.name,format==='json'?'json':'mmd'),format==='json'?'application/json':'text/plain');
 }
+function remapPortableMetadata(metadata:string,ids:Map<string,string>):string {
+ let value:any;try{value=JSON.parse(metadata);}catch{return metadata;}
+ const portable=value?.graphdone?.portable;if(portable===undefined)return metadata;
+ const fail=():never=>{throw Error('A portable metadata reference is malformed, unsupported, or points to a task missing from this project. Nothing was imported.');};
+ if(!portable||typeof portable!=='object'||Array.isArray(portable)||portable.version!==1||!portable.nodeRefs||typeof portable.nodeRefs!=='object'||Array.isArray(portable.nodeRefs))fail();
+ const entries=Object.entries(portable.nodeRefs);if(entries.length>50)fail();
+ for(const [key,sourceId] of entries){if(!key||key.length>100||typeof sourceId!=='string')fail();const source=sourceId as string;if(!ids.has(source))fail();portable.nodeRefs[key]=ids.get(source);}
+ const remapped=JSON.stringify(value);if(remapped.length>10000)fail();return remapped;
+}
 export async function importOffline(file:File) {
  if(file.size>50*1024*1024)throw Error('Backup is too large (50 MB maximum).');
  let data:any;try{data=JSON.parse(await file.text());}catch{throw Error('This file is not valid JSON. Mermaid files are diagrams; import a GraphDone JSON export to restore work.');}
@@ -148,19 +178,25 @@ export async function importOffline(file:File) {
  if(data?.format!=='graphdone-offline-v1'||!data.account?.projects||Array.isArray(data.account.projects)||typeof data.account.projects!=='object'||!owner)throw Error('Choose a GraphDone offline backup while signed in.');
  // Import as NEW local projects. Never replay another account's requests/ids.
  if(Object.keys(data.account.projects).length>100)throw Error('Import at most 100 projects at a time.');
- const copies:Snapshot[]=[];
+ const snapshots:Snapshot[]=[];
  for(const p of Object.values(data.account.projects) as any[]) {
   if(!p||typeof p!=='object')throw Error('Invalid project in backup');
   if(!p.local)continue;const s=p.local as Snapshot;validateBackupSnapshot(s);
   if(!s.project||typeof s.project.name!=='string'||!Array.isArray(s.nodes)||!Array.isArray(s.edges)||!Array.isArray(s.notes))throw Error('Invalid project in backup');
   if(s.nodes.length>300||s.edges.length>600||s.notes.length>2000)throw Error('A project exceeds the supported import size.');
-  const ids=new Map(s.nodes.map(n=>[n.id,crypto.randomUUID()]));
-  copies.push({project:{...s.project,id:crypto.randomUUID(),owner_id:owner,sync_version:0,name:`${s.project.name.slice(0,105)} (imported)`},nodes:s.nodes.map(n=>({...n,id:ids.get(n.id)!})),edges:s.edges.map(e=>({...e,id:crypto.randomUUID(),source_id:ids.get(e.source_id),target_id:ids.get(e.target_id)})),notes:s.notes.map(n=>({...n,id:crypto.randomUUID(),work_item_id:ids.get(n.work_item_id)||null}))});
+  snapshots.push(s);
  }
+ validateBackupProjects(snapshots);
+ // A signed-in account syncs, and /api/sync keeps no parent yet: import it flat (#277).
+ const hierarchy=localGuest(),newIds=snapshots.map(()=>crypto.randomUUID()),projectIds=new Map(snapshots.map((s,i)=>[s.project.id,newIds[i]]));
+ const copies:Snapshot[]=snapshots.map((s,i)=>{
+  const ids=new Map(s.nodes.map(n=>[n.id,crypto.randomUUID()])),{type,parent_id,...project}=s.project,parent=hierarchy&&parent_id!=null?projectIds.get(parent_id)!:null;
+  return {project:{...project,...(hierarchy&&type!=null?{type}:{}),...(parent?{parent_id:parent}:{}),id:newIds[i],owner_id:owner,sync_version:0,name:parent?s.project.name:`${s.project.name.slice(0,105)} (imported)`},nodes:s.nodes.map(n=>({...n,id:ids.get(n.id)!,metadata:remapPortableMetadata(n.metadata,ids)})),edges:s.edges.map(e=>({...e,id:crypto.randomUUID(),source_id:ids.get(e.source_id),target_id:ids.get(e.target_id)})),notes:s.notes.map(n=>({...n,id:crypto.randomUUID(),work_item_id:ids.get(n.work_item_id)||null}))};
+ });
  if(!copies.length)throw Error('This file contains no projects to import.');
  if(owner!==ownerId())throw Error('Account changed. Please import again.');
  await editAccount(owner,a=>{const ids=new Set(a.list.map(p=>p.id));for(const [id,p] of Object.entries(a.projects)){if(p.local)ids.add(id);else ids.delete(id);}
- if(ids.size+copies.length>100)throw Error('Import would exceed 100 projects. Remove unused projects or import fewer projects.');
+ if(ids.size+copies.length>OFFLINE_PROJECT_LIMIT)throw Error(`Import would exceed ${OFFLINE_PROJECT_LIMIT} projects. Remove unused projects or import fewer projects.`);
  for(const s of copies)a.projects[s.project.id]={base:null,local:s,checkedAt:Date.now()};});
  window.dispatchEvent(new Event('graphdone-sync-refresh'));void syncNow();
  return copies.map(s=>({id:s.project.id,name:s.project.name}));
@@ -176,5 +212,12 @@ if(offlineEnabled) {
   if(owner){const user=JSON.parse(getUserRaw()||'null');void readAccount(owner).then(async a=>{if(JSON.stringify(a.user)!==JSON.stringify(user))await editAccount(owner,state=>{state.user=user;});}).catch(storageError);}
   if(owner && token!==observedToken){observedToken=token;void editAccount(owner,a=>{if(a.blocked==='auth'){a.retryAt=0;a.error='';delete a.blocked;}}).then(()=>syncNow());}
  });
- setInterval(()=>{if(!document.hidden)void syncNow(false,true);},60000);
+ const poll = async () => {
+  let delay=SYNC_INTERVAL_MS;
+  try {
+   if(!document.hidden)delay=(await syncProjects(false,true))??SYNC_INTERVAL_MS;
+  } catch(error) {storageError(error);}
+  finally {window.setTimeout(poll,delay);}
+ };
+ window.setTimeout(poll,SYNC_INTERVAL_MS);
 }

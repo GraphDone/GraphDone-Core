@@ -44,6 +44,6 @@ COPY packages/web/https_redirect.html /usr/share/nginx/html/
 # Copy nginx configuration
 COPY packages/web/nginx.conf /etc/nginx/conf.d/default.conf
 
-EXPOSE 3127
+EXPOSE 3128
 
 CMD ["nginx", "-g", "daemon off;"]

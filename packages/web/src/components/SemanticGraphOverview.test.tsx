@@ -75,7 +75,7 @@ it('restores Auto hysteresis history when inspection returns to the same camera'
   render(<Fixture />);
   const before = ids();
   expect(before).toHaveLength(1);
-  fireEvent.click(screen.getByRole('button', { name: '1 groups · 4 items' }));
+  fireEvent.click(screen.getByRole('button', { name: '1 group · 4 items' }));
   fireEvent.click(screen.getByRole('button', { name: /^System 4 items/ }));
   fireEvent.click(screen.getByRole('button', { name: 'Node 0 TASK · ACTIVE' }));
   expect(summaries()).toHaveLength(0);
@@ -85,6 +85,15 @@ it('restores Auto hysteresis history when inspection returns to the same camera'
   expect(ids()).toEqual(before);
   act(() => changeScale(0.46));
   expect(summaries()).toHaveLength(2);
+});
+
+it('uses singular accessible and visible counts for one group and one item', () => {
+  render(<Fixture />);
+  act(() => replaceItems(items.slice(0, 1)));
+  const button = screen.getByRole('button', { name: '1 group · 1 item' });
+  expect(button).toHaveTextContent('1 group');
+  expect(button).toHaveTextContent('1 item');
+  expect(button).not.toHaveTextContent(/groups|items/);
 });
 
 it('moves focus to the visible descendant and back to its parent as the cut changes', () => {
@@ -271,4 +280,20 @@ it('returns keyboard focus to overview controls when zoom removes the entire bus
   act(() => { for(const frame of frames.splice(0)) frame(0); });
   expect(screen.getByRole('button', { name: '2 groups · 4 items' })).toHaveFocus();
   expect(screen.queryByRole('tooltip')).toBeNull();
+});
+
+it('reports a screen frame around projected group cards and clears it in Items mode', () => {
+  const onFrameChange = vi.fn();
+  render(<SemanticGraphOverview
+    items={items} edges={edges} camera={{ x: 0, y: 0, scale: 0.2 }}
+    readPositions={positions} onActiveChange={noop} onFrameChange={onFrameChange}
+    onBrowse={noop} onInspect={noop} onBack={noop}
+  />);
+  const [frame] = onFrameChange.mock.lastCall ?? [];
+  expect(frame).toBeTruthy();
+  const [group] = summaries();
+  expect(frame.x).toBeLessThan(parseFloat(group.style.left));
+  expect(frame.x + frame.w).toBeGreaterThan(parseFloat(group.style.left) + parseFloat(group.style.width));
+  fireEvent.change(screen.getByLabelText('Graph detail'), { target: { value: 'items' } });
+  expect(onFrameChange).toHaveBeenLastCalledWith(null);
 });

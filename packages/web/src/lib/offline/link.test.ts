@@ -4,7 +4,7 @@ import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { emptyAccount, type Account, type Snapshot } from './model';
 
-const fixture = vi.hoisted(() => ({ account: null as Account | null, graphId: 'project', showSuccess: vi.fn(), showError: vi.fn() }));
+const fixture = vi.hoisted(() => ({ account: null as Account | null, graphId: 'project', graphs: [] as Array<{ id: string; name: string; parentGraphId?: string | null }>, guest: false, showSuccess: vi.fn(), showError: vi.fn() }));
 vi.mock('./store', () => ({
   readAccount: async () => structuredClone(fixture.account),
   editAccount: async (_owner: string, edit: (account: Account) => unknown) => {
@@ -18,7 +18,7 @@ vi.mock('./engine', () => ({
   offlineEnabled: true,
   ownerId: () => 'owner',
   sessionAccountId: () => 'owner',
-  localGuest: () => false,
+  localGuest: () => fixture.guest,
   primaryProjectId: () => 'primary',
   listProjects: async () => Object.values(fixture.account!.projects).flatMap(p => p.local ? [p.local.project] : []),
   getProject: async (id: string) => {
@@ -28,11 +28,14 @@ vi.mock('./engine', () => ({
   },
 }));
 vi.mock('../authStorage', () => ({ getUserRaw: () => JSON.stringify({ id: 'owner', role: 'USER' }) }));
-vi.mock('../../contexts/GraphContext', () => ({ useGraph: () => ({ currentGraph: { id: fixture.graphId, name: fixture.graphId }, deleteGraph: vi.fn() }) }));
+vi.mock('../../contexts/GraphContext', () => ({ useGraph: () => ({ currentGraph: { id: fixture.graphId, name: fixture.graphId }, availableGraphs: fixture.graphs, deleteGraph: vi.fn(), canDeleteGraph: () => true }) }));
 vi.mock('../../contexts/NotificationContext', () => ({ useNotifications: () => ({ showSuccess: fixture.showSuccess, showError: fixture.showError }) }));
 
 import { offlineLink } from './link';
 import { DeleteGraphModal } from '../../components/DeleteGraphModal';
+import { CREATE_GRAPH, CREATE_STARTER_GRAPHS, GET_GRAPHS, UPDATE_GRAPH, DELETE_GRAPH } from '../../graphql/graph';
+import { CREATE_EDGE, CREATE_WORK_ITEM, GET_EDGES, GET_WORK_ITEMS } from '../queries';
+import { buildStarterWorkspace, createStarterWorkspace, type StarterApi } from '../starterWorkspace';
 
 const snapshot = (id: string, ids: string[]): Snapshot => ({
   project: { id, name: id, owner_id: 'owner' },
@@ -50,6 +53,7 @@ describe('offline GraphQL bulk selection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     fixture.graphId = 'project';
+    fixture.graphs = [];
     fixture.account = emptyAccount();
     for (const s of [snapshot('project', ['a', 'b', 'c']), snapshot('other', ['d'])]) {
       fixture.account.projects[s.project.id] = { base: structuredClone(s), local: s, checkedAt: 0 };
@@ -67,6 +71,30 @@ describe('offline GraphQL bulk selection', () => {
     expect(result.data.deleteWorkItems.nodesDeleted).toBe(2);
     expect(fixture.account!.projects.project.local!.nodes.map(n => n.id)).toEqual(['b']);
     expect(fixture.account!.projects.other.local!.nodes.map(n => n.id)).toEqual(['d']);
+  });
+
+  it('preserves an older stored request when a later offline edit updates its task', async () => {
+    const draft = fixture.account!.projects.project;
+    const row = draft.local!.nodes[0];
+    row.title = 'Previously submitted';
+    draft.request = {
+      requestId: 'retained-request', projectId: 'project', version: 1,
+      changes: [{table: 'nodes', id: row.id, action: 'put', value: row}],
+      sent: {...draft.local!, nodes: [...draft.local!.nodes]},
+    };
+    const requestBeforeEdit = JSON.stringify(draft.request);
+    fixture.account = structuredClone(fixture.account);
+
+    const result = await run(gql`
+      mutation RevisePending($where: WorkItemWhere!, $update: WorkItemUpdateInput!) {
+        updateWorkItems(where: $where, update: $update) { workItems { id title } }
+      }
+    `, { where: { graph: { id: 'project' }, id: row.id }, update: { title: 'New edit' } });
+
+    expect(result.data.updateWorkItems.workItems).toEqual([{id: row.id, title: 'New edit'}]);
+    const edited = fixture.account!.projects.project;
+    expect(edited.local?.nodes[0].title).toBe('New edit');
+    expect(JSON.stringify(edited.request)).toBe(requestBeforeEdit);
   });
 
   it('supports an empty ID selection without deleting any work', async () => {
@@ -102,6 +130,59 @@ describe('offline GraphQL bulk selection', () => {
     expect(fixture.account!.projects.project.local!.nodes).toEqual([]);
     expect(fixture.account!.projects.other.local!.nodes.map(n => n.id)).toEqual(['d']);
     expect(screen.queryByRole('button', { name: /Delete All Unconnected/ })).toBeNull();
+    client.stop();
+  });
+
+  it('inspects the graph that was clicked, not the one that is open', async () => {
+    const client = new ApolloClient({ link: offlineLink, cache: new InMemoryCache() });
+    const other = { id: 'other', name: 'other' } as never;
+    render(createElement(ApolloProvider, { client, children: createElement(DeleteGraphModal, { isOpen: true, onClose: vi.fn(), graph: other }) }));
+    expect(await screen.findByRole('button', { name: 'Delete All Unconnected Work Items (1)' })).not.toBeNull();
+    expect(screen.getByText('"other"')).not.toBeNull();
+    client.stop();
+  });
+
+  const addInside = (parent: string, names: string[]) => {
+    for (const name of names) {
+      const s = snapshot(name, []);
+      s.project = { ...s.project, type: 'SUBGRAPH', parent_id: parent };
+      fixture.account!.projects[name] = { base: null, local: s, checkedAt: 0 };
+    }
+  };
+  const openDelete = (graph: { id: string; name: string }) => {
+    const asked: string[] = [];
+    const spy = new ApolloLink((operation, forward) => { asked.push(operation.operationName); return forward(operation); });
+    const client = new ApolloClient({ link: spy.concat(offlineLink), cache: new InMemoryCache() });
+    render(createElement(ApolloProvider, { client, children: createElement(DeleteGraphModal, { isOpen: true, onClose: vi.fn(), graph: graph as never }) }));
+    return { asked, client };
+  };
+
+  it('refuses a project that still holds graphs before anyone types its name', async () => {
+    addInside('project', ['Welcome', 'Plan a launch', 'Fix bugs', 'Ideas']);
+    const { asked, client } = openDelete({ id: 'project', name: 'Getting started' });
+    expect((await screen.findByRole('alert')).textContent).toBe('Getting started holds 4 graphs. Delete them first.');
+    expect(screen.getByText('This project still holds graphs')).not.toBeNull();
+    expect(screen.queryByRole('textbox')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Delete/ })).toBeNull();
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)); });
+    expect(asked, 'only the graphs inside are asked for').toEqual(['GetChildGraphs']);
+    client.stop();
+  });
+
+  it('asks the backend for the graphs inside, so a stale list in this tab cannot allow the delete', async () => {
+    fixture.graphs = [{ id: 'project', name: 'Home', parentGraphId: null }];
+    addInside('project', ['Added in another tab']);
+    const { client } = openDelete({ id: 'project', name: 'Home' });
+    expect((await screen.findByRole('alert')).textContent).toBe('Home holds 1 graph. Delete them first.');
+    expect(screen.queryByRole('button', { name: /Delete All/ })).toBeNull();
+    client.stop();
+  });
+
+  it('goes on to the usual checks once the backend says nothing is inside, whatever this tab listed', async () => {
+    fixture.graphs = [{ id: 'project', name: 'Home', parentGraphId: null }, { id: 'gone', name: 'Moved away', parentGraphId: 'project' }];
+    const { client } = openDelete({ id: 'project', name: 'Home' });
+    expect(await screen.findByRole('button', { name: 'Delete All Unconnected Work Items (3)' })).not.toBeNull();
+    expect(screen.queryByText('This project still holds graphs')).toBeNull();
     client.stop();
   });
 
@@ -172,5 +253,133 @@ describe('offline GraphQL bulk selection', () => {
     expect(screen.queryByRole('button', { name: /Delete All Unconnected/ })).toBeNull();
     expect(fixture.account!.projects.other.local!.nodes.map(n => n.id)).toEqual(['d']);
     client.stop();
+  });
+});
+
+type Shaped = { id: string; name: string; [field: string]: unknown };
+
+describe('offline graph hierarchy', () => {
+  const graphs = async () => (await run(GET_GRAPHS, {})).data.graphs as Shaped[];
+  const byName = (list: Shaped[], name: string) => list.find(g => g.name === name);
+  const create = async (input: Record<string, unknown>) => (await run(CREATE_GRAPH, { input })).data.createGraphs.graphs[0];
+  const move = (id: string, parentGraphId: string | null) => run(UPDATE_GRAPH, { id, input: { parentGraphId } });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    fixture.guest = true;
+    fixture.account = emptyAccount();
+    for (const s of [snapshot('project', ['a']), snapshot('other', [])]) {
+      fixture.account.projects[s.project.id] = { base: null, local: s, checkedAt: 0 };
+    }
+  });
+
+  it('reads rows saved before the hierarchy existed as top-level projects', async () => {
+    fixture.guest = false;
+    expect((await graphs()).map(g => [g.name, g.type, g.parentGraphId, g.depth, g.path])).toEqual([
+      ['project', 'PROJECT', null, 0, []],
+      ['other', 'PROJECT', null, 0, []],
+    ]);
+  });
+
+  it('round-trips a guest graph created inside a project', async () => {
+    const child = await create({ name: 'Inside', type: 'SUBGRAPH', parentGraphId: 'project', depth: 1, path: ['project'] });
+    expect(child).toMatchObject({ type: 'SUBGRAPH', parentGraphId: 'project', depth: 1, path: ['project'] });
+    const grandchild = await create({ name: 'Deeper', type: 'SUBGRAPH', parentGraphId: child.id });
+    expect(grandchild).toMatchObject({ parentGraphId: child.id, depth: 2, path: ['project', child.id] });
+    const listed = await graphs();
+    expect(byName(listed, 'Inside')).toMatchObject({ id: child.id, type: 'SUBGRAPH', parentGraphId: 'project', depth: 1, path: ['project'] });
+    expect(byName(listed, 'Deeper')).toMatchObject({ parentGraphId: child.id, depth: 2, path: ['project', child.id] });
+    expect(fixture.account!.projects[child.id].local!.project).toMatchObject({ type: 'SUBGRAPH', parent_id: 'project' });
+    expect((await run(gql`query($p: String) { graphs(where: { parentGraphId: $p }) { name } }`, { p: 'project' })).data.graphs).toEqual([{ name: 'Inside' }]);
+  });
+
+  it('rejects a parent that does not exist or a type that is not a graph type', async () => {
+    await expect(create({ name: 'Lost', type: 'SUBGRAPH', parentGraphId: 'missing' })).rejects.toThrow('The parent project does not exist.');
+    await expect(create({ name: 'Odd', type: 'FOLDER' })).rejects.toThrow(/Choose a project/);
+    expect(Object.keys(fixture.account!.projects)).toEqual(['project', 'other']);
+  });
+
+  it('keeps a guest graph\'s description and tags, and updates them', async () => {
+    const made = await create({ name: 'Notes', type: 'PROJECT', description: 'Plans for the move', tags: ['home', 'move'] });
+    expect(made).toMatchObject({ description: 'Plans for the move', tags: ['home', 'move'] });
+    expect(byName(await graphs(), 'Notes')).toMatchObject({ description: 'Plans for the move', tags: ['home', 'move'] });
+    await run(UPDATE_GRAPH, { id: made.id, input: { description: 'Moved in', tags: ['done'] } });
+    expect(byName(await graphs(), 'Notes')).toMatchObject({ description: 'Moved in', tags: ['done'] });
+    await run(UPDATE_GRAPH, { id: made.id, input: { name: 'Renamed' } });
+    expect(byName(await graphs(), 'Renamed'), 'a rename keeps them').toMatchObject({ description: 'Moved in', tags: ['done'] });
+    await expect(create({ name: 'Too many', tags: Array.from({ length: 51 }, (_, i) => `t${i}`) })).rejects.toThrow(/up to 50 tags/);
+    await expect(create({ name: 'Too long', description: 'x'.repeat(4001) })).rejects.toThrow(/4000 characters/);
+  });
+
+  it('keeps no description or tags for a signed-in account, whose sync carries only the name', async () => {
+    fixture.guest = false;
+    const made = await create({ name: 'Synced', description: 'Lost on sync', tags: ['x'] });
+    expect(made).toMatchObject({ description: '', tags: [] });
+    expect(fixture.account!.projects[made.id].local!.project).not.toHaveProperty('description');
+  });
+
+  it('keeps a signed-in account flat, because its sync has no parent column yet', async () => {
+    fixture.guest = false;
+    const created = await create({ name: 'Flat', type: 'SUBGRAPH', parentGraphId: 'project' });
+    expect(created).toMatchObject({ type: 'PROJECT', parentGraphId: null, depth: 0, path: [] });
+    expect(fixture.account!.projects[created.id].local!.project).not.toHaveProperty('parent_id');
+    await move('other', 'project');
+    expect(byName(await graphs(), 'other')).toMatchObject({ parentGraphId: null, depth: 0 });
+  });
+
+  it('moves a graph to another parent or the top level, and refuses cycles', async () => {
+    const child = await create({ name: 'Inside', type: 'SUBGRAPH', parentGraphId: 'project' });
+    await move('other', child.id);
+    expect(byName(await graphs(), 'other')).toMatchObject({ parentGraphId: child.id, depth: 2, path: ['project', child.id] });
+    await expect(move('project', 'other')).rejects.toThrow('A graph cannot be moved inside itself.');
+    await expect(move('project', 'project')).rejects.toThrow('A graph cannot be moved inside itself.');
+    await expect(move('other', 'missing')).rejects.toThrow('The parent project does not exist.');
+    await move('other', null);
+    expect(byName(await graphs(), 'other')).toMatchObject({ parentGraphId: null, depth: 0, path: [] });
+    expect(byName(await graphs(), 'project')).toMatchObject({ parentGraphId: null, depth: 0 });
+  });
+
+  it('refuses to delete a project that still has graphs, so none is left without its parent', async () => {
+    const child = await create({ name: 'Inside', type: 'SUBGRAPH', parentGraphId: 'other' });
+    await expect(run(DELETE_GRAPH, { id: 'other' })).rejects.toThrow('other holds 1 graph. Delete them first.');
+    expect(fixture.account!.projects.other.local).not.toBeNull();
+    await run(DELETE_GRAPH, { id: child.id });
+    await run(DELETE_GRAPH, { id: 'other' });
+    expect((await graphs()).map(g => g.name)).toEqual(['project']);
+  });
+
+  it('a child whose parent row is gone still shows, at the top level', async () => {
+    const child = await create({ name: 'Inside', type: 'SUBGRAPH', parentGraphId: 'other' });
+    fixture.account!.projects.other.local = null;
+    expect(byName(await graphs(), 'Inside')).toMatchObject({ id: child.id, parentGraphId: null, depth: 0, path: [] });
+  });
+
+  it('builds the whole starter workspace for a guest, and Welcome is the graph that opens', async () => {
+    fixture.account = emptyAccount();
+    const api: StarterApi = {
+      createGraphs: async inputs => (await run(CREATE_STARTER_GRAPHS, { input: inputs.map(input => ({ ...input, status: 'ACTIVE', createdBy: 'owner' })) })).data.createGraphs.graphs,
+      createItems: async (graphId, items) => (await run(CREATE_WORK_ITEM, {
+        input: items.map(item => ({ title: item.title, description: item.description, type: item.type, status: item.status, priority: item.priority, positionX: item.x, positionY: item.y, tags: item.tags, graph: { connect: { where: { node: { id: graphId } } } } })),
+      })).data.createWorkItems.workItems.map((w: Shaped) => w.id),
+      createEdges: async edges => { await run(CREATE_EDGE, { input: edges.map(e => ({ type: e.type, source: { connect: { where: { node: { id: e.sourceId } } } }, target: { connect: { where: { node: { id: e.targetId } } } } })) }); },
+      setCounts: async (id, counts) => { await run(UPDATE_GRAPH, { id, input: { ...counts, lastActivity: new Date().toISOString() } }); },
+    };
+    const plan = buildStarterWorkspace({ hierarchy: true });
+    const created = await createStarterWorkspace(plan, api);
+    const listed = await graphs();
+    expect(listed).toHaveLength(7);
+    const project = (key: string) => created.ids[key];
+    for (const p of plan.projects) expect(listed.find(g => g.id === project(p.key))).toMatchObject({ name: p.name, type: 'PROJECT', parentGraphId: null, depth: 0, nodeCount: 0 });
+    for (const g of plan.graphs) {
+      expect(listed.find(x => x.id === created.ids[g.key])).toMatchObject({
+        name: g.name, type: 'SUBGRAPH', parentGraphId: project(g.project!), depth: 1, path: [project(g.project!)], nodeCount: g.items.length, edgeCount: g.edges.length,
+      });
+    }
+    const welcome = created.ids.welcome;
+    const items = (await run(GET_WORK_ITEMS, { where: { graph: { id: welcome } } })).data.workItems;
+    expect(items.map((w: Shaped) => [w.title, w.positionX, w.positionY])).toEqual([
+      ['Welcome to GraphDone', 0, -100], ['Create your first work item', -150, 50], ['Connect work items together', 150, 50], ['Explore different views', 0, 200],
+    ]);
+    expect((await run(GET_EDGES, { where: { source: { graph: { id: welcome } } } })).data.edges).toHaveLength(3);
   });
 });

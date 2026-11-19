@@ -47,6 +47,13 @@ async function zoomToFirstCard(page: Page) {
   await settle(page, 1200);
 }
 
+/** The graph list from whichever graph selector this layout shows (the phone's sits in its top bar). */
+async function openGraphList(page: Page) {
+  await openView(page, 'cards');
+  await page.locator('[data-testid="graph-selector"]:visible, [data-testid="graph-selector-mobile"]:visible').first().click();
+  await expect(page.getByTestId('graph-selector-dropdown')).toBeVisible();
+}
+
 /** Activate a graph card header control with the keyboard (they are buttons). */
 async function useCardControl(page: Page, selector: string, graphId?: string) {
   await openView(page, 'graph', graphId);
@@ -186,6 +193,40 @@ export const UI_FIT_SCREENS: UiFitScreen[] = [
     async open(page) {
       await useCardControl(page, '.node-expand-icon');
       await expect(page.locator('[id^="node-expand-panel-"]').first()).toBeVisible();
+      await settle(page, 800);
+    },
+  },
+  {
+    id: 'graph-list',
+    async open(page) {
+      await openGraphList(page);
+      await settle(page, 800);
+    },
+  },
+  {
+    id: 'graph-create',
+    async open(page) {
+      await openGraphList(page);
+      await page.getByTestId('graph-selector-dropdown').getByRole('button', { name: 'Create New Graph', exact: true }).click();
+      await expect(page.getByRole('dialog', { name: 'Create new graph' })).toBeVisible();
+      await settle(page, 800);
+    },
+  },
+  {
+    id: 'graph-edit',
+    async open(page) {
+      await openGraphList(page);
+      await page.getByTestId('graph-selector-dropdown').locator('button[aria-label^="Edit "]:not([aria-disabled])').first().click();
+      await expect(page.getByRole('dialog', { name: 'Edit graph' })).toBeVisible();
+      await settle(page, 800);
+    },
+  },
+  {
+    id: 'graph-delete',
+    async open(page) {
+      await openGraphList(page);
+      await page.getByTestId('graph-selector-dropdown').locator('button[aria-label^="Delete "]:not([aria-disabled])').first().click();
+      await expect(page.getByRole('dialog', { name: 'Delete graph' })).toBeVisible();
       await settle(page, 800);
     },
   },
