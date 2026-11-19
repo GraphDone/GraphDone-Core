@@ -224,6 +224,18 @@ export interface CloneGraphArgs {
 export class GraphService {
   constructor(private driver: Driver) {}
 
+  private async refreshGraphCounts(session: Session, graphIds: string[]): Promise<void> {
+    if (!graphIds.length) return;
+    await session.run(`
+      MATCH (g:Graph) WHERE g.id IN $graphIds
+      OPTIONAL MATCH (g)<-[:BELONGS_TO]-(w:WorkItem)
+      WITH g, count(DISTINCT w) AS nodeCount
+      OPTIONAL MATCH (g)<-[:BELONGS_TO]-(source:WorkItem)<-[:EDGE_SOURCE]-(e:Edge)-[:EDGE_TARGET]->(target:WorkItem)-[:BELONGS_TO]->(g)
+      WITH g, nodeCount, count(DISTINCT e) AS edgeCount
+      SET g.nodeCount = nodeCount, g.edgeCount = edgeCount, g.updatedAt = datetime()
+    `, { graphIds });
+  }
+
   private async withSession<T>(work: (session: Session) => Promise<T>): Promise<T> {
     // Check system stress before expensive operations
     const stressCheck = isSystemUnderStress();
@@ -534,6 +546,7 @@ export class GraphService {
           isError: true
         };
       }
+      if (graphId) await this.refreshGraphCounts(session, [graphId]);
       const rawNode = result.records[0].get('n').properties;
       
       // Parse metadata back from JSON string for data integrity
@@ -854,7 +867,8 @@ export class GraphService {
       const checkQuery = `
         MATCH (n:WorkItem {id: $node_id})
         OPTIONAL MATCH (n)-[r]-()
-        RETURN n, COUNT(r) as relationshipCount
+        OPTIONAL MATCH (n)-[:BELONGS_TO]->(g:Graph)
+        RETURN n, COUNT(DISTINCT r) as relationshipCount, collect(DISTINCT g.id) AS graphIds
       `;
 
       const checkResult = await session.run(checkQuery, { node_id });
@@ -870,15 +884,20 @@ export class GraphService {
       }
 
       const relationshipCount = checkResult.records[0]?.get('relationshipCount')?.toNumber?.() || 0;
+      const graphIds = checkResult.records[0]?.get('graphIds') as string[];
 
       // Delete the node and all its relationships
       const deleteQuery = `
         MATCH (n:WorkItem {id: $node_id})
+        OPTIONAL MATCH (n)<-[:EDGE_SOURCE|EDGE_TARGET]-(e:Edge)
+        WITH n, collect(DISTINCT e) AS edges
+        FOREACH (edge IN edges | DETACH DELETE edge)
         DETACH DELETE n
         RETURN $node_id as deletedId
       `;
 
       await session.run(deleteQuery, { node_id });
+      await this.refreshGraphCounts(session, graphIds);
 
       return {
         content: [{
@@ -944,6 +963,11 @@ export class GraphService {
       };
 
       const result = await session.run(createQuery, params);
+      const graphResult = await session.run(`
+        MATCH (source:WorkItem {id: $source_id})-[:BELONGS_TO]->(g:Graph)<-[:BELONGS_TO]-(target:WorkItem {id: $target_id})
+        RETURN collect(DISTINCT g.id) AS graphIds
+      `, { source_id, target_id });
+      await this.refreshGraphCounts(session, graphResult.records[0]?.get('graphIds') || []);
       const relationship = result.records[0].get('r').properties;
       const source = result.records[0].get('source').properties;
       const target = result.records[0].get('target').properties;
@@ -987,6 +1011,12 @@ export class GraphService {
           isError: true
         };
       }
+
+      const graphResult = await session.run(`
+        MATCH (source:WorkItem {id: $source_id})-[:BELONGS_TO]->(g:Graph)<-[:BELONGS_TO]-(target:WorkItem {id: $target_id})
+        RETURN collect(DISTINCT g.id) AS graphIds
+      `, { source_id, target_id });
+      await this.refreshGraphCounts(session, graphResult.records[0]?.get('graphIds') || []);
 
       const source = result.records[0].get('source').properties;
       const target = result.records[0].get('target').properties;
