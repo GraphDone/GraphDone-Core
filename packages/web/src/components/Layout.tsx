@@ -7,6 +7,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { Brain, Bot, BarChart3, Settings, Server, Globe, Shield, Users, Terminal, Plus } from 'lucide-react';
 import { UserSelector } from './UserSelector';
 import { GraphSelector } from './GraphSelector';
+import { requestGraph } from '../lib/graphRequests';
 import { useAuth } from '../contexts/AuthContext';
 import { canAccessAdmin, canAccessBackend } from '../lib/roleAccess';
 import { McpHealthIndicator } from './McpHealthIndicator';
@@ -62,7 +63,12 @@ export function Layout({ children }: LayoutProps) {
         <div data-workspace-header className="mobile-project-header md:hidden relative z-30 pt-safe">
           <div className="flex items-center bg-gray-800/90 backdrop-blur-sm px-3 py-2 border-b border-gray-700/50">
             <div className="flex-1 min-w-0">
-              <GraphSelector testId="graph-selector-mobile" />
+              <GraphSelector
+                testId="graph-selector-mobile"
+                onCreateGraph={() => requestGraph('create')}
+                onEditGraph={graph => requestGraph('edit', graph)}
+                onDeleteGraph={graph => requestGraph('delete', graph)}
+              />
             </div>
             <button aria-label="New work item" onClick={()=>window.dispatchEvent(new Event('graphdone-create-task'))} className="min-h-[44px] min-w-[44px] ml-2 flex items-center justify-center rounded-lg bg-violet-700 text-white"><Plus className="h-6 w-6" aria-hidden="true" /></button>
           </div>
