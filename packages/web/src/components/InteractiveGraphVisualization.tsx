@@ -75,6 +75,7 @@ import { edgeBorderEndpoints, minEdgeLength, clampToMinNeighbors } from '../lib/
 import { directionStrategy, arrowVisibility, perpendicularOffset } from '../lib/edgeLOD';
 import { assignParallelEdgeIndices } from '../lib/parallelEdges';
 import { isTap, touchHitSize, isCoarsePointer } from '../lib/touchInteraction';
+import { beginNodeDetails, releaseNodeDetails as releaseNodeDetailsState, shouldCreateNodeDetails } from '../lib/lazyNodeDetails';
 import { usePositionSaveQueue } from '../hooks/usePositionSaveQueue';
 import { spawnCelebration } from '../lib/celebration';
 import { buildNeighborhood } from '../lib/graphAdjacency';
@@ -506,6 +507,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   });
   
   const [nodeMenu, setNodeMenu] = useState<NodeMenuState>({ node: null, position: { x: 0, y: 0 }, visible: false });
+  const nodeMenuNodeIdRef = useRef<string | null>(null);
+  nodeMenuNodeIdRef.current = nodeMenu.visible ? nodeMenu.node?.id ?? null : null;
   const [edgeMenu, setEdgeMenu] = useState<EdgeMenuState>({ edge: null, position: { x: 0, y: 0 }, visible: false });
   const [menuDragState, setMenuDragState] = useState<DragState>({ isDragging: false, offset: { x: 0, y: 0 } });
 
@@ -543,6 +546,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const [showUpdateGraphModal, setShowUpdateGraphModal] = useState(false);
   const [showDeleteGraphModal, setShowDeleteGraphModal] = useState(false);
   const [selectedNode, setSelectedNode] = useState<WorkItem | null>(null);
+  const selectedNodeIdRef = useRef<string | null>(null);
+  selectedNodeIdRef.current = selectedNode?.id ?? null;
   // Lift selection to the host (Workspace) for the docked inspector. One effect
   // captures every path that changes selectedNode (node click, edit icon,
   // background-click deselect) without instrumenting each call site.
@@ -622,6 +627,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const [contextMenuPlacement, setContextMenuPlacement] = useState<{ left: number; top: number; maxHeight: number } | null>(null);
   const [isFlippingEdge, setIsFlippingEdge] = useState(false);
   const [selectedNodes, setSelectedNodes] = useState<Set<string>>(new Set());
+  const selectedNodesRef = useRef<Set<string>>(new Set());
+  selectedNodesRef.current = selectedNodes;
   // Inline rename: an input floats over the node — no modal (W2)
   const [inlineEdit, setInlineEdit] = useState<{ nodeId: string; value: string; original: string; graphX: number; graphY: number } | null>(null);
   // PR #87: quick in-context node editor (double-click a node) — edits every
@@ -629,6 +636,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const [quickEditNode, setQuickEditNode] = useState<any | null>(null);
   const [quickEditWrites] = useState(createSerialQueue);
   const quickEditNodeId = quickEditNode?.id ?? null;
+  const quickEditNodeIdRef = useRef<string | null>(null);
+  quickEditNodeIdRef.current = quickEditNodeId;
   const quickEditReturnFocusIdRef = useRef<string | null>(null);
   const closeQuickEdit = useCallback(() => {
     const returnFocusId = quickEditReturnFocusIdRef.current;
@@ -1935,8 +1944,11 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       if (!updatedNode) return;
 
       const dimensions = getNodeDimensions(updatedNode);
-      renderItemTitle(this as SVGGElement, updatedNode, dimensions);
-      renderItemMetadata(this as SVGGElement, updatedNode, dimensions);
+      const detailsCreated = (this as SVGGElement).hasAttribute('data-node-details');
+      if (detailsCreated) {
+        renderItemTitle(this as SVGGElement, updatedNode, dimensions);
+        renderItemMetadata(this as SVGGElement, updatedNode, dimensions);
+      }
       const completed = isCompletedStatus(updatedNode.status);
       nodeGroup.select('.node-bg').attr('class', `node-bg ${nodeLifeClasses(updatedNode.status)}`)
         .attr('fill', completed ? '#374151' : '#1f2937');
@@ -1948,7 +1960,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           return config.label.toUpperCase();
         });
 
-      nodeGroup.select('.node-description-text').text(dimensions.description);
+      if (detailsCreated) nodeGroup.select('.node-description-text').text(dimensions.description);
     });
 
     // Physics is one-shot: it settles a graph, then stays idle. A routine
@@ -2479,6 +2491,12 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .enter()
       .append('g')
       .attr('class', (d: WorkItem) => `node node-type-${d.type.toLowerCase()}`)
+      // The semantic identity is eager even when visual text descendants are
+      // deferred. Screen-reader navigation therefore never depends on whether
+      // this card has entered the painted viewport yet.
+      .attr('role', 'button')
+      .attr('aria-label', (d: WorkItem) => `${d.title}, ${getTypeConfig(d.type as WorkItemType).label}`)
+      .attr('tabindex', 0)
       // Place replacement nodes before their first paint, not on a later tick.
       .attr('transform', (d: any) => `translate(${d.x ?? d.positionX ?? 0},${d.y ?? d.positionY ?? 0})`)
       .style('cursor', 'pointer')
@@ -2809,8 +2827,46 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       })
       .style('pointer-events', 'none');
 
+    const openQuickEdit = (event: MouseEvent | KeyboardEvent, d: WorkItem) => {
+      event.stopPropagation();
+      event.preventDefault();
+
+      setInlineEdit(null);
+      setExpandedNode(null);
+      quickEditReturnFocusIdRef.current = d.id;
+      setQuickEditNode(d);
+    };
+
+    // Until a large off-screen card hydrates its header controls, the labelled
+    // card group remains the keyboard target. Enter/Space keeps quick edit
+    // reachable and Menu/Shift+F10 preserves the full action-menu path.
+    nodeElements.on('keydown.lazy-card', function(event: KeyboardEvent, d: WorkItem) {
+      if (event.target !== this) return;
+      if (event.key === 'Enter' || event.key === ' ') {
+        openQuickEdit(event, d);
+        return;
+      }
+      if (event.key !== 'ContextMenu' && !(event.shiftKey && event.key === 'F10')) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const containerRect = containerRef.current?.getBoundingClientRect();
+      const cardRect = this.getBoundingClientRect();
+      if (!containerRect) return;
+      setNodeMenu({
+        node: d,
+        position: {
+          x: Math.max(10, Math.min(cardRect.left + cardRect.width / 2 - containerRect.left, window.innerWidth - 330)),
+          y: Math.max(10, Math.min(cardRect.top + cardRect.height / 2 - containerRect.top, window.innerHeight - 510)),
+        },
+        visible: true,
+      });
+    });
+
+    // Keep the full control construction in one behavior-preserving factory so
+    // large graphs can later invoke it only for hydrated card selections.
+    const appendNodeControls = (controlNodes: typeof nodeElements) => {
     // Edit icon in title bar (centered vertically, left side) - scales with zoom
-    const editIcons = nodeElements.append('g')
+    const editIcons = controlNodes.append('g')
       .attr('class', 'node-edit-icon')
       .attr('role', 'button')
       .attr('tabindex', 0)
@@ -2879,16 +2935,6 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           .attr('transform', nodeControlGlyphTransform(iconSize));
       });
     
-    const openQuickEdit = (event: MouseEvent | KeyboardEvent, d: WorkItem) => {
-      event.stopPropagation();
-      event.preventDefault();
-
-      setInlineEdit(null);
-      setExpandedNode(null);
-      quickEditReturnFocusIdRef.current = d.id;
-      setQuickEditNode(d);
-    };
-
     // The visible gear is a real keyboard action as well as a pointer target.
     // Keeping focus on the trigger lets the dialog accessibility hook restore it
     // when quick edit closes, so keyboard users do not fall back to <body>.
@@ -2911,7 +2957,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       });
 
     // Relationship creation icon in title bar (centered vertically, right side) - mirrors edit icon
-    const relationshipIcons = nodeElements.append('g')
+    const relationshipIcons = controlNodes.append('g')
       .attr('class', 'node-relationship-icon')
       .attr('role', 'button')
       .attr('tabindex', 0)
@@ -3016,7 +3062,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // Expand-in-place icon (title bar, inboard of the + icon): opens a readable
     // peek panel anchored to the node (Card/Contents/Diagram at full size) so you
     // can read a node's contents/diagram WITHOUT zooming in (PR-3).
-    const expandIcons = nodeElements.append('g')
+    const expandIcons = controlNodes.append('g')
       .attr('class', 'node-expand-icon')
       .attr('role', 'button')
       .attr('tabindex', 0)
@@ -3083,7 +3129,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
     // Sheet-symbol affordances: a "descend" glyph (bottom-right) + a child
     // count line, only for nodes that drill into a sub-graph.
-    const sheetNodes = nodeElements.filter((d: WorkItem) => !!d.subgraphId);
+    const sheetNodes = controlNodes.filter((d: WorkItem) => !!d.subgraphId);
 
     const descendIcon = sheetNodes.append('g')
       .attr('class', 'node-descend-icon')
@@ -3136,7 +3182,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // look. The rect lives in the group's counter-zoomed local space, so it tracks.
     if (isCoarsePointer()) {
       const hit = touchHitSize(iconSize, true);
-      nodeElements.selectAll('.node-edit-icon, .node-relationship-icon, .node-expand-icon, .node-descend-icon')
+      controlNodes.selectAll('.node-edit-icon, .node-relationship-icon, .node-expand-icon, .node-descend-icon')
         .insert('rect', ':first-child')
         .attr('class', 'touch-hit-area')
         .attr('x', -hit / 2)
@@ -3163,29 +3209,64 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         const e = d.subgraph?.edgeCount ?? 0;
         return `▸ ${n} nodes · ${e} edges`;
       });
-
-    nodeElements.each(function(d: WorkItem) { renderItemTitle(this, d, getNodeDimensions(d)); });
-
-    // Description section - bigger and more readable
-    nodeElements.append('text')
-      .attr('class', 'node-description-text')
-      .attr('x', 0)
-      .attr('y', (d: WorkItem) => getNodeDimensions(d).descriptionY)
-      .attr('text-anchor', 'middle')
-      .attr('dominant-baseline', 'middle')
-      .text((d: WorkItem) => getNodeDimensions(d).description)
-      .style('opacity', (currentTransform?.k || 1) >= LOD_THRESHOLDS.CLOSE ? 1 : 0)
-      .style('font-size', '14px')
-      .style('font-family', GRAPH_FONT_FAMILY)
-      .style('font-weight', '500')
-      .style('fill', (d: WorkItem) => {
-        const isCompleted = d.status === 'COMPLETED' || d.status === 'Completed' || d.status === 'Done' || d.status === 'DONE';
-        return isCompleted ? '#6b7280' : '#d1d5db';
-      })
-      .style('pointer-events', 'none');
-
+    };
+    // Large graphs keep every card group, hit target and simulation ID, but
+    // defer the heavy control/text descendants until the card is near viewport.
+    // This hook is idempotent so culling, data refreshes and presentation changes
+    // can safely materialize a card that was initially off screen.
+    let nodePresentationScales = new WeakMap<WorkItem, number>();
+    const MAX_HYDRATED_NODE_DETAILS = 500;
+    let hydratedNodeDetails = 0;
+    const shouldRetainNodeDetails = (element: SVGGElement, d: WorkItem) => {
+      const active = document.activeElement;
+      return (active instanceof Node && element.contains(active)) ||
+        selectedNodeIdRef.current === d.id || selectedNodesRef.current.has(d.id) ||
+        quickEditNodeIdRef.current === d.id || quickEditReturnFocusIdRef.current === d.id ||
+        expandedNodeIdRef.current === d.id || nodeMenuNodeIdRef.current === d.id ||
+        mousedownNodeRef.current?.id === d.id;
+    };
+    const ensureNodeDetails = (element: SVGGElement, d: WorkItem, force = false) => {
+      if (!element.hasAttribute('data-node-details') && nodes.length > 200 &&
+          hydratedNodeDetails >= MAX_HYDRATED_NODE_DETAILS && !force) return false;
+      if (!beginNodeDetails(element)) return true;
+      hydratedNodeDetails++;
+      const node = d3.select(element);
+      appendNodeControls(node as unknown as typeof nodeElements);
+      node.attr('role', 'group').attr('tabindex', null);
+      const layout = getNodeDimensions(d);
+      renderItemTitle(element, d, layout);
+      node.append('text')
+        .attr('class', 'node-description-text')
+        .attr('x', 0)
+        .attr('y', layout.descriptionY)
+        .attr('text-anchor', 'middle')
+        .attr('dominant-baseline', 'middle')
+        .text(layout.description)
+        .style('opacity', (currentTransform?.k || 1) >= LOD_THRESHOLDS.CLOSE ? 1 : 0)
+        .style('font-size', '14px')
+        .style('font-family', GRAPH_FONT_FAMILY)
+        .style('font-weight', '500')
+        .style('fill', isCompletedStatus(d.status) ? '#6b7280' : '#d1d5db')
+        .style('pointer-events', 'none');
+      renderItemMetadata(element, d, layout);
+      return true;
+    };
+    const releaseNodeDetails = (element: SVGGElement, d: WorkItem) => {
+      releaseNodeDetailsState(element, shouldRetainNodeDetails(element, d), () => {
+        hydratedNodeDetails = Math.max(0, hydratedNodeDetails - 1);
+        // A later materialization must reapply geometry even when the semantic
+        // presentation scale itself did not change while this card was absent.
+        nodePresentationScales.delete(d);
+        d3.select(element)
+          .attr('role', 'button')
+          .attr('tabindex', 0)
+          .selectAll('.node-edit-icon, .node-relationship-icon, .node-expand-icon, .node-descend-icon, .node-title-group, .node-description-text, .node-meta, .node-subgraph-count')
+          .remove();
+      });
+    };
+    const initialCamera = d3.zoomTransform(svg.node()!);
     nodeElements.each(function(d: WorkItem) {
-      renderItemMetadata(this, d, getNodeDimensions(d));
+      if (nodes.length <= 200 || (initialCamera.k >= 0.3 && shouldCreateNodeDetails(d as any, initialCamera, { width, height }))) ensureNodeDetails(this, d);
     });
 
     // Create arrow symbols for middle of edges
@@ -3637,9 +3718,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       element.select('.long-press-feedback').remove();
     }, { capture: true });
 
-    let nodePresentationScales = new WeakMap<WorkItem, number>();
     const compactFocusOrigins = new WeakMap<SVGGElement, string>();
     const updateNodePresentationFor = (element: SVGGElement, d: WorkItem) => {
+      if (!ensureNodeDetails(element, d, shouldRetainNodeDetails(element, d))) return;
       const presentedScale = itemPresentationScaleRef.current;
       if (nodePresentationScales.get(d) === presentedScale) return;
       nodePresentationScales.set(d, presentedScale);
@@ -3687,8 +3768,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     };
     const updateNodePresentation = () => {
       g.attr('data-presentation-scale', itemPresentationScaleRef.current);
+      const camera = d3.zoomTransform(svg.node()!);
       nodeElements.each(function(d: WorkItem) {
-        if (!cullActive || !(d as any)._culled) updateNodePresentationFor(this, d);
+        const nearViewport = nodes.length <= 200 || (camera.k >= 0.3 && shouldCreateNodeDetails(d as any, camera, { width, height }));
+        if ((!cullActive && nearViewport) || (cullActive && !(d as any)._culled)) updateNodePresentationFor(this, d);
       });
     };
 
@@ -3927,11 +4010,31 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       applyEdgeDisplays();
     };
     const applyViewportCull = () => {
-      if (itemPresentation.isOverview()) return;
+      if (itemPresentation.isOverview()) {
+        if (nodes.length > 200) nodeElements.each(function(d: WorkItem) {
+          releaseNodeDetails(this, d);
+          if (!this.hasAttribute('data-node-details')) d3.select(this).attr('tabindex', -1);
+        });
+        return;
+      }
       const svgEl = svg.node();
       if (!svgEl) return;
       const t = d3.zoomTransform(svgEl);
       if (t.k < CULL_MIN_SCALE) {
+        let focusableSkeletons = 0;
+        nodeElements.each(function(d: WorkItem) {
+          const near = t.k >= 0.3 && shouldCreateNodeDetails(d as any, t, { width, height });
+          if (!near && nodes.length > 200) releaseNodeDetails(this, d);
+        });
+        nodeElements.each(function(d: WorkItem) {
+          const near = t.k >= 0.3 && shouldCreateNodeDetails(d as any, t, { width, height });
+          if (near) updateNodePresentationFor(this, d);
+          if (!this.hasAttribute('data-node-details')) {
+            const painted = shouldCreateNodeDetails(d as any, t, { width, height }, 0);
+            const keyboardReachable = painted && focusableSkeletons++ < 200;
+            d3.select(this).attr('tabindex', keyboardReachable ? 0 : -1);
+          }
+        });
         if (cullActive) clearCull();
         return;
       }
@@ -3940,12 +4043,25 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       const maxGX = (width + CULL_MARGIN_PX - t.x) / t.k;
       const minGY = (-CULL_MARGIN_PX - t.y) / t.k;
       const maxGY = (height + CULL_MARGIN_PX - t.y) / t.k;
+      let focusableSkeletons = 0;
+      nodeElements.each(function(d: any) {
+        const x = d.x ?? 0;
+        const y = d.y ?? 0;
+        const inViewport = x >= minGX && x <= maxGX && y >= minGY && y <= maxGY;
+        if (!inViewport && !shouldRetainNodeDetails(this, d)) releaseNodeDetails(this, d);
+      });
       nodeElements.style('display', function(d: any) {
         const x = d.x ?? 0;
         const y = d.y ?? 0;
-        const visible = x >= minGX && x <= maxGX && y >= minGY && y <= maxGY;
+        const inViewport = x >= minGX && x <= maxGX && y >= minGY && y <= maxGY;
+        const retained = shouldRetainNodeDetails(this, d);
+        const visible = inViewport || retained;
         d._culled = !visible;
         if (visible) updateNodePresentationFor(this, d);
+        if (!this.hasAttribute('data-node-details')) {
+          const keyboardReachable = inViewport && focusableSkeletons++ < 200;
+          d3.select(this).attr('tabindex', keyboardReachable ? 0 : -1);
+        }
         return visible ? null : 'none';
       });
       applyEdgeDisplays();
