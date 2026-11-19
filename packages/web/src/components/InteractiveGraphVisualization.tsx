@@ -624,7 +624,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const [isFlippingEdge, setIsFlippingEdge] = useState(false);
   const [selectedNodes, setSelectedNodes] = useState<Set<string>>(new Set());
   // Inline rename: an input floats over the node — no modal (W2)
-  const [inlineEdit, setInlineEdit] = useState<{ nodeId: string; value: string; original: string; graphX: number; graphY: number } | null>(null);
+  const [inlineEdit, setInlineEdit] = useState<{ nodeId: string; value: string; original: string; graphX: number; graphY: number; scope: string | null } | null>(null);
   // PR #87: quick in-context node editor (double-click a node) — edits every
   // field without the heavy details modal. Holds the work item being edited.
   const [quickEditNode, setQuickEditNode] = useState<any | null>(null);
@@ -1796,8 +1796,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
         // The name is the next thing a person wants to set — put them
         // straight into an inline rename, no modal (interaction-model W2/W3)
-        if (newNode?.id) {
-          setInlineEdit({ nodeId: newNode.id, value: newNode.title || nodeTitle, original: newNode.title || nodeTitle, graphX: x, graphY: y });
+        if (newNode?.id && activeLayoutScopeRef.current === layoutScope && canEditCurrentGraphRef.current) {
+          setInlineEdit({ nodeId: newNode.id, value: newNode.title || nodeTitle, original: newNode.title || nodeTitle, graphX: x, graphY: y, scope: layoutScope });
         }
         return newNode;
       }
@@ -5859,29 +5859,39 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       )}
 
       {/* Inline rename: the input floats over the node — no modal (W2) */}
-      {inlineEdit && (() => {
+      {inlineEdit && inlineEdit.scope === layoutScope && canEditCurrentGraph && (() => {
         const simNode = (simulationRef.current?.nodes() as any[])?.find((n: any) => n.id === inlineEdit.nodeId);
         const gx = simNode?.x ?? inlineEdit.graphX;
         const gy = simNode?.y ?? inlineEdit.graphY;
         const left = gx * currentTransform.scale + currentTransform.x;
         const top = gy * currentTransform.scale + currentTransform.y;
-        const commit = () => {
+        const saveTitle = async (title: string) => {
+          if (!currentUser || !currentGraph || activeLayoutScopeRef.current !== inlineEdit.scope || !canEditCurrentGraphRef.current) {
+            throw new Error('This work item can no longer be edited.');
+          }
+          const result = await updateWorkItemMutation({
+            context: { expectedOwnerId: currentUser.id },
+            variables: { where: { id: inlineEdit.nodeId, graph: { id: currentGraph.id } }, update: { title } },
+            awaitRefetchQueries: false,
+          });
+          const saved = result.data?.updateWorkItems?.workItems?.some((item: { id: string; title: string }) =>
+            item.id === inlineEdit.nodeId && item.title === title
+          );
+          if (result.errors?.length || !saved) throw new Error('The work item title was not saved.');
+        };
+        const commit = async () => {
           const title = inlineEdit.value.trim();
           const previous = inlineEdit.original;
           setInlineEdit(null);
-          if (title && title !== previous) {
-            updateWorkItemMutation({
-              variables: { where: { id: inlineEdit.nodeId }, update: { title } }
-            }).then(() => {
-              undoStack.push({
-                label: 'Rename item',
-                undo: async () => {
-                  await updateWorkItemMutation({
-                    variables: { where: { id: inlineEdit.nodeId }, update: { title: previous } }
-                  });
-                }
-              });
-            }).catch(() => showError('Could not rename item'));
+          if (!title || title === previous) return;
+          const generation = undoStack.generation;
+          try {
+            await saveTitle(title);
+            if (undoStack.generation === generation && activeLayoutScopeRef.current === inlineEdit.scope && canEditCurrentGraphRef.current) {
+              undoStack.push({ label: 'Rename item', undo: () => saveTitle(previous) });
+            }
+          } catch {
+            if (activeLayoutScopeRef.current === inlineEdit.scope) showError('Could not rename item');
           }
         };
         return (
