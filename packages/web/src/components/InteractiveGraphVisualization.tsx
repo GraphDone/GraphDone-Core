@@ -1805,6 +1805,18 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     return layout;
   }, [getNodeDimensions]);
 
+  // Publish only after the live simulation has received the current dataset.
+  // This is also used by the frozen-data update path, where no later tick is
+  // guaranteed to refresh Mini-Map dots.
+  const publishMiniMapPositions = useCallback(() => {
+    const sim = simulationRef.current;
+    const upd = (window as { updateMiniMapPositions?: (p: Record<string, { x: number; y: number }>) => void }).updateMiniMapPositions;
+    if (!sim || !upd) return;
+    const { positions, types } = collectMiniMapPositions(sim.nodes() as MiniMapSimulationNode[]);
+    upd(positions);
+    (window as { updateMiniMapTypes?: (t: Record<string, string>) => void }).updateMiniMapTypes?.(types);
+  }, []);
+
   // Smart data update function - only reinitializes when necessary, preserves camera position
   const updateVisualizationData = useCallback(() => {
     if (!simulationRef.current || !svgRef.current) return;
@@ -1860,6 +1872,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         }
     });
     simulation.nodes(nodeMerge.nodes as any);
+    publishMiniMapPositions();
     const linkForce = simulation.force('link') as d3.ForceLink<any, any>;
     if (linkForce) {
       const edgeMerge = mergeSimulationEdges(
@@ -1905,7 +1918,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       simulation.alpha(0.1).restart();
     }
 
-  }, [nodes, validatedEdges, getNodeDimensions]);
+  }, [nodes, validatedEdges, getNodeDimensions, publishMiniMapPositions]);
 
   // Define initializeVisualization function with access to nodes data
   const initializeVisualization = useCallback(() => {
@@ -2152,6 +2165,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     const simulation = d3.forceSimulation(visibleNodes as any);
     simulationLayoutScopeRef.current = activeLayoutScopeRef.current;
     simulationRef.current = simulation; // Store reference for resize handling
+    publishMiniMapPositions();
     
     // RESTORE PRESERVED POSITIONS to prevent nodes jumping to origin
     if (existingPositions.size > 0) {
@@ -4409,16 +4423,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   useEffect(() => {
     if (!currentGraph) return undefined;
     let n = 0;
-    const publish = () => {
-      const sim = simulationRef.current;
-      const upd = (window as { updateMiniMapPositions?: (p: Record<string, { x: number; y: number }>) => void }).updateMiniMapPositions;
-      if (!sim || !upd) return;
-      const { positions, types } = collectMiniMapPositions(sim.nodes() as MiniMapSimulationNode[]);
-      {
-        upd(positions);
-        (window as { updateMiniMapTypes?: (t: Record<string, string>) => void }).updateMiniMapTypes?.(types);
-      }
-    };
+    const publish = publishMiniMapPositions;
     let alive = true;
     let settleEpoch: number | null = null;
     const refitIfCovered = (epoch: number) => {
@@ -4485,20 +4490,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       window.removeEventListener('graphdone:minimap-open', snapshot);
       window.removeEventListener('graphdone:layout-organized', publish);
     };
-  }, [currentGraph?.id]);
-
-  // A frozen/locked simulation may never emit another tick after late data is
-  // merged. Refresh the Mini-Map from the changed node set without reopening
-  // or rearming the panel's camera-settle window.
-  useEffect(() => {
-    if (!currentGraph || workItemsData?.workItems?.length === undefined) return;
-    const sim = simulationRef.current;
-    const upd = (window as { updateMiniMapPositions?: (p: Record<string, { x: number; y: number }>) => void }).updateMiniMapPositions;
-    if (!sim || !upd) return;
-    const { positions, types } = collectMiniMapPositions(sim.nodes() as MiniMapSimulationNode[]);
-    upd(positions);
-    (window as { updateMiniMapTypes?: (t: Record<string, string>) => void }).updateMiniMapTypes?.(types);
-  }, [currentGraph?.id, workItemsData?.workItems?.length]);
+  }, [currentGraph?.id, publishMiniMapPositions]);
 
   // Center on specific node
   const centerOnNode = useCallback((nodeId?: string) => {
@@ -5173,6 +5165,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     edgesLoading, // Re-init when edges loading completes
     // Track node property changes for selective updates (only titles, descriptions, types)
     nodes.map(n => `${n.id}:${n.title}:${n.description}:${n.type}:${n.status}:${n.priority}`).join(','),
+    publishMiniMapPositions,
     // Track edge type/direction changes so a relationship edit or flip rebuilds
     validatedEdges.map((e: any) => {
       const sId = typeof e.source === 'object' ? e.source?.id : e.source;

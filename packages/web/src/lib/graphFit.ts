@@ -25,7 +25,6 @@ export interface FitObstacle {
   right: number;
   bottom: number;
 }
-
 export interface GraphFitInput<T extends FitPoint> {
   /** Size of the camera viewport in screen pixels. */
   width: number;
