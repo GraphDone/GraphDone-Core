@@ -15,6 +15,7 @@ import {
 import { inspectItemSymbols } from '../../lib/itemSymbolVisual';
 import { inspectOverviewBus } from '../../lib/overviewBusInspection';
 import { inspectSchematicOverview } from '../../lib/schematicOverview';
+import { isExampleWrite } from '../../../packages/web/src/lib/exampleOperations';
 
 const SIZE = 2000;
 const test = base.extend<{
@@ -96,7 +97,7 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
     errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.route('**/api/graphql', async route => {
-    if (/^\s*mutation\b/.test(route.request().postDataJSON()?.query ?? '')) {
+    if (/^\s*mutation\b/.test(route.request().postDataJSON()?.query ?? '') && !isExampleWrite(route.request().postDataJSON()?.operationName)) {
       writes.push(route.request().postDataJSON().operationName ?? 'mutation');
       await route.abort();
     } else await route.continue();
