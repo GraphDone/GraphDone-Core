@@ -54,6 +54,8 @@ Delete a node and all its relationships.
 ### create_edge
 Create a relationship between two nodes.
 
+When MCP writes attach items to a graph, the graph's stored `nodeCount` is recomputed. Its stored `edgeCount` counts first-class Edge records whose source and target both belong to that graph; a boundary connection to an item outside the graph is not included. Repeating the same source/target/type create remains idempotent, while reverse directions or different types are distinct. Create and delete operations refresh these counts so nested graph cards do not rely on fixture-supplied values.
+
 ### delete_edge
 Delete a specific relationship between two nodes.
 
