@@ -3,6 +3,8 @@ import {
   fitGraphText,
   graphItemLayout,
   edgeLabelDimensions,
+  compactRelationshipLabel,
+  PHONE_RELATIONSHIP_CHIP,
   ITEM_TITLE_SIZE,
   ITEM_TITLE_LINE,
   type TextMeasure,
@@ -16,6 +18,13 @@ const measure: TextMeasure = (text, size) =>
   );
 
 describe('graph symbol content geometry', () => {
+  it('uses 24 px relationship chips only on narrow touch canvases below full detail', () => {
+    expect(PHONE_RELATIONSHIP_CHIP).toEqual({ width: 24, height: 24 });
+    expect(compactRelationshipLabel(390, true, 0.65)).toBe(true);
+    expect(compactRelationshipLabel(390, true, 1)).toBe(false);
+    expect(compactRelationshipLabel(390, false, 0.65)).toBe(false);
+    expect(compactRelationshipLabel(834, true, 0.65)).toBe(false);
+  });
   it('fits unequal-width words and unbroken identifiers without losing an unmarked suffix', () => {
     for (const value of [
       'WWW iii WWW iii WWW',

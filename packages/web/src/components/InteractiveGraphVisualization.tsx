@@ -62,7 +62,7 @@ import { createParallelEdgeRoute, edgeRouteLabel, edgeRouteArrowBounds, edgeSegm
 import { PerfMeter, DriftMeter } from '../lib/perfMeter';
 import { computeGraphFit, collectMiniMapPositions, type FitObstacle, type MiniMapSimulationNode } from '../lib/graphFit';
 import { appendNodeControlGlyph, nodeControlGlyphTransform } from '../lib/nodeControlIcons';
-import { graphItemLayout, itemTitleScale, measureGraphText, edgeLabelDimensions, GRAPH_FONT_FAMILY, ITEM_TITLE_SIZE, ITEM_TITLE_LINE, ITEM_HEADER_HEIGHT, EDGE_LABEL_SIZE, ITEM_WIRE_WIDTH } from '../lib/graphSymbolLayout';
+import { graphItemLayout, itemTitleScale, measureGraphText, edgeLabelDimensions, PHONE_RELATIONSHIP_CHIP, compactRelationshipLabel, GRAPH_FONT_FAMILY, ITEM_TITLE_SIZE, ITEM_TITLE_LINE, ITEM_HEADER_HEIGHT, EDGE_LABEL_SIZE, ITEM_WIRE_WIDTH } from '../lib/graphSymbolLayout';
 import { placeItemLabelsWithRetry } from '../lib/edgeLabelPlacement';
 import { separateCards } from '../lib/separateCards';
 import { organizeTopology } from '../lib/topologyOrganization';
@@ -1849,9 +1849,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   }, [getNodeDimensions]);
   // Room for every relationship label in "Organize", the hierarchical rows and
   // a settled force layout, framed as fitViewToNodes will frame it.
-  const labelRoom = useCallback((width: number, height: number, floor: number): LabelRoomOptions<WorkItem, any> => ({
+  const labelRoom = useCallback((width: number, height: number, floor: number, chips = false): LabelRoomOptions<WorkItem, any> => ({
     dimensionsAt: getNodeDimensionsAt,
-    labelFor: drawnLabel,
+    labelFor: chips ? edge => drawnLabel(edge) && PHONE_RELATIONSHIP_CHIP : drawnLabel,
     priority: (edge: any) => relationshipPriorityTier(edge.type),
     viewport: { width, height },
     obstacles: containerRef.current ? graphFitObstacles(containerRef.current, floor) : [],
@@ -3773,7 +3773,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     let routeObstacles: ObstacleBox[] = [];
     let labelViewport: ObstacleBox | undefined;
     let uiLabelObstacles: ObstacleBox[] = [];
-    const applyLabel = (element: SVGGElement, d: any, placement: EdgeRouteLabel | null) => {
+    const applyLabel = (element: SVGGElement, d: any, placement: EdgeRouteLabel | null, chip = false) => {
       d._routeLabel = placement;
       const label = d3.select(element);
       label.style('display', () => placement ? edgeDisplay(d) : 'none');
@@ -3783,14 +3783,23 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       }
       d.labelT = placement.t;
       label.attr('transform', `translate(${placement.x},${placement.y}) rotate(${placement.rotation}) scale(${d._labelScale || 1})`);
-      const center = d._labelIconCenter;
+      const dimensions = chip ? PHONE_RELATIONSHIP_CHIP : d._labelDims;
+      const center = chip ? { x: 0, y: 0 } : d._labelIconCenter;
+      if (chip || element.hasAttribute('data-edge-label-chip')) {
+        label.attr('data-edge-label-chip', chip ? 'true' : null);
+        label.select('.edge-label').style('display', () => chip ? 'none' : null);
+        label.select('.edge-label-bg')
+          .attr('width', dimensions.width).attr('height', dimensions.height)
+          .attr('x', -dimensions.width / 2).attr('y', -dimensions.height / 2);
+        label.select('.edge-label-icon').attr('x', center.x - 7);
+      }
       label.select('.edge-label-icon').attr('transform', placement.iconRotation
         ? `rotate(${placement.iconRotation}, ${center.x}, ${center.y})` : null);
       // The turned label itself (edgeRouteLabel tests turned boxes exactly).
       labelRects.set(d.id, {
         x: placement.x, y: placement.y,
-        width: d._labelDims.width * (d._labelScale || 1),
-        height: d._labelDims.height * (d._labelScale || 1),
+        width: dimensions.width * (d._labelScale || 1),
+        height: dimensions.height * (d._labelScale || 1),
         rotation: placement.rotation,
       });
     };
@@ -3872,11 +3881,13 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       const drawnEdges = visibleEdges.filter((edge: any) => edgeDisplay(edge) !== 'none');
       routeSegments = drawnEdges.flatMap((edge: any) => edge._route?.segments ?? []).filter(segment => edgeSegmentHitsBox(segment, labelViewport!, 8));
       routeObstacles = drawnEdges.map((edge: any) => edgeRouteArrowBounds(edge._route, arrowVisibility(liveK, edge._pTotal || 1).scale)).filter(intersectsViewport);
+      const chips = compactRelationshipLabel(container.clientWidth, isCoarsePointer(), liveK);
       const candidates = edgeLabelGroups.data().map((d: any) => {
         d._labelScale = Math.max(1, 1 / liveK);
+        const dimensions = chips ? PHONE_RELATIONSHIP_CHIP : d._labelDims;
         return {
           id: d.id, route: d._route, eligible: liveK >= LABEL_MIN_ZOOM && edgeDisplay(d) !== 'none', priority: relationshipPriorityTier(d.type),
-          dims: { width: d._labelDims.width * d._labelScale, height: d._labelDims.height * d._labelScale },
+          dims: { width: dimensions.width * d._labelScale, height: dimensions.height * d._labelScale },
           t: d.labelT ?? 0.5, offset: (d._routeLabel?.offset < 0 ? -1 : 1) * (26 * d._labelScale + 3), dragged: !!d.labelTUser,
         };
       });
@@ -3885,7 +3896,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       edgeLabelGroups.each(function(d: any) {
         const placement = result.placements.get(d.id) ?? null;
         d._labelBlocked = !placement;
-        applyLabel(this, d, placement);
+        applyLabel(this, d, placement, chips);
       });
       g.attr('data-label-attempts', result.attempts);
       g.attr('data-label-checks', result.checks);
@@ -3913,8 +3924,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           const t = projectEdgeRoutePointer(d._route, {
             x: x - d._labelGrab.x, y: y - d._labelGrab.y
           }, d.labelT, { offset: d._routeLabel?.offset ?? 25 });
+          const chip = this.hasAttribute('data-edge-label-chip');
+          const dimensions = chip ? PHONE_RELATIONSHIP_CHIP : d._labelDims;
           const placement = edgeRouteLabel(d._route, {
-            dims: { width: d._labelDims.width * d._labelScale, height: d._labelDims.height * d._labelScale }, t,
+            dims: { width: dimensions.width * d._labelScale, height: dimensions.height * d._labelScale }, t,
             offset: d._routeLabel?.offset ?? 25, segments: routeSegments,
             viewport: labelViewport,
             obstacles: nodeLabelObstacles.concat(uiLabelObstacles, routeObstacles, [...labelRects].filter(([id]) => id !== d.id).map(([, box]) => box))
@@ -3922,7 +3935,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           if (placement) {
             d.labelTUser = true;
             d._labelBlocked = false;
-            applyLabel(this, d, placement);
+            applyLabel(this, d, placement, chip);
           }
         })
         .on('end', (_event, d: any) => { delete d._labelGrab; }));
@@ -4751,7 +4764,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // where their titles still fit whole (compact label chips: #283).
     const whole = simulation.nodes().length <= WHOLE_FIT_MAX_CARDS && !window.matchMedia(COMPACT_WORKSPACE_QUERY).matches;
     const floor = whole ? SMALL_GRAPH_ZOOM_FLOOR : ORGANIZED_ZOOM_FLOOR;
-    const arranged = organizeWithLabelRoom(simulation.nodes() as WorkItem[], validatedEdges as any[], labelRoom(container.clientWidth, container.clientHeight, floor));
+    const chips = compactRelationshipLabel(container.clientWidth, isCoarsePointer(), floor);
+    const arranged = organizeWithLabelRoom(simulation.nodes() as WorkItem[], validatedEdges as any[], labelRoom(container.clientWidth, container.clientHeight, floor, chips));
     for (const node of simulation.nodes() as any[]) {
       const point = arranged.positions.get(node.id);
       if (!point) continue;

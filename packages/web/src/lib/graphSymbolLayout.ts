@@ -177,6 +177,12 @@ export function graphItemLayout(
   };
 }
 
+export const PHONE_RELATIONSHIP_CHIP = { width: 24, height: 24 };
+
+export function compactRelationshipLabel(width: number, coarse: boolean, zoom: number) {
+  return coarse && width <= 430 && zoom < 1;
+}
+
 export function edgeLabelDimensions(
   textWidth: number,
   textHeight = EDGE_LABEL_SIZE
