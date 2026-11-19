@@ -24,6 +24,13 @@ describe('assignLayersByDependencyDirection', () => {
     expect(layers.get('A')).toBe(2);
   });
 
+  it('assigns every row in a 10,000-item dependency chain', () => {
+    const nodes = Array.from({ length: 10_000 }, (_, index) => n(String(index)));
+    const edges = nodes.slice(1).map((node, index) => dep(nodes[index].id, node.id));
+    const layers = assignLayersByDependencyDirection(nodes, edges);
+    expect(nodes.map(node => layers.get(node.id))).toEqual(nodes.map((_, index) => nodes.length - 1 - index));
+  });
+
   it('isolated nodes are layer 0', () => {
     const layers = assignLayersByDependencyDirection([n('A'), n('X')], [dep('A', 'A2')]);
     expect(layers.get('X')).toBe(0);

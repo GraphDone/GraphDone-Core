@@ -30,18 +30,31 @@ export function assignLayersByDependencyDirection(nodes: NodeLike[], edges: Edge
 
   const layer = new Map<string, number>();
   const visiting = new Set<string>();
-  const resolve = (id: string): number => {
-    if (layer.has(id)) return layer.get(id)!;
-    if (visiting.has(id)) return 0; // cycle guard — break at current node
-    visiting.add(id);
-    let max = -1;
-    for (const p of deps.get(id) || []) max = Math.max(max, resolve(p));
-    visiting.delete(id);
-    const v = max + 1; // 0 if it depends on nothing
-    layer.set(id, v);
-    return v;
-  };
-  for (const n of nodes) resolve(n.id);
+  for (const node of nodes) {
+    if (layer.has(node.id)) continue;
+    const path = [{ id: node.id, next: 0, depth: 0 }];
+    visiting.add(node.id);
+    while (path.length) {
+      const current = path[path.length - 1];
+      const prerequisites = deps.get(current.id)!;
+      if (current.next < prerequisites.length) {
+        const id = prerequisites[current.next++];
+        const depth = layer.get(id);
+        if (depth !== undefined || visiting.has(id)) {
+          current.depth = Math.max(current.depth, (depth ?? 0) + 1);
+        } else {
+          visiting.add(id);
+          path.push({ id, next: 0, depth: 0 });
+        }
+        continue;
+      }
+      layer.set(current.id, current.depth);
+      visiting.delete(current.id);
+      path.pop();
+      const dependent = path[path.length - 1];
+      if (dependent) dependent.depth = Math.max(dependent.depth, current.depth + 1);
+    }
+  }
   return layer;
 }
 
