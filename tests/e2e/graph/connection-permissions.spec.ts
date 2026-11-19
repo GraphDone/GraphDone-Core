@@ -15,7 +15,7 @@ for (const scope of ['desktop', 'phone'] as const) {
     test('only an editor can connect items from the inspector', async ({ page, ownedGraphIds }) => {
       test.setTimeout(90000);
       await login(page, TEST_USERS.ADMIN);
-      const graph = await ownedGraphIds.seed({ size: 3, spacing: 210, namePrefix: 'Connection permissions' });
+      const graph = await ownedGraphIds.seed({ size: 3, spacing: 210, edgeFactor: 0.5, namePrefix: 'Connection permissions' });
       const owner = (await gql(page, '{me{id}}')).me.id;
       const [source, , target] = graph.nodeIds;
       const setEditable = (editable: boolean) => gql(page, 'mutation($id:ID!,$acl:String!){updateGraphs(where:{id:$id},update:{permissions:$acl}){graphs{id}}}', {
@@ -47,7 +47,10 @@ for (const scope of ['desktop', 'phone'] as const) {
       await openGraph();
       const readEdges = async () => (await storedEdges(page, graph.graphId)).sort((left, right) => left.id.localeCompare(right.id));
       const before = await readEdges();
+      const isPair = (edge: { source: string; target: string }) =>
+        (edge.source === source && edge.target === target) || (edge.source === target && edge.target === source);
       expect(before.length).toBeGreaterThan(0);
+      expect(before.some(isPair)).toBe(false);
       let writes = 0;
       page.on('request', request => {
         if (request.method() !== 'POST' || !new URL(request.url()).pathname.endsWith('/graphql')) return;
@@ -80,9 +83,9 @@ for (const scope of ['desktop', 'phone'] as const) {
       if (phone) await connect.tap();
       else await connect.click();
       await pressCard(target);
-      await expect.poll(async () => (await readEdges()).filter(edge =>
-        edge.source === source && edge.target === target,
-      )).toHaveLength(1);
+      await expect.poll(async () => (await readEdges()).filter(isPair)).toEqual([
+        expect.objectContaining({ source, target }),
+      ]);
       expect(writes).toBe(1);
     });
   });
