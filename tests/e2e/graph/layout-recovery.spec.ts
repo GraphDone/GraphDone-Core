@@ -394,15 +394,26 @@ test('revoked graph writes and deleted graphs retain scoped recovery until expli
     const changed = await session.run('MATCH (g:Graph {id:$id,createdBy:$owner}) SET g.createdBy=$revoked RETURN g.id AS id', { id: graph.graphId, owner, revoked });
     expect(changed.records.map(record => record.get('id'))).toEqual([graph.graphId]);
     await page.unroute('**/api/graphql', route);
+    let positionWrites = 0;
+    page.on('request', request => {
+      if (!request.url().endsWith('/api/graphql') || request.method() !== 'POST') return;
+      const body = request.postDataJSON();
+      if (body?.operationName === 'UpdateWorkItems' && body.variables?.where?.id === nodeId) positionWrites++;
+    });
     await page.reload();
     await expect(page.getByTestId('layout-save-status')).toContainText('The task position was not saved');
     await expect(page.getByTestId('layout-save-status')).toContainText('Waiting to send 1 layout change');
     expect(await readSaved(page, graph.graphId, nodeId)).toEqual(initial);
     expect((await readReceipt(page, graph.graphId, nodeId)).receipt).toBeDefined();
+    await expect(page.getByRole('button', { name: 'Retry layout save' })).toBeDisabled();
+    await expect.poll(async () => rounded((await readPosition(page, nodeId))!)).toEqual(rounded(initial));
+    expect(positionWrites, 'A read-only graph must retain its receipt without attempting a position write').toBe(0);
     const restored = await session.run('MATCH (g:Graph {id:$id,createdBy:$revoked}) SET g.createdBy=$owner RETURN g.id AS id', { id: graph.graphId, owner, revoked });
     expect(restored.records.map(record => record.get('id'))).toEqual([graph.graphId]);
     await gql(page, 'mutation($id:ID!){deleteEdges(where:{OR:[{source:{id:$id}},{target:{id:$id}}]}){nodesDeleted}}', { id: nodeId });
     await gql(page, 'mutation($id:ID!,$graph:ID!){deleteWorkItems(where:{id:$id,graph:{id:$graph}}){nodesDeleted}}', { id: nodeId, graph: graph.graphId });
+    await page.reload();
+    await expect.poll(() => positionWrites, { message: 'Restored editing access retries the retained receipt' }).toBeGreaterThan(0);
     await page.getByRole('button', { name: 'Retry layout save' }).click();
     await expect(page.getByTestId('layout-save-status')).toContainText('The task position was not saved');
     expect((await readReceipt(page, graph.graphId, nodeId)).receipt).toBeDefined();

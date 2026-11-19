@@ -10,6 +10,7 @@ type Attachment = { save: (position: PositionSave) => Promise<void>; onError: (m
 type Entry = PositionSaveScope & {
   queue: ReturnType<typeof createRecoverablePositionQueue>;
   attachment?: Attachment;
+  draining?: Promise<void>;
   reportedFailure: boolean;
 };
 
@@ -56,19 +57,21 @@ function createRegistry() {
     return entry;
   };
   const flush = async (entry: Entry) => {
-    if (!entry.attachment || getSessionOwnerId() !== entry.ownerId) return;
-    try {
-      await entry.queue.flush();
+    const attachment = entry.attachment;
+    if (!attachment || getSessionOwnerId() !== entry.ownerId) return;
+    if (entry.draining) return entry.draining;
+    entry.draining = entry.queue.flush().then(() => {
       entry.reportedFailure = false;
-    } catch (error) {
-      if (entry.attachment && getSessionOwnerId() === entry.ownerId && !entry.reportedFailure) {
+    }).catch(error => {
+      if (entry.attachment === attachment && getSessionOwnerId() === entry.ownerId && !entry.reportedFailure) {
         entry.reportedFailure = true;
-        entry.attachment.onError(error instanceof Error ? error.message : undefined);
+        attachment.onError(error instanceof Error ? error.message : undefined);
       }
-    }
+    }).finally(() => { entry.draining = undefined; });
+    return entry.draining;
   };
   return {
-    get, flush,
+    get, flush, changed,
     entries: () => [...entries.values()],
     discardScope: async (scope: PositionSaveScope) => {
       if (getSessionOwnerId() !== scope.ownerId) throw new Error('Sign in as the layout owner before discarding changes.');
@@ -159,12 +162,18 @@ export function PositionSaveProvider({ children }: { children: ReactNode }) {
         event.returnValue = '';
       }
     };
+    const sessionChanged = () => { value.changed(); value.reconnect(); };
+    const storageChanged = (event: StorageEvent) => {
+      if (!event.key || event.key === 'authToken' || event.key === 'currentUser') sessionChanged();
+    };
     window.addEventListener('online', value.reconnect);
-    window.addEventListener('graphdone-session', value.reconnect);
+    window.addEventListener('graphdone-session', sessionChanged);
+    window.addEventListener('storage', storageChanged);
     window.addEventListener('beforeunload', leaving);
     return () => {
       window.removeEventListener('online', value.reconnect);
-      window.removeEventListener('graphdone-session', value.reconnect);
+      window.removeEventListener('graphdone-session', sessionChanged);
+      window.removeEventListener('storage', storageChanged);
       window.removeEventListener('beforeunload', leaving);
     };
   }, [value]);
@@ -175,25 +184,29 @@ export function usePositionSaveQueue(
   save: (position: PositionSave) => Promise<void>,
   onError: (message?: string) => void,
   scope: PositionSaveScope | null,
+  canWrite = true,
 ) {
   const registry = useContext(PositionSaveContext);
   if (!registry) throw new Error('PositionSaveProvider is required.');
   useSyncExternalStore(registry.subscribe, registry.snapshot);
-  const key = scope ? JSON.stringify([scope.ownerId, scope.graphId]) : null;
-  const latest = useRef({ save, onError, key });
-  latest.current = { save, onError, key };
+  const key = scope && getSessionOwnerId() === scope.ownerId ? JSON.stringify([scope.ownerId, scope.graphId]) : null;
+  const latest = useRef({ save, onError, key, canWrite });
+  latest.current = { save, onError, key, canWrite };
   const attachment = useMemo<Attachment>(() => ({
     save: position => {
       if (latest.current.key !== key) return Promise.reject(new Error('The active graph changed.'));
+      if (!canWrite || !latest.current.canWrite) {
+        return Promise.reject(new Error('The task position was not saved. Editing access is required to send this layout.'));
+      }
       return latest.current.save(position);
     },
     onError: message => { if (latest.current.key === key) latest.current.onError(message); },
-  }), [key]);
+  }), [key, canWrite]);
   const active = useRef<Entry>();
   const [scopeError, setScopeError] = useState<{ key: string | null; message: string }>();
 
   useEffect(() => {
-    if (!scope) return;
+    if (!scope || !key) return;
     let entry: Entry;
     try { entry = registry.get(scope); }
     catch (error) {
@@ -205,7 +218,10 @@ export function usePositionSaveQueue(
     setScopeError(undefined);
     active.current = entry;
     entry.attachment = attachment;
-    void registry.flush(entry);
+    // Finish the previous attachment's drain before retrying under a new permission.
+    const resume = () => { if (entry.attachment === attachment) void registry.flush(entry); };
+    if (entry.draining) void entry.draining.then(resume);
+    else resume();
     return () => {
       if (entry.attachment === attachment) entry.attachment = undefined;
       if (active.current === entry) active.current = undefined;
@@ -214,6 +230,7 @@ export function usePositionSaveQueue(
 
   const queue = useCallback((id: string, x: number, y: number) => {
     const entry = active.current;
+    if (!latest.current.canWrite) return false;
     if (!entry || entry.attachment !== attachment || latest.current.key !== key || getSessionOwnerId() !== entry.ownerId) {
       attachment.onError('Layout saving is unavailable. Return to this graph while signed in as its owner before moving tasks.');
       return false;
@@ -234,5 +251,5 @@ export function usePositionSaveQueue(
   }, [attachment, key]);
 
   const entry = registry.peek(key);
-  return { queue, flush, discard, error: scopeError?.key === key ? scopeError.message : undefined, state: entry?.queue.state, saving: entry?.queue.saving ?? false };
+  return { queue, flush, discard, canWrite, error: scopeError?.key === key ? scopeError.message : undefined, state: entry?.queue.state, saving: entry?.queue.saving ?? false };
 }
