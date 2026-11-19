@@ -30,11 +30,11 @@ export function separateCards<T extends { id: string; x?: number; y?: number }>(
   const free = (x: number, y: number, width: number, height: number) => {
     const col = Math.floor(x / cellWidth);
     const row = Math.floor(y / cellHeight);
-    for (let j = row - 1; j <= row + 1; j++) {
-      const columns = rows.get(j);
+    for (let dy = -1; dy <= 1; dy++) {
+      const columns = rows.get(row + dy);
       if (!columns) continue;
-      for (let i = col - 1; i <= col + 1; i++) {
-        const occupants = columns.get(i);
+      for (let dx = -1; dx <= 1; dx++) {
+        const occupants = columns.get(col + dx);
         if (!occupants) continue;
         for (const card of occupants) {
           if (Math.abs(x - card.x) < (width + card.width) / 2 + gap &&

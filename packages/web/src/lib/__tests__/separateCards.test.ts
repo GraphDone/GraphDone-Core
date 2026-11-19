@@ -23,3 +23,10 @@ it('preserves saved spiral placement across cell boundaries and different card d
     [46, -46], [-650, -220], [-539, 59],
   ]);
 });
+
+it('leaves distant finite coordinates intact beyond the integer precision of a cell index', () => {
+  const nodes = [{ id: 'a', x: 1e25, y: -1e25 }, { id: 'b', x: 2e25, y: 1e25 }];
+  const before = structuredClone(nodes);
+  expect(separateCards(nodes, () => ({ width: 320, height: 175 })).size).toBe(0);
+  expect(nodes).toEqual(before);
+});
