@@ -15,20 +15,30 @@ for (const scope of ['desktop', 'phone'] as const) {
     test('only an editor can connect items from the inspector', async ({ page, ownedGraphIds }) => {
       test.setTimeout(90000);
       await login(page, TEST_USERS.ADMIN);
-      const graph = await ownedGraphIds.seed({ size: 3, spacing: 210, edgeFactor: 0.5, namePrefix: 'Connection permissions' });
+      const graph = await ownedGraphIds.seed({ size: 3, spacing: 210, edgeFactor: 0.5, namePrefix: 'Connection permissions', titleForIndex: index => ['Source item', 'Middle item', 'Target item'][index] });
       const owner = (await gql(page, '{me{id}}')).me.id;
       const [source, , target] = graph.nodeIds;
       const setEditable = (editable: boolean) => gql(page, 'mutation($id:ID!,$acl:String!){updateGraphs(where:{id:$id},update:{permissions:$acl}){graphs{id}}}', {
         id: graph.graphId,
         acl: JSON.stringify({ owner: editable ? owner : 'connection-fixture-owner', admins: [], editors: [], viewers: [owner], teamPermission: 'VIEW' }),
       });
-      const openGraph = async () => {
-        await page.evaluate(id => {
+      const openView = async (view: 'graph' | 'cards') => {
+        await page.evaluate(({ id, view }) => {
           localStorage.setItem('currentGraphId', id);
-          localStorage.setItem('graphdone:viewMode', 'graph');
-        }, graph.graphId);
+          localStorage.setItem('graphdone:viewMode', view);
+        }, { id: graph.graphId, view });
         await page.reload();
-        await expect(page.locator('.graph-container svg .node')).toHaveCount(3);
+        if (view === 'graph') await expect(page.locator('.graph-container svg .node')).toHaveCount(3);
+        else await expect(page.getByTestId('task-list')).toBeVisible();
+      };
+      const openDetails = async () => {
+        await openView('cards');
+        const edit = page.getByTestId('task-list').getByRole('button', { name: 'Edit Source item', exact: true });
+        if (phone) await edit.tap();
+        else await edit.click();
+        const dialog = page.getByRole('dialog');
+        await expect(dialog.getByRole('heading', { name: /^Connections/ })).toBeVisible();
+        return dialog;
       };
       const pressCard = async (id: string, shift = false) => {
         await expect.poll(async () => {
@@ -44,7 +54,7 @@ for (const scope of ['desktop', 'phone'] as const) {
         }
       };
       await setEditable(false);
-      await openGraph();
+      await openView('graph');
       const readEdges = async () => (await storedEdges(page, graph.graphId)).sort((left, right) => left.id.localeCompare(right.id));
       const before = await readEdges();
       const isPair = (edge: { source: string; target: string }) =>
@@ -71,13 +81,16 @@ for (const scope of ['desktop', 'phone'] as const) {
           await pressCard(source, true);
           await pressCard(target, true);
         }
+        const details = await openDetails();
+        await expect(details.getByRole('button', { name: /^Connect to other work items/ })).toHaveCount(0);
+        await expect(details.getByRole('button', { name: /^Disconnect from work items/ })).toHaveCount(0);
         expect(await readEdges()).toEqual(before);
         expect(writes).toBe(0);
       } finally {
         await setEditable(true);
       }
 
-      await openGraph();
+      await openView('graph');
       await pressCard(source);
       const connect = page.getByRole('button', { name: /^Connect .* to another item$/ });
       if (phone) await connect.tap();
@@ -87,6 +100,14 @@ for (const scope of ['desktop', 'phone'] as const) {
         expect.objectContaining({ source, target }),
       ]);
       expect(writes).toBe(1);
+
+      const details = await openDetails();
+      const disconnect = details.getByRole('button', { name: /^Disconnect from work items/ });
+      if (phone) await disconnect.tap();
+      else await disconnect.click();
+      await details.getByRole('checkbox', { name: 'Select Target item to disconnect' }).check();
+      await details.getByRole('button', { name: 'Remove Selected (1)', exact: true }).click();
+      await expect.poll(async () => (await readEdges()).filter(isPair)).toHaveLength(0);
     });
   });
 }

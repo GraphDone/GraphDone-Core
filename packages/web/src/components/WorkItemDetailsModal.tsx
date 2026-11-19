@@ -186,8 +186,8 @@ export function WorkItemDetailsModal({
   onDelete,
   undoStack,
 }: NodeDetailsModalProps) {
-  const { currentGraph, canEditGraph } = useGraph();
-  const canConnectItems = !!currentGraph && canEditGraph(currentGraph.id);
+  const { currentGraph, canEditGraph, canEditGraphNow } = useGraph();
+  const canEditConnections = !!currentGraph && canEditGraph(currentGraph.id);
   const { currentUser } = useAuth();
   const { showSuccess, showError, showWarning } = useNotifications();
   const [editedNode, setEditedNode] = useState<WorkItem | null>(null);
@@ -367,10 +367,16 @@ export function WorkItemDetailsModal({
     );
   };
 
+  const canEditConnectionsNow = () => {
+    const { graphId, ownerId } = editorSession;
+    return !!graphId && !!ownerId && canEditGraphNow(graphId, ownerId);
+  };
+
   // Connect to selected nodes
   const handleConnectSelected = async () => {
-    if (!canConnectItems || selectedNodesForConnection.length === 0) return;
+    if (!canEditConnectionsNow() || selectedNodesForConnection.length === 0) return;
     
+    const undoGeneration = undoStack?.generation;
     const count = selectedNodesForConnection.length;
     const isPlural = count > 1;
     
@@ -383,6 +389,7 @@ export function WorkItemDetailsModal({
       }));
 
       const result = await createEdge({
+        context: { expectedOwnerId: editorSession.ownerId },
         variables: { input: edgeInputs }
       });
 
@@ -390,10 +397,12 @@ export function WorkItemDetailsModal({
         .map((edge: { id?: string }) => edge.id)
         .filter((id: unknown): id is string => typeof id === 'string');
       if (createdIds.length !== edgeInputs.length) throw new Error('The new connections could not be identified for Undo.');
-      undoStack?.push({
+      if (undoStack?.generation === undoGeneration) undoStack?.push({
         label: 'Connect items',
         undo: async () => {
+          if (!canEditConnectionsNow()) throw new Error('Editing access is required to undo this connection.');
           await deleteEdge({
+            context: { expectedOwnerId: editorSession.ownerId },
             variables: {
               where: createdIds.length === 1
                 ? { id: createdIds[0] }
@@ -414,7 +423,7 @@ export function WorkItemDetailsModal({
 
   // Disconnect selected edges
   const handleDisconnectSelected = async () => {
-    if (selectedEdgesForDisconnection.length === 0) return;
+    if (!canEditConnectionsNow() || selectedEdgesForDisconnection.length === 0) return;
     
     const selectedEdges = selectedEdgesForDisconnection
       .map(edgeId => edges.find(edge => edge.id === edgeId))
@@ -423,6 +432,7 @@ export function WorkItemDetailsModal({
       showError('A selected connection is no longer available. Refresh and try again.');
       return;
     }
+    const undoGeneration = undoStack?.generation;
     const count = selectedEdges.length;
     const isPlural = count > 1;
     let restoreInputs: ReturnType<typeof edgeCreateInput>[];
@@ -436,16 +446,21 @@ export function WorkItemDetailsModal({
     
     try {
       await deleteEdge({
+        context: { expectedOwnerId: editorSession.ownerId },
         variables: {
           where: count === 1
             ? { id: selectedEdges[0].id }
             : { OR: selectedEdges.map(edge => ({ id: edge.id })) },
         },
       });
-      undoStack?.push({
+      if (undoStack?.generation === undoGeneration) undoStack?.push({
         label: 'Disconnect items',
         undo: async () => {
-          await createEdge({ variables: { input: restoreInputs } });
+          if (!canEditConnectionsNow()) throw new Error('Editing access is required to undo this disconnection.');
+          await createEdge({
+            context: { expectedOwnerId: editorSession.ownerId },
+            variables: { input: restoreInputs },
+          });
         },
       });
 
@@ -455,19 +470,6 @@ export function WorkItemDetailsModal({
     } catch (error) {
       console.error('Error removing connections:', error);
       showError('Failed to remove some connections');
-    }
-  };
-
-  // Handle disconnecting from a node
-  const handleDisconnect = async (edgeId: string) => {
-    try {
-      await deleteEdge({
-        variables: {
-          where: { id: edgeId }
-        }
-      });
-    } catch (error) {
-      console.error('Error removing connection:', error);
     }
   };
 
@@ -1232,7 +1234,7 @@ export function WorkItemDetailsModal({
                   <GitBranch className="h-8 w-8 text-gray-500 mx-auto" />
                 </div>
                 <p className="text-gray-400 text-xs font-medium mb-1">No connections yet</p>
-                {canConnectItems && <p className="text-gray-500 text-xs">Use Connect button to link nodes</p>}
+                {canEditConnections && <p className="text-gray-500 text-xs">Use Connect button to link nodes</p>}
               </div>
             ) : (
 
@@ -1335,7 +1337,7 @@ export function WorkItemDetailsModal({
             </h3>
             <div className="space-y-2">
               {/* Enhanced Connect Dropdown */}
-              {canConnectItems && <div className="relative" ref={connectDropdownRef}>
+              {canEditConnections && <div className="relative" ref={connectDropdownRef}>
                 <button
                   ref={connectButtonRef}
                   type="button"
@@ -1415,7 +1417,7 @@ export function WorkItemDetailsModal({
               </div>}
 
               {/* Enhanced Disconnect Dropdown */}
-              <div className="relative" ref={disconnectDropdownRef}>
+              {canEditConnections && <div className="relative" ref={disconnectDropdownRef}>
                 <button
                   ref={disconnectButtonRef}
                   type="button"
@@ -1492,7 +1494,7 @@ export function WorkItemDetailsModal({
                     </div>
                   </div>
                 )}
-              </div>
+              </div>}
 
               {!showDeleteConfirm ? (
                 <button

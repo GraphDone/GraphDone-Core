@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 import { useQuery, useMutation, useApolloClient } from '@apollo/client';
 import { useAuth } from './AuthContext';
 import { Graph, GraphHierarchy, CreateGraphInput, GraphContextType, GraphPermissions, ShareSettings } from '../types/graph';
@@ -22,6 +22,7 @@ import { GET_WORK_ITEMS, DELETE_WORK_ITEM, CREATE_WORK_ITEM, CREATE_EDGE } from 
 import { awaitExampleIdle, buildStarterWorkspace, createStarterWorkspace, exampleIdleMs, examplePendingParts, starterGraphCount, withExampleFailure, withoutPendingTag, type StarterApi, type StarterJournal } from '../lib/starterWorkspace';
 import { offlineEnabled, localGuest } from '../lib/offline/engine';
 import { OFFLINE_PROJECT_LIMIT } from '../lib/offline/model';
+import { getSessionOwnerId } from '../lib/authStorage';
 import { withStorageLock } from '../lib/storageLock';
 import { exampleLimitMessage, graphTree, parseStarterMarker, projectDeleteBlock, seenGraphCount, starterHierarchy, starterMayOpen, starterStep, type StarterMarker } from '../lib/workspaceRules';
 
@@ -872,6 +873,11 @@ export function GraphProvider({ children }: GraphProviderProps) {
     );
   };
 
+  const latestGraphEdit = useRef<(graphId: string, ownerId: string) => boolean>(() => false);
+  latestGraphEdit.current = (graphId, ownerId) =>
+    currentGraph?.id === graphId && currentUser?.id === ownerId && getSessionOwnerId() === ownerId && canEditGraph(graphId);
+  const canEditGraphNow = useCallback((graphId: string, ownerId: string) => latestGraphEdit.current(graphId, ownerId), []);
+
   const canDeleteGraph = (graphId: string): boolean => {
     const graph = availableGraphs.find(g => g.id === graphId);
     if (!graph || !currentUser?.id) return false;
@@ -913,6 +919,7 @@ export function GraphProvider({ children }: GraphProviderProps) {
     updatePermissions,
     joinSharedGraph,
     canEditGraph,
+    canEditGraphNow,
     canDeleteGraph,
     canShareGraph,
     refreshGraphs
