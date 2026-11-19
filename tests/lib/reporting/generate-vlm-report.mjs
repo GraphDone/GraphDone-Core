@@ -3,7 +3,7 @@
  * Renders local-VLM visual evaluations into one self-contained gallery:
  *   test-artifacts/vlm/index.html
  *
- * Input: test-artifacts/vlm/results.json (from visual-vlm.spec.ts)
+ * Input: test-artifacts/vlm/results.json (from tests/e2e/reports/vlm-evaluation.spec.ts)
  * Output: each captured screenshot with a card per persona verdict
  * (pass/flag badge, 0-1 score, summary, issues). No deps, no external assets.
  */

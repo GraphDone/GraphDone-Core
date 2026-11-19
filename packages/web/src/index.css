@@ -11,6 +11,13 @@
   display: none;
 }
 
+.graph-container:is([data-zoom-level="2"], [data-zoom-level="3"]) .semantic-overview-host {
+  visibility: hidden;
+}
+.graph-container:is([data-zoom-level="2"], [data-zoom-level="3"]) .semantic-overview-host * {
+  pointer-events: none !important;
+}
+
 /* The UI is dark everywhere. Tell the browser, so native controls (select
    menus, checkboxes, scrollbars, date pickers) are drawn dark too: without it
    Safari paints a <select> light grey under our white text, which is
@@ -1027,6 +1034,9 @@ html:not([data-theme="contrast"]) .workspace-surface .graph-container .node-titl
 .graph-zoom-context [role="button"] { pointer-events: auto; cursor: pointer; outline: none; }
 .graph-zoom-context .zoom-frame { fill: none; stroke: var(--gd-accent); stroke-opacity: .6; stroke-width: 1.5; stroke-dasharray: 6 5; }
 .graph-zoom-context .zoom-tile-bg { stroke: var(--gd-line); stroke-width: 1.5; }
+/* A sibling label can rewrap during a pinch. Its card rectangle stays the
+   touch target even when the text under a finger changes. */
+.graph-zoom-context .zoom-tile-graph .zoom-label { pointer-events: none; }
 .graph-zoom-context .zoom-tile-graph .zoom-tile-bg { fill: var(--gd-surface); fill-opacity: .94; }
 .graph-zoom-context .zoom-tile-project .zoom-tile-bg { fill: var(--gd-chrome); fill-opacity: .6; }
 .graph-zoom-context [role="button"]:hover .zoom-tile-bg { stroke: var(--gd-accent); }

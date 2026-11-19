@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 import { useQuery, useMutation, useApolloClient } from '@apollo/client';
 import { useAuth } from './AuthContext';
 import { Graph, GraphHierarchy, CreateGraphInput, GraphContextType, GraphPermissions, ShareSettings } from '../types/graph';
@@ -14,12 +14,15 @@ import {
   STARTER_OWN_GRAPHS,
   UPDATE_GRAPH,
   DELETE_GRAPH,
-  GET_CHILD_GRAPHS
+  GET_CHILD_GRAPHS,
+  UPDATE_STARTER_GRAPH,
+  DELETE_STARTER_GRAPH
 } from '../graphql/graph';
 import { GET_WORK_ITEMS, DELETE_WORK_ITEM, CREATE_WORK_ITEM, CREATE_EDGE } from '../lib/queries';
 import { awaitExampleIdle, buildStarterWorkspace, createStarterWorkspace, exampleIdleMs, examplePendingParts, starterGraphCount, withExampleFailure, withoutPendingTag, type StarterApi, type StarterJournal } from '../lib/starterWorkspace';
 import { offlineEnabled, localGuest } from '../lib/offline/engine';
 import { OFFLINE_PROJECT_LIMIT } from '../lib/offline/model';
+import { getSessionOwnerId } from '../lib/authStorage';
 import { withStorageLock } from '../lib/storageLock';
 import { exampleLimitMessage, graphTree, parseStarterMarker, projectDeleteBlock, seenGraphCount, starterHierarchy, starterMayOpen, starterStep, type StarterMarker } from '../lib/workspaceRules';
 
@@ -128,6 +131,9 @@ export function GraphProvider({ children }: GraphProviderProps) {
   const [createStarterGraphsMutation] = useMutation(CREATE_STARTER_GRAPHS);
   const [updateGraphMutation] = useMutation(UPDATE_GRAPH);
   const [deleteGraphMutation] = useMutation(DELETE_GRAPH);
+  // Every write the example makes is a …Starter… operation; see UPDATE_STARTER_GRAPH.
+  const [updateStarterGraph] = useMutation(UPDATE_STARTER_GRAPH);
+  const [deleteStarterGraph] = useMutation(DELETE_STARTER_GRAPH);
   const [deleteWorkItemMutation] = useMutation(DELETE_WORK_ITEM);
   const [createWorkItemMutation] = useMutation(CREATE_WORK_ITEM);
   const [createEdgeMutation] = useMutation(CREATE_EDGE);
@@ -241,7 +247,7 @@ export function GraphProvider({ children }: GraphProviderProps) {
       });
     },
     setCounts: async (graphId, { nodeCount, edgeCount, tags }) => {
-      await updateGraphMutation({
+      await updateStarterGraph({
         variables: { id: graphId, input: { nodeCount, edgeCount, lastActivity: new Date().toISOString(), ...(tags && { tags }) } }
       });
     },
@@ -254,7 +260,7 @@ export function GraphProvider({ children }: GraphProviderProps) {
       await apolloClient.mutate({ mutation: DELETE_STARTER_CONTENT, variables: { items, edges }, fetchPolicy: 'no-cache' });
     },
     setTags: async (graphId, tags) => {
-      await updateGraphMutation({ variables: { id: graphId, input: { tags } } });
+      await updateStarterGraph({ variables: { id: graphId, input: { tags } } });
     },
     idle: yieldToView(),
     filled: async graphId => {
@@ -271,7 +277,7 @@ export function GraphProvider({ children }: GraphProviderProps) {
     const created = await createStarterWorkspace(plan, {
       ...api,
       deleteGraph: async graphId => {
-        await deleteGraphMutation({ variables: { id: graphId } });
+        await deleteStarterGraph({ variables: { id: graphId } });
       },
       opened: async graphId => {
         const { data } = await refetchGraphs();
@@ -304,7 +310,7 @@ export function GraphProvider({ children }: GraphProviderProps) {
   const countExampleFailure = async (userId: string) => {
     const { data } = await apolloClient.query({ query: STARTER_OWN_GRAPHS, variables: { userId }, fetchPolicy: 'no-cache' });
     for (const graph of examplePendingParts(data?.graphs || []).open) {
-      await updateGraphMutation({ variables: { id: graph.id, input: { tags: withExampleFailure(graph) } } });
+      await updateStarterGraph({ variables: { id: graph.id, input: { tags: withExampleFailure(graph) } } });
     }
   };
 
@@ -315,7 +321,7 @@ export function GraphProvider({ children }: GraphProviderProps) {
       const local = readStarterPending(userId);
       const { open, abandoned } = examplePendingParts(offlineEnabled ? [] : data?.userGraphs || []);
       for (const graph of abandoned) {
-        await updateGraphMutation({ variables: { id: graph.id, input: { tags: withoutPendingTag(graph.tags) } } });
+        await updateStarterGraph({ variables: { id: graph.id, input: { tags: withoutPendingTag(graph.tags) } } });
       }
       // On the self-hosted server the backend says what is unfinished; this browser's marker only covers a first write still in flight.
       const unfinished = offlineEnabled ? !!local : open.length > 0 || (!!local?.inflight.length && seenGraphCount(data) === 0);
@@ -867,6 +873,11 @@ export function GraphProvider({ children }: GraphProviderProps) {
     );
   };
 
+  const latestGraphEdit = useRef<(graphId: string, ownerId: string) => boolean>(() => false);
+  latestGraphEdit.current = (graphId, ownerId) =>
+    currentGraph?.id === graphId && currentUser?.id === ownerId && getSessionOwnerId() === ownerId && canEditGraph(graphId);
+  const canEditGraphNow = useCallback((graphId: string, ownerId: string) => latestGraphEdit.current(graphId, ownerId), []);
+
   const canDeleteGraph = (graphId: string): boolean => {
     const graph = availableGraphs.find(g => g.id === graphId);
     if (!graph || !currentUser?.id) return false;
@@ -908,6 +919,7 @@ export function GraphProvider({ children }: GraphProviderProps) {
     updatePermissions,
     joinSharedGraph,
     canEditGraph,
+    canEditGraphNow,
     canDeleteGraph,
     canShareGraph,
     refreshGraphs

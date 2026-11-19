@@ -29,8 +29,6 @@ flowchart LR
 | [`useHealthStatus.ts`](useHealthStatus.ts) | Fetches `/health` to tell whether the graph service (Neo4j) is available. |
 | [`useHealthCheck.ts`](useHealthCheck.ts) | Detailed `/health` and `/mcp/status` check for the MCP indicator. |
 | [`useSystemConfig.ts`](useSystemConfig.ts) | Reads `/config` (ports, TLS, OAuth) for the Admin page. |
-| [`useTeamData.ts`](useTeamData.ts) | Team node queries; used only by the unrouted `pages/NodeList.tsx`. |
-| [`useMcpServers.ts`](useMcpServers.ts) | MCP server detection; used only by the unused `components/McpServerCard.tsx`. |
 | `useHealthStatus.test.ts`, `useItemPresentation.test.tsx`, [`__tests__/`](__tests__/README.md) | Vitest tests. |
 
 Up: [`src/`](../README.md)

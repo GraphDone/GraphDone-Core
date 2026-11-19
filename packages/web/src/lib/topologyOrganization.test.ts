@@ -1,4 +1,6 @@
 import { expect, it } from 'vitest';
+import { borderReach } from './edgeGeometry';
+import { computeGraphFit } from './graphFit';
 import { graphItemLayout } from './graphSymbolLayout';
 import {
   organizeTopology,
@@ -62,6 +64,27 @@ it('puts the actual hub at the center of a clear ring without duplicate-type bia
     ).positions
   ).toEqual(result.positions);
   expect({ nodes, edges }).toEqual(input);
+});
+
+it('frames a desktop hub and its eight labelled spokes at a readable card width', () => {
+  const nodes = ['hub', ...Array.from({ length: 8 }, (_, index) => `leaf-${index}`)].map(id => ({ id }));
+  const edges = nodes.slice(1).map(node => edge('hub', node.id));
+  const viewport = { width: 1376, height: 744 };
+  const dimensions = { width: 210, height: 104 };
+  const labelGap = 260;
+  const arranged = organizeTopology(nodes, edges, () => dimensions, viewport, 64, { edgeGap: () => labelGap });
+  const hub = arranged.positions.get('hub')!;
+  const ring = nodes.slice(1).map(node => arranged.positions.get(node.id)!);
+  const radii = ring.map(point => Math.hypot(point.x - hub.x, point.y - hub.y));
+  for (const point of ring) {
+    const dx = point.x - hub.x;
+    const dy = point.y - hub.y;
+    const visible = Math.hypot(dx, dy) - 2 * borderReach(dimensions, dx, dy);
+    expect(visible).toBeGreaterThanOrEqual(labelGap - 0.001);
+  }
+  expect(Math.max(...radii) - Math.min(...radii)).toBeLessThan(0.001);
+  const fit = computeGraphFit({ ...viewport, obstacles: [], cards: [hub, ...ring], dimensionsAt: () => dimensions })!;
+  expect(dimensions.width * fit.scale).toBeGreaterThanOrEqual(132);
 });
 
 it('follows cycle and chain topology instead of inventing dependency tiers', () => {
@@ -348,4 +371,32 @@ it('packs loose cards side by side on a landscape phone instead of stacking them
   // column (the 3:2 rows put two side by side and shrank both to ~0.5).
   const three = organizeTopology([...nodes, { id: 'third' }], [], () => ({ width: 240, height: 140 }), { width: 390, height: 844 });
   expect(new Set([...three.positions.values()].map(point => Math.round(point.x))).size).toBe(1);
+});
+
+it('gives every edge the visible length its edgeGap asks for, in chains, cycles and hub rings', () => {
+  const visible = (result: ReturnType<typeof organizeTopology>, a: string, b: string, nodes: { id: string }[]) => {
+    const p = result.positions.get(a)!, q = result.positions.get(b)!;
+    const da = size(nodes.find(node => node.id === a)!), db = size(nodes.find(node => node.id === b)!);
+    const dx = q.x - p.x, dy = q.y - p.y, length = Math.hypot(dx, dy);
+    const reach = (d: { width: number; height: number }) => {
+      const s = Math.min(dx ? d.width / 2 / Math.abs(dx) : Infinity, dy ? d.height / 2 / Math.abs(dy) : Infinity);
+      return Math.hypot(dx * s, dy * s);
+    };
+    return length - reach(da) - reach(db);
+  };
+  const shapes = {
+    chain: { nodes: ['a', 'b', 'c', 'd'], edges: [edge('a', 'b'), edge('b', 'c'), edge('c', 'd')] },
+    cycle: { nodes: ['a', 'b', 'c', 'd', 'e'], edges: [edge('a', 'b'), edge('b', 'c'), edge('c', 'd'), edge('d', 'e'), edge('e', 'a')] },
+    hub: { nodes: ['hub', ...Array.from({ length: 9 }, (_, i) => `leaf-${i}`)], edges: Array.from({ length: 9 }, (_, i) => edge('hub', `leaf-${i}`)) },
+  };
+  for (const [name, shape] of Object.entries(shapes)) {
+    const nodes = shape.nodes.map(id => ({ id }));
+    const plain = organizeTopology(nodes, shape.edges, size, view);
+    const roomy = organizeTopology(nodes, shape.edges, size, view, 64, { edgeGap: () => 260 });
+    for (const e of shape.edges) {
+      expect(visible(roomy, e.source, e.target, nodes), `${name} ${e.source}-${e.target}`).toBeGreaterThanOrEqual(259.5);
+    }
+    expect(Math.min(...shape.edges.map(e => visible(plain, e.source, e.target, nodes)))).toBeLessThan(259.5);
+    checkClearance(roomy, nodes);
+  }
 });

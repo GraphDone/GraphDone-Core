@@ -34,7 +34,6 @@ flowchart TD
 | [`Signin.captcha.test.tsx`](Signin.captcha.test.tsx) | | Vitest: sign-in never submits without a valid CAPTCHA proof and clears a used proof. |
 | [`Signin.turnstile.test.tsx`](Signin.turnstile.test.tsx) | | Vitest: the sign-in email request carries the server's human check when `/config` asks for one. |
 | [`Signin.handover.test.tsx`](Signin.handover.test.tsx), [`Signin.urlToken.test.tsx`](Signin.urlToken.test.tsx) | | Vitest: a handed-over sign-in is confirmed before anything is stored; a token in the address is removed and never used. |
-| `GraphManagement.tsx`, `GraphView.tsx`, `NodeList.tsx` | none | Older pages that no route uses. |
 
 `/api/enrollment` and `/api/share` are provided by the hosted build's backend;
 [`packages/server/`](../../../server/README.md) does not serve them (it has its

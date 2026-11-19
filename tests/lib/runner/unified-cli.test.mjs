@@ -88,7 +88,7 @@ test('disposable Git fixture commits do not spawn background maintenance', t => 
   assert.deepEqual(events.filter(event => event.event === 'child_start' && event.argv?.includes('maintenance')), []);
 });
 
-for (const sequence of ['new-user', 'example-resume', 'agent-connection', 'inspector-readability', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'devices', 'perf-budgets', 'relationship-edit', 'zoom-out']) {
+for (const sequence of ['new-user', 'example-resume', 'agent-connection', 'inspector-readability', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'devices', 'perf-budgets', 'relationship-edit', 'zoom-out', 'zoom-out-guest-phone', 'organize-labels']) {
   test(`CLI forwards failure-only tracing without retries for ${sequence}`, t => {
     const { dir, run } = fixture(t);
     const report = { suites: [{ specs: [{ title: 'fixture', ok: true,
@@ -124,6 +124,13 @@ for (const sequence of ['new-user', 'example-resume', 'agent-connection', 'inspe
       for (const profile of ['pr', 'full']) assert.ok(PROFILES[profile].includes(sequence));
       assertSmokeGateRuns(sequence, { out: 'ci-inspector-readability', xvfb: true });
     }
+    if (sequence === 'organize-labels') {
+      assert.deepEqual(args.filter(arg => arg.endsWith('.spec.ts')), ['tests/e2e/journeys/organize-labels.spec.ts']);
+      assert.deepEqual(args.filter(arg => arg.startsWith('--project=')), ['--project=journeys', '--project=journeys-iphone']);
+      assert.equal(SEQUENCES[sequence].blocking, true);
+      for (const profile of ['pr', 'full']) assert.ok(PROFILES[profile].includes(sequence));
+      assertSmokeGateRuns(sequence, { out: 'ci-organize-labels', xvfb: false });
+    }
     if (sequence === 'relationship-edit') {
       assert.deepEqual(args.filter(arg => arg.endsWith('.spec.ts')), ['tests/e2e/journeys/relationship-edit.spec.ts']);
       assert.deepEqual(args.filter(arg => arg.startsWith('--project=')), ['--project=journeys', '--project=journeys-ipad', '--project=journeys-iphone']);
@@ -138,6 +145,7 @@ for (const sequence of ['new-user', 'example-resume', 'agent-connection', 'inspe
       assert.equal(guest[0].if, 'matrix.guest && !cancelled()');
       assert.match(guest[0].run, /VITE_OFFLINE_SYNC=true VITE_HOSTED_USAGE=true .* vite build --outDir \/tmp\/graphdone-guest\)/);
       assert.match(guest[0].run, /\nnode tests\/run-unified\.mjs --sequence relationship-edit --out test-artifacts\/ci-relationship-edit-guest\n/);
+      assert.match(guest[0].run, /\nnode tests\/run-unified\.mjs --sequence zoom-out-guest-phone --out test-artifacts\/ci-zoom-out-guest-phone\n/);
       assert.equal(ci.jobs['smoke-gate-shard'].strategy.matrix.include.filter(shard => shard.guest).length, 1);
     }
     if (sequence === 'zoom-out') {
@@ -146,6 +154,12 @@ for (const sequence of ['new-user', 'example-resume', 'agent-connection', 'inspe
       assert.equal(SEQUENCES[sequence].blocking, true);
       for (const profile of ['pr', 'full']) assert.ok(PROFILES[profile].includes(sequence));
       assertSmokeGateRuns(sequence, { out: 'ci-zoom-out', xvfb: false });
+    }
+    if (sequence === 'zoom-out-guest-phone') {
+      assert.deepEqual(args.filter(arg => arg.endsWith('.spec.ts')), ['tests/e2e/journeys/zoom-out-guest-phone.spec.ts']);
+      assert.deepEqual(args.filter(arg => arg.startsWith('--project=')), ['--project=journeys-guest-iphone']);
+      assert.equal(SEQUENCES[sequence].blocking, true);
+      for (const profile of Object.values(PROFILES)) assert.ok(!profile.includes(sequence));
     }
     if (sequence === 'large-symbols') {
       assert.ok(args.includes('tests/e2e/graph/large-graph-symbols.spec.ts'));
@@ -376,12 +390,12 @@ test('every Smoke Gate shard warms up with THE GATE, and the summary job keeps t
   }
   assert.equal(runs.smoke.length, shards.length);
   // Every sequence the single Smoke Gate job ran before #274 (its schematic-visual
-  // and toolchain steps are checked above), plus relationship-edit (#262) and
-  // zoom-out (#277), so a sequence dropped from every shard fails here. Change
-  // this list on purpose only.
+  // and toolchain steps are checked above), plus organize-labels, relationship-edit
+  // (#262) and zoom-out (#277), so a sequence dropped from every shard fails here.
+  // Change this list on purpose only.
   assert.deepEqual(Object.keys(runs).sort(), [
     'agent-connection', 'example-resume', 'inspector-readability', 'item-wires', 'large-symbols', 'layout-recovery',
-    'living-graph-effects', 'mobile', 'nested-lod', 'new-user', 'perf-budgets', 'relationship-edit',
+    'living-graph-effects', 'mobile', 'nested-lod', 'new-user', 'organize-labels', 'perf-budgets', 'relationship-edit',
     'router-navigation', 'semantic-lod', 'smoke', 'zoom-out',
   ]);
   for (const [sequence, entries] of Object.entries(runs)) {

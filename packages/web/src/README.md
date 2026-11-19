@@ -34,7 +34,6 @@ flowchart TD
 | [`graphql/`](graphql/README.md) | GraphQL documents for graphs (projects). |
 | [`types/`](types/README.md) | Shared TypeScript types for graphs, work items and auth. |
 | [`utils/`](utils/README.md) | Small helpers: graph data validation, form validation, app version. |
-| [`examples/`](examples/README.md) | A radar chart demo component (not routed). |
 | [`test/`](test/README.md) | Vitest setup file. |
 
 Unit tests sit next to the code (`*.test.ts(x)`) or in `__tests__/` folders;

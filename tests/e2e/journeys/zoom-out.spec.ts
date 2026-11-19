@@ -150,6 +150,13 @@ test('JOURNEY zoom-out: every level is labelled, from items to projects', async 
   }
   expect(wobble, 'a small wobble changed the level').toEqual([2, 2, 2, 2]);
 
+  const browse = page.getByRole('button', { name: /Browse all relationships$/ });
+  await expect(browse, 'the selected graph still offers its relationship list beside its siblings').toBeVisible();
+  await browse.click();
+  const relationships = page.getByRole('region', { name: 'Graph relationships' });
+  await expect(relationships.getByRole('button', { name: /^Edit relationship / }).first()).toBeVisible();
+  await relationships.getByRole('button', { name: 'Back to graph', exact: true }).click();
+
   // A neighbouring graph is a button: opening it switches graphs and frames
   // the new graph, so its own item titles are readable.
   const tile = page.getByRole('button', { name: /^Plan a launch graph, \d+ items?$/ });

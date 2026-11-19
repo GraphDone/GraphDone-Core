@@ -16,7 +16,7 @@ export function collectControls() {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
 
-  const OVERLAY = '[role="dialog"], [role="alertdialog"], [aria-modal="true"], dialog[open], [data-modal-backdrop], [role="menu"], [role="listbox"], [role="tooltip"]';
+  const OVERLAY = '[role="dialog"], [role="alertdialog"], [aria-modal="true"], dialog[open], [data-modal-backdrop], [role="menu"], [role="listbox"], [role="tooltip"], [data-testid="graph-selector-dropdown"]';
   const isHidden = el => {
     if (el.closest('[aria-hidden="true"], [inert], .sr-only')) return true;
     // Content of a closed <details> keeps a layout box in some engines but is not drawn.

@@ -30,7 +30,7 @@ export function LayoutSaveStatus({ queue }: { queue: ReturnType<typeof usePositi
         {state.cleanupError && <p className="mt-1 text-amber-200">{state.cleanupError}</p>}
         {state.sendError && <p className="mt-1 text-amber-200">{state.sendError}</p>}
         {(state.pending > 0 || state.storageError) && !passive && <div className="mt-2 flex flex-wrap gap-3">
-          <button type="button" disabled={queue.saving} onClick={() => void queue.flush()} className="min-h-11 rounded bg-blue-700 px-2 disabled:opacity-50">{state.cleanupPending && !state.unsent ? 'Retry receipt cleanup' : 'Retry layout save'}</button>
+          <button type="button" disabled={queue.saving || (!queue.canWrite && !!state.unsent)} onClick={() => void queue.flush()} className="min-h-11 rounded bg-blue-700 px-2 disabled:opacity-50">{state.cleanupPending && !state.unsent ? 'Retry receipt cleanup' : 'Retry layout save'}</button>
           {state.unsent > 0 && <button type="button" disabled={queue.saving} onClick={() => void queue.discard()} className="min-h-11 rounded bg-gray-700 px-2 disabled:opacity-50">Discard unsent layout</button>}
         </div>}
       </>}

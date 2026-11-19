@@ -7,8 +7,8 @@ import { gql } from '../graphRequest';
  * saved truth, whichever backend serves it. Journeys never seed through an API:
  * they start where a real person starts and use the same controls.
  *
- *   JOURNEY_BACKEND=selfhost      sign in as the admin test user, new graph (default;
- *                                 phones, which cannot create a graph, get it from the API)
+ *   JOURNEY_BACKEND=selfhost      sign in as the admin test user and create a new graph
+ *                                 with the visible graph selector (default; on every device)
  *   JOURNEY_BACKEND=hosted-guest  "Continue as Guest" on the hosted build; work is
  *                                 saved in the browser's local workspace
  */
@@ -32,20 +32,7 @@ export async function enterWorkspace(page: Page): Promise<{ graphId?: string }> 
     return {};
   }
   await login(page, TEST_USERS.ADMIN);
-  if (!(await page.getByTestId('graph-selector').isVisible())) {
-    // Phones have no "Create New Graph" control (the phone header's project
-    // switcher only switches), so the trial's empty graph is made through the
-    // API, as that dialog would make it, and opened.
-    const me = (await gql(page, '{ me { id } }')).me.id;
-    const created = await gql(page, 'mutation($input:[GraphCreateInput!]!){createGraphs(input:$input){graphs{id}}}',
-      { input: [{ name: `Journey ${Date.now()}`, type: 'PROJECT', status: 'ACTIVE', createdBy: me }] });
-    const graphId: string = created.createGraphs.graphs[0].id;
-    await page.evaluate(id => localStorage.setItem('currentGraphId', id), graphId);
-    await page.goto('/');
-    await openGraphView(page);
-    return { graphId };
-  }
-  await page.getByTestId('graph-selector').click();
+  await page.locator('[data-testid="graph-selector"]:visible, [data-testid="graph-selector-mobile"]:visible').first().click();
   await page.getByRole('button', { name: 'Create New Graph', exact: true }).click();
   const create = page.getByRole('dialog', { name: 'Create new graph' });
   await create.getByRole('button', { name: 'Continue', exact: true }).click();
@@ -60,10 +47,11 @@ export async function enterWorkspace(page: Page): Promise<{ graphId?: string }> 
 /** Phones open on the List view; a person taps "Graph" in the bottom bar. */
 export async function openGraphView(page: Page) {
   const graph = page.locator('.graph-container');
-  const nav = page.getByTestId('mobile-bottom-nav');
-  await graph.or(nav).first().waitFor({ timeout: 20000 });
-  if (!(await graph.isVisible()) && (await nav.isVisible())) {
-    await nav.getByRole('button', { name: 'Graph', exact: true }).click();
+  const graphTab = page.getByTestId('mobile-bottom-nav').getByRole('button', { name: 'Graph', exact: true });
+  await graph.or(graphTab).filter({ visible: true }).first().waitFor({ timeout: 20000 });
+  // On reload the selected Graph tab is visible before its canvas mounts.
+  if (!(await graph.isVisible()) && await graphTab.isVisible() && await graphTab.getAttribute('aria-pressed') !== 'true') {
+    await graphTab.click({ timeout: 10000 });
   }
   await expect(graph).toBeVisible({ timeout: 20000 });
 }

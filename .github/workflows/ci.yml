@@ -191,6 +191,7 @@ jobs:
               semantic-lod ci-semantic-lod xvfb
               layout-recovery ci-layout-recovery xvfb
               example-resume ci-example-resume
+              organize-labels ci-organize-labels
               relationship-edit ci-relationship-edit
     services:
       neo4j:
@@ -267,7 +268,7 @@ jobs:
       # where nothing listens, so every read and write goes to the browser workspace.
       # It is served as a static host serves it, without vite.config.ts (whose dev
       # proxy `vite preview` would reuse, reaching the dev stack's API).
-      - name: Relationship edit as a hosted guest
+      - name: Hosted guest journeys
         if: matrix.guest && !cancelled()
         env:
           CI: true
@@ -278,9 +279,18 @@ jobs:
           node -e "import('vite').then(v => v.preview({ configFile: false, root: 'packages/web', build: { outDir: '/tmp/graphdone-guest' }, preview: { host: '127.0.0.1', port: 4190, strictPort: true } }))" > /tmp/guest-preview.log 2>&1 &
           timeout 60 bash -c 'until curl -sf http://127.0.0.1:4190 >/dev/null; do sleep 1; done'
           node tests/run-unified.mjs --sequence relationship-edit --out test-artifacts/ci-relationship-edit-guest
+          node tests/run-unified.mjs --sequence zoom-out-guest-phone --out test-artifacts/ci-zoom-out-guest-phone
       - name: Dump dev log on failure
         if: failure()
         run: tail -100 /tmp/dev.log || true
+      - name: Upload compact failure reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-reports-${{ github.sha }}-${{ strategy.job-index }}
+          path: test-artifacts/ci-*/report.json
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Upload test artifacts
         if: always()
         uses: actions/upload-artifact@v4

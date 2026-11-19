@@ -21,6 +21,7 @@ flowchart LR
 | [`dialog-positioning.spec.ts`](dialog-positioning.spec.ts) | The work-item edit and create modals fit the screen and paint above the bottom nav. `@audit` |
 | [`experience.spec.ts`](experience.spec.ts) | A phone lands on a readable list (not the graph), shows no Neo4j chrome, and the bottom nav drives the views. |
 | [`view-navigation.spec.ts`](view-navigation.spec.ts) | Every non-graph view reads by scrolling down, never sideways; Calendar opens as an agenda list. |
+| [`graph-view-entry.spec.ts`](graph-view-entry.spec.ts) | Checks selected and unselected Graph tabs during loading, pans a clipped sibling into view and releases phone contacts if a gesture check fails. |
 | [`touch-graph.spec.ts`](touch-graph.spec.ts) | A touch on a locked node previews the task, Edit opens its editor, and the edit is saved. `@touch` |
 | [`agent-approval.spec.ts`](agent-approval.spec.ts) | An approved agent connection fits a 320×568 phone; the enrollment API is a local route fixture. |
 

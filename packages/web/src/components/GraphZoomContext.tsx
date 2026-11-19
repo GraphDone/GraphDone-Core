@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { gql, useQuery } from '@apollo/client';
+import { fitGraphText, measureGraphText } from '../lib/graphSymbolLayout';
 import {
   fitLabel,
   fitLines,
@@ -31,6 +32,7 @@ export interface GraphZoomContextProps {
   readPositions: () => readonly { x?: number; y?: number }[];
   itemSize: (item: any) => { width: number; height: number };
   overview: boolean;
+  overviewFrame: Rect | null;
   onOpen: (graphId: string) => void;
   onLevel: (level: ZoomLevel, minScale: number) => void;
 }
@@ -99,8 +101,8 @@ function Label({ x, y, k, name, detail, anchor = 'start', maxPx, backing = false
   );
 }
 
-function Tile({ id, openId = id, rect, k, name, detail, viewportShort, interactive, labelled, onOpen, kind, labelAbove = false, holdsGraphs = true }: {
-  id: string; openId?: string; rect: Rect; labelAbove?: boolean; holdsGraphs?: boolean; k: number; name: string; detail: string; viewportShort: number;
+function Tile({ id, openId = id, rect, k, name, detail, viewportShort, interactive, labelled, onOpen, kind, labelAbove = false, holdsGraphs = true, hidden = false }: {
+  id: string; openId?: string; rect: Rect; labelAbove?: boolean; holdsGraphs?: boolean; hidden?: boolean; k: number; name: string; detail: string; viewportShort: number;
   interactive: boolean; labelled: boolean; onOpen: (id: string) => void; kind: 'graph' | 'project';
 }) {
   const ref = useRef<SVGGElement>(null);
@@ -112,13 +114,17 @@ function Tile({ id, openId = id, rect, k, name, detail, viewportShort, interacti
     const el = ref.current;
     if (!el || !interactive || kind !== 'graph') return;
     // Zooming in over a tile that already fills much of the screen opens it:
-    // the person is diving into that graph. (d3's zoom stops wheel events at
-    // the SVG, so this listens on the tile itself.)
+    // the person is diving into that graph. D3 owns the wheel gesture on the
+    // SVG, so observe it here without preventing the camera movement. Touch is
+    // owned once per gesture by GraphZoomContext below, not once per tile.
     let opened = false; // one gesture opens the graph once
-    const wheel = (event: WheelEvent) => {
-      if (opened || event.deltaY >= 0 || sizeRef.current < 0.42 * viewportShort) return;
+    const openWhenLarge = () => {
+      if (opened || sizeRef.current < 0.42 * viewportShort) return;
       opened = true;
       openRef.current(openId);
+    };
+    const wheel = (event: WheelEvent) => {
+      if (event.deltaY < 0) openWhenLarge();
     };
     el.addEventListener('wheel', wheel, { passive: true });
     return () => el.removeEventListener('wheel', wheel);
@@ -134,6 +140,8 @@ function Tile({ id, openId = id, rect, k, name, detail, viewportShort, interacti
       className={`zoom-tile zoom-tile-${kind}`}
       data-zoom-tile={kind === 'graph' ? id : undefined}
       data-zoom-project={kind === 'project' ? id : undefined}
+      visibility={hidden ? 'hidden' : undefined}
+      aria-hidden={hidden || undefined}
       role={interactive ? 'button' : undefined}
       tabIndex={interactive ? 0 : undefined}
       aria-label={interactive ? label : undefined}
@@ -160,7 +168,7 @@ function Tile({ id, openId = id, rect, k, name, detail, viewportShort, interacti
   );
 }
 
-export function GraphZoomContext({ graphs, currentGraphId, camera, readPositions, itemSize, overview, onOpen, onLevel }: GraphZoomContextProps) {
+export function GraphZoomContext({ graphs, currentGraphId, camera, readPositions, itemSize, overview, overviewFrame, onOpen, onLevel }: GraphZoomContextProps) {
   const ref = useRef<SVGGElement>(null);
   const viewport = useViewport(ref);
   const k = camera.scale || 1;
@@ -213,6 +221,11 @@ export function GraphZoomContext({ graphs, currentGraphId, camera, readPositions
     return graphs.map(graph => (live.get(graph.id) === undefined ? graph : { ...graph, nodeCount: live.get(graph.id) }));
   }, [graphs, countData]);
   const context = useMemo(() => (currentGraphId ? zoomContextOf(counted, currentGraphId) : null), [counted, currentGraphId]);
+  const frameTitleSize = viewport.w < 768 ? 13 : NAME_PX;
+  const projectedName = useMemo(() => context && overviewFrame
+    ? fitGraphText(context.current.name, overviewFrame.w - 32, frameTitleSize,
+      (text, size) => measureGraphText(text, size, 700), 1).lines[0]
+    : '', [context, overviewFrame, frameTitleSize]);
   const portrait = viewport.h > viewport.w * 1.2;
   const layout = useMemo(() => (context && frame ? zoomLayout(context, frame, portrait) : null), [context, frame, portrait]);
 
@@ -235,6 +248,72 @@ export function GraphZoomContext({ graphs, currentGraphId, camera, readPositions
   const level: ZoomLevel = layout ? zoomLevelOf(state.current, overview) : 0;
   const minScale = layout && viewport.w > 0 ? minZoomScale(layout.span, viewport) : 0.1;
 
+  // Browsers deliver later touch events to the elements where the fingers
+  // landed. Preserve those targets while a pinch crosses the sibling level.
+  const [holdingSiblingTiles, setHoldingSiblingTiles] = useState(false);
+  const onOpenRef = useRef(onOpen);
+  onOpenRef.current = onOpen;
+  useEffect(() => {
+    const svg = ref.current?.ownerSVGElement;
+    if (!svg) return;
+    type PinchSession = { ids: [number, number]; graphId: string; initialGap: number; previousGap: number; initialSize: number };
+    let session: PinchSession | null = null;
+    const touchById = (touches: TouchList, id: number) => Array.from(touches).find(touch => touch.identifier === id);
+    const gap = (a: Touch, b: Touch) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    const cancel = () => {
+      if (!session) return;
+      session = null;
+      setHoldingSiblingTiles(false);
+    };
+    const start = (event: TouchEvent) => {
+      if (event.touches.length !== 2) { cancel(); return; }
+      const [a, b] = Array.from(event.touches);
+      const x = (a.clientX + b.clientX) / 2;
+      const y = (a.clientY + b.clientY) / 2;
+      const tile = document.elementFromPoint(x, y)?.closest<SVGGElement>('[data-zoom-tile][role="button"]');
+      const graphId = tile?.dataset.zoomTile;
+      const bounds = tile?.getBoundingClientRect();
+      const initialGap = gap(a, b);
+      if (!graphId || !bounds || !initialGap || !svg.contains(tile) ||
+          !svg.contains(a.target as Node) || !svg.contains(b.target as Node)) { cancel(); return; }
+      session = { ids: [a.identifier, b.identifier], graphId, initialGap, previousGap: initialGap, initialSize: Math.max(bounds.width, bounds.height) };
+      setHoldingSiblingTiles(true);
+    };
+    const move = (event: TouchEvent) => {
+      if (!session) return;
+      if (event.touches.length !== 2) { cancel(); return; }
+      const a = touchById(event.touches, session.ids[0]);
+      const b = touchById(event.touches, session.ids[1]);
+      if (!a || !b) { cancel(); return; }
+      const currentGap = gap(a, b);
+      // A real zoom-in grows steadily. Small sensor jitter is tolerated, but a
+      // direction reversal ends this navigation candidate while D3 keeps zooming.
+      if (currentGap < session.previousGap - 4) { cancel(); return; }
+      session.previousGap = currentGap;
+      const meaningful = currentGap >= session.initialGap + 12 && currentGap >= session.initialGap * 1.1;
+      if (meaningful && session.initialSize * currentGap / session.initialGap >= 0.42 * Math.min(viewport.w, viewport.h)) {
+        const graphId = session.graphId;
+        cancel();
+        onOpenRef.current(graphId);
+      }
+    };
+    // Keep the session above React's tile lifecycle: the tile disappears as
+    // the pinch crosses back into item view, but the same two contacts must
+    // still finish their SVG-owned gesture. Capture also sees a third contact
+    // that lands outside the original tile and cancels it.
+    window.addEventListener('touchstart', start, { capture: true, passive: true });
+    window.addEventListener('touchmove', move, { capture: true, passive: true });
+    window.addEventListener('touchend', cancel, { capture: true, passive: true });
+    window.addEventListener('touchcancel', cancel, { capture: true, passive: true });
+    return () => {
+      cancel();
+      window.removeEventListener('touchstart', start, { capture: true });
+      window.removeEventListener('touchmove', move, { capture: true });
+      window.removeEventListener('touchend', cancel, { capture: true });
+      window.removeEventListener('touchcancel', cancel, { capture: true });
+    };
+  }, [currentGraphId, viewport.w, viewport.h]);
+
   const onLevelRef = useRef(onLevel);
   onLevelRef.current = onLevel;
   useEffect(() => { onLevelRef.current(level, minScale); }, [level, minScale]);
@@ -242,8 +321,14 @@ export function GraphZoomContext({ graphs, currentGraphId, camera, readPositions
 
   const short = Math.max(1, Math.min(viewport.w, viewport.h));
   const content = (() => {
-    if (!layout || !context || level === 0) return null;
-    const { frame: f } = layout;
+    if (!layout || !context || (level === 0 && !holdingSiblingTiles)) return null;
+    const projectedFrame = level === 1 && overview ? overviewFrame : null;
+    const f = projectedFrame ? {
+      x: (projectedFrame.x - camera.x) / k,
+      y: (projectedFrame.y - camera.y) / k,
+      w: projectedFrame.w / k,
+      h: projectedFrame.h / k,
+    } : layout.frame;
     const radius = 18 / k;
     const items = plural(readPositions().length, 'item');
     return (
@@ -270,7 +355,7 @@ export function GraphZoomContext({ graphs, currentGraphId, camera, readPositions
               kind="project"
               holdsGraphs={project.children.length > 0}
               name={project.graph.name}
-              detail={project.children.length ? `${plural(project.children.length, 'graph')} · ${plural(project.items, 'item')}` : plural(project.items, 'item')}
+              detail={project.children.length ? `${plural(project.graphCount, 'graph')} · ${plural(project.items, 'item')}` : plural(project.items, 'item')}
               viewportShort={short}
               interactive={!project.current}
               labelled
@@ -279,7 +364,7 @@ export function GraphZoomContext({ graphs, currentGraphId, camera, readPositions
             />
           </g>
         ))}
-        {level >= 2 && layout.siblings.map(({ graph, rect }) => {
+        {(level >= 2 || holdingSiblingTiles) && layout.siblings.map(({ graph, rect }) => {
           const children = context.childCount.get(graph.id) ?? 0;
           return (
             <Tile
@@ -292,7 +377,8 @@ export function GraphZoomContext({ graphs, currentGraphId, camera, readPositions
               detail={children ? `${plural(children, 'graph')}` : plural(graph.nodeCount ?? 0, 'item')}
               viewportShort={short}
               interactive={level === 2}
-              labelled={level === 2}
+              labelled={level === 2 || holdingSiblingTiles}
+              hidden={level < 2}
               onOpen={onOpen}
             />
           );
@@ -307,7 +393,15 @@ export function GraphZoomContext({ graphs, currentGraphId, camera, readPositions
           );
         })()}
         <rect className="zoom-frame" x={f.x} y={f.y} width={f.w} height={f.h} rx={radius} ry={radius} vectorEffect="non-scaling-stroke" />
-        {level <= 2 && (
+        {projectedFrame ? (
+          <g className="zoom-frame-label" data-zoom-frame={context.current.id} role="img" aria-label={`${context.current.name}, ${items}`}>
+            <title>{context.current.name}, {items}</title>
+            <text className="zoom-label" x={f.x + 16 / k} y={f.y + 7 / k}
+              style={{ fontSize: frameTitleSize / k, paintOrder: 'stroke', stroke: 'var(--gd-canvas)', strokeWidth: 5 / k, strokeLinejoin: 'round' }}>
+              <tspan className="zoom-label-name">{projectedName}</tspan>
+            </text>
+          </g>
+        ) : level <= 2 && (
           <g className="zoom-frame-label" data-zoom-frame={context.current.id}>
             {/* Alone, the label sits above the frame; with neighbours around it
                 (one may be directly above), it moves inside like theirs. */}
@@ -327,7 +421,7 @@ export function GraphZoomContext({ graphs, currentGraphId, camera, readPositions
   })();
 
   return (
-    <g ref={ref} className="graph-zoom-context" data-level={level}>
+    <g ref={ref} className="graph-zoom-context" data-level={level} visibility={level === 0 ? 'hidden' : undefined} aria-hidden={level === 0 || undefined}>
       {content}
     </g>
   );

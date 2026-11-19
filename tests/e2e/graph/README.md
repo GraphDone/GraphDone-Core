@@ -23,7 +23,7 @@ flowchart LR
 | `inspector-readability` | `inspector-readability.spec.ts` | Inspector code and nested previews stay readable at several widths. |
 | `semantic-lod` | `semantic-lod.spec.ts`, `local-item-lod.spec.ts` | Zoomed-out overview keeps all 301 items and layout; busy items keep readable neighbours. |
 | `nested-lod` | `nested-semantic-lod.spec.ts` | Nested summaries keep selection, relationships and layout through zoom. |
-| `item-wires` | `item-wire-consumers.spec.ts`, `topology-organization.spec.ts`, `item-symbols.spec.ts`, `relationship-priority.spec.ts` | Wire paths, hit areas, arrows, labels, ring organisation and card symbols. |
+| `item-wires` | `item-wire-consumers.spec.ts`, `topology-organization.spec.ts`, `item-symbols.spec.ts`, `relationship-priority.spec.ts`, `relationship-arrow-pinch.spec.ts` | Wire paths, hit areas, arrows, labels, ring organisation, card symbols and the iPad edge-pinch regression. |
 | `large-symbols` | `large-graph-symbols.spec.ts` | 2000 items and 5000 relationships survive overview and detail zoom. |
 | `layout-recovery` | `layout-recovery.spec.ts` | The latest drag survives reloads, crashes, logout, storage failures and retries. |
 | `new-user` | `guest-dialog-layout`, `responsive-real-workflows`, `overview-board-actions`, `recorded-ai-work`, `admin-dialog-responsive`, `quick-edit-write-order` | Dialogs fit small screens; API progress shows up in the workspace; the last quick edit wins. |

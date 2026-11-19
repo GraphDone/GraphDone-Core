@@ -50,7 +50,7 @@ export const SEQUENCES = {
     'tests/e2e/graph/nested-semantic-lod.spec.ts', `--project=${PW}`, '--headed', '--workers=1', '--retries=0', '--trace=retain-on-failure',
   ], blocking: true },
   'item-wires': { adapter: 'playwright', title: 'Item wire consumer acceptance', args: [
-    'tests/e2e/graph/item-wire-consumers.spec.ts', 'tests/e2e/graph/topology-organization.spec.ts', 'tests/e2e/graph/item-symbols.spec.ts', 'tests/e2e/graph/relationship-priority.spec.ts', `--project=${PW}`, '--headed', '--workers=1', '--retries=0', '--trace=retain-on-failure',
+    'tests/e2e/graph/item-wire-consumers.spec.ts', 'tests/e2e/graph/topology-organization.spec.ts', 'tests/e2e/graph/item-symbols.spec.ts', 'tests/e2e/graph/relationship-priority.spec.ts', 'tests/e2e/graph/relationship-arrow-pinch.spec.ts', `--project=${PW}`, '--headed', '--workers=1', '--retries=0', '--trace=retain-on-failure',
   ], blocking: true },
   'large-symbols': { adapter: 'playwright', title: 'Two thousand item zoom acceptance', args: [
     'tests/e2e/graph/large-graph-symbols.spec.ts', `--project=${PW}`, '--workers=1', '--retries=0', '--trace=retain-on-failure',
@@ -91,6 +91,15 @@ export const SEQUENCES = {
     `--repeat-each=${JOURNEY_REPEAT}`, '--workers=4', '--retries=0',
     ...(process.env.JOURNEY_GREP ? [`--grep=${process.env.JOURNEY_GREP}`] : []),
   ], timeoutMs: Number(process.env.JOURNEY_TIMEOUT_MINUTES || JOURNEY_REPEAT * 6) * 60_000, blocking: false },
+  // ORGANIZE LABELS: after "Organize around connections" every relationship
+  // label is readable (not under a card or another label, inside its edge's
+  // gap) and no card title splits a word, on desktop and iPhone, for Welcome
+  // and a launch checklist; a graph of unplaced items opens no smaller than
+  // its titles and labels show.
+  'organize-labels': { adapter: 'playwright', title: 'Organize — every relationship label readable', args: [
+    'tests/e2e/journeys/organize-labels.spec.ts', '--project=journeys', '--project=journeys-iphone',
+    '--workers=1', '--retries=0', '--trace=retain-on-failure',
+  ], blocking: true },
   // RELATIONSHIP EDIT (#262): change a relationship's type through every type,
   // flip it, reload, delete it, and see a second tab catch up, once per path on
   // desktop, iPad and iPhone. The repeated measurement is the journeys sequence.
@@ -109,6 +118,13 @@ export const SEQUENCES = {
     'tests/e2e/journeys/zoom-out.spec.ts', '--project=journeys', '--project=journeys-ipad', '--project=journeys-iphone',
     '--workers=1', '--retries=0', '--trace=retain-on-failure',
   ], blocking: true },
+  // The phone pinch journey needs the browser-local starter workspace that is
+  // only present in the hosted offline build. Its dedicated blocking sequence
+  // is run by that build's CI step, never collected as a self-hosted skip.
+  'zoom-out-guest-phone': { adapter: 'playwright', title: 'Hosted guest phone — pinch into a sibling graph', args: [
+    'tests/e2e/journeys/zoom-out-guest-phone.spec.ts', '--project=journeys-guest-iphone',
+    '--workers=1', '--retries=0', '--trace=retain-on-failure',
+  ], blocking: true },
   // Cross-repo: ingest the newest GraphDone-Cloud live-audit findings.json (sibling
   // repo) into the unified report. Skips cleanly when absent.
   'cloud-audit': { adapter: 'cloud-audit', title: 'Cloud live audit (ingested)', blocking: false },
@@ -116,8 +132,8 @@ export const SEQUENCES = {
 
 export const PROFILES = {
   smoke: ['unit-web', 'smoke', 'e2e-auth'],
-  pr: ['unit-web', 'smoke', 'e2e-auth', 'e2e-graph', 'agent-connection', 'inspector-readability', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'devices', 'perf-budgets', 'relationship-edit', 'zoom-out'],
-  full: ['unit-web', 'smoke', 'e2e-auth', 'e2e-graph', 'agent-connection', 'inspector-readability', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'devices', 'perf-budgets', 'relationship-edit', 'zoom-out', 'diagnostics', 'showcase', 'matrix', 'vlm', 'perf-scale', 'cloud-audit'],
+  pr: ['unit-web', 'smoke', 'e2e-auth', 'e2e-graph', 'agent-connection', 'inspector-readability', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'organize-labels', 'router-navigation', 'mobile', 'devices', 'perf-budgets', 'relationship-edit', 'zoom-out'],
+  full: ['unit-web', 'smoke', 'e2e-auth', 'e2e-graph', 'agent-connection', 'inspector-readability', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'organize-labels', 'router-navigation', 'mobile', 'devices', 'perf-budgets', 'relationship-edit', 'zoom-out', 'diagnostics', 'showcase', 'matrix', 'vlm', 'perf-scale', 'cloud-audit'],
   report: ['diagnostics', 'showcase', 'matrix', 'vlm', 'perf-scale', 'cloud-audit'],
   live: ['live-journey'],
   journeys: ['journeys'],

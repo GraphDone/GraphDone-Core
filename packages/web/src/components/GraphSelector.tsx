@@ -1,13 +1,18 @@
 import { ProjectTransfer } from './ProjectTransfer';
-import { useState, useRef, useEffect, type ReactNode } from 'react';
+import { useState, useRef, useEffect, useId, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Plus, Folder, FolderOpen, FileText, Share2, Eye, Edit3, Crown, Trash2, FolderPlus, ChevronRight, Users, Bot, Settings, Zap, User, Lock, Sparkles } from 'lucide-react';
 import { useQuery } from '@apollo/client';
 import { useGraph } from '../contexts/GraphContext';
+import type { GraphHierarchy } from '../types/graph';
 import { useAuth } from '../contexts/AuthContext';
 import { GET_WORK_ITEMS, GET_EDGES } from '../lib/queries';
+import { plural } from '../lib/graphZoomContext';
 import { offlineEnabled, localGuest } from '../lib/offline/engine';
 import { exampleAction, starterHierarchy, systemLocked } from '../lib/workspaceRules';
+
+/** Room the locked-button reason needs beside its button (it is one line, about 200 px). */
+const LOCKED_TIP_WIDTH = 240;
 
 interface GraphSelectorProps {
   onCreateGraph?: () => void;
@@ -20,9 +25,10 @@ interface GraphSelectorProps {
 }
 
 export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testId = 'graph-selector' }: GraphSelectorProps) {
-  const { currentGraph, availableGraphs, graphHierarchy, selectGraph, addExampleProject } = useGraph();
+  const { currentGraph, availableGraphs, graphHierarchy, selectGraph, addExampleProject, canEditGraph, canDeleteGraph } = useGraph();
   const { currentTeam, currentUser } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
+  const dropdownId = useId();
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['team', 'personal', 'system']));
   // Which parent graphs are expanded to show their sub-graphs (the hierarchy).
   const [expandedGraphs, setExpandedGraphs] = useState<Set<string>>(new Set());
@@ -55,7 +61,11 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
     });
   };
   const [buttonPosition, setButtonPosition] = useState<{ top: number; left: number; width: number } | null>(null);
-  const [hoveredTooltip, setHoveredTooltip] = useState<{ message: string; x: number; y: number } | null>(null);
+  const [hoveredTooltip, setHoveredTooltip] = useState<{ message: string; x: number; y: number; left?: boolean } | null>(null);
+  const tooltipTimer = useRef<number | null>(null);
+  useEffect(() => () => {
+    if (tooltipTimer.current !== null) window.clearTimeout(tooltipTimer.current);
+  }, []);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
@@ -155,31 +165,48 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
   const graphActions = (row: any) => {
     const graph = availableGraphs.find(g => g.id === row.id) ?? row;
     const isSystemGraph = systemLocked(graph, currentUser?.id);
-    const action = (run: (graph: any) => void, locked: string, hover: string, icon: ReactNode) => (
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          if (!isSystemGraph) {
-            run(graph);
-            setIsOpen(false);
-          }
-        }}
-        onMouseEnter={(e) => {
-          if (isSystemGraph) {
-            const rect = e.currentTarget.getBoundingClientRect();
-            setHoveredTooltip({ message: locked, x: rect.right + 8, y: rect.top + rect.height / 2 });
-          }
-        }}
-        onMouseLeave={() => setHoveredTooltip(null)}
-        className={`p-1.5 rounded-lg transition-all duration-200 ${isSystemGraph ? 'text-gray-600 cursor-not-allowed' : `text-gray-400 ${hover} hover:scale-110`}`}
-      >
-        {icon}
-      </button>
-    );
+    // Why a locked button does nothing: beside it (on its left when the right
+    // edge is near, as on a phone), on hover or on a tap, and to screen readers.
+    const explain = (target: HTMLElement, message: string, fade: boolean) => {
+      const rect = target.getBoundingClientRect();
+      const left = rect.right + 8 + LOCKED_TIP_WIDTH > window.innerWidth;
+      if (tooltipTimer.current !== null) window.clearTimeout(tooltipTimer.current);
+      tooltipTimer.current = fade ? window.setTimeout(() => setHoveredTooltip(null), 2500) : null;
+      setHoveredTooltip({ message, x: left ? rect.left - 8 : rect.right + 8, y: rect.top + rect.height / 2, left });
+    };
+    const action = (label: string, run: (graph: any) => void, locked: string | undefined, hover: string, icon: ReactNode) => {
+      const reasonId = `graph-locked-${label.toLowerCase()}-${graph.id}`;
+      return (
+        <button
+          aria-label={`${label} ${graph.name}`}
+          aria-disabled={locked ? true : undefined}
+          aria-describedby={locked ? reasonId : undefined}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (!locked) {
+              run(graph);
+              setIsOpen(false);
+            } else explain(e.currentTarget, locked, true);
+          }}
+          onMouseEnter={(e) => {
+            if (locked) explain(e.currentTarget, locked, false);
+          }}
+          onMouseLeave={() => setHoveredTooltip(null)}
+          className={`p-1.5 [@media(hover:none)]:p-[15px] rounded-lg transition-all duration-200 ${locked ? 'text-gray-600 cursor-not-allowed' : `text-gray-400 ${hover} hover:scale-110`}`}
+        >
+          {icon}
+          {locked && <span id={reasonId} className="sr-only">{locked}</span>}
+        </button>
+      );
+    };
+    const editReason = isSystemGraph ? "🔒 System graph — can't be edited"
+      : !canEditGraph(graph.id) ? 'You need edit access to rename or change this graph.' : undefined;
+    const deleteReason = isSystemGraph ? "🔒 System graph — can't be deleted"
+      : !canDeleteGraph(graph.id) ? 'Only the graph owner or admin can delete this graph.' : undefined;
     return (
-      <div className="shrink-0 flex items-center space-x-1 opacity-0 group-hover/item:opacity-100 transition-opacity ml-2">
-        {onEditGraph && action(onEditGraph, '🔒 System graph — can\'t be edited', 'hover:text-blue-400 hover:bg-blue-500/20', <Edit3 className="h-3.5 w-3.5" />)}
-        {onDeleteGraph && action(onDeleteGraph, '🔒 System graph — can\'t be deleted', 'hover:text-red-400 hover:bg-red-500/20', <Trash2 className="h-3.5 w-3.5" />)}
+      <div className="shrink-0 flex items-center space-x-1 opacity-0 group-hover/item:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity ml-2">
+        {onEditGraph && action('Edit', onEditGraph, editReason, 'hover:text-blue-400 hover:bg-blue-500/20', <Edit3 className="h-3.5 w-3.5" />)}
+        {onDeleteGraph && action('Delete', onDeleteGraph, deleteReason, 'hover:text-red-400 hover:bg-red-500/20', <Trash2 className="h-3.5 w-3.5" />)}
       </div>
     );
   };
@@ -216,11 +243,11 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
   // Organize graphs into folder structure
   const organizeGraphsIntoFolders = () => {
     const folders = {
-      team: [] as any[],
-      personal: [] as any[],
-      system: [] as any[],
-      ai: [] as any[],
-      templates: [] as any[]
+      team: [] as GraphHierarchy[],
+      personal: [] as GraphHierarchy[],
+      system: [] as GraphHierarchy[],
+      ai: [] as GraphHierarchy[],
+      templates: [] as GraphHierarchy[]
     };
 
     graphHierarchy.forEach(graph => {
@@ -279,6 +306,52 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
     }
   };
 
+  const renderGraph = (graph: GraphHierarchy, depth = 0): ReactNode => {
+    const expanded = expandedGraphs.has(graph.id);
+    const active = graph.id === currentGraph?.id;
+    return (
+      <div key={graph.id}>
+        <div
+          className={`flex min-w-0 items-center group/item ${depth > 0 ? 'border-l border-gray-700/40 pl-2' : ''}`}
+          style={{ marginLeft: Math.min(depth, 4) * 12 }}
+        >
+          {graph.children.length > 0 && (
+            <button
+              onClick={() => toggleGraphExpand(graph.id)}
+              className="min-h-11 min-w-11 flex shrink-0 items-center justify-center rounded-lg text-gray-400 hover:text-white"
+              title={plural(graph.children.length, 'sub-graph')}
+              aria-label={`${expanded ? 'Collapse' : 'Expand'} ${graph.name}`}
+              aria-expanded={expanded}
+            >
+              <ChevronRight className={`h-3.5 w-3.5 transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`} />
+            </button>
+          )}
+          <button
+            onClick={() => handleGraphSelect(graph.id)}
+            className={`min-w-0 flex-1 flex items-center gap-2 rounded-xl border p-2 text-left transition-all duration-200 ${
+              active
+                ? 'bg-gradient-to-r from-emerald-500/25 to-green-500/25 text-emerald-200 border-emerald-400/40'
+                : 'hover:bg-gray-700/50 text-gray-300 border-transparent hover:border-gray-600/30'
+            }`}
+          >
+            <div className={`w-7 h-7 rounded-lg flex shrink-0 items-center justify-center ${getGraphTypeColor(graph.type)}`}>
+              {getGraphTypeIcon(graph.type)}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-medium truncate">{graph.name}</div>
+              <div className="text-xs text-gray-400">
+                {plural(active ? actualNodeCount : graph.nodeCount || 0, 'item')} • {plural(active ? actualEdgeCount : graph.edgeCount || 0, 'connection')}
+              </div>
+            </div>
+            {active && <div className="w-2 h-2 shrink-0 bg-green-400 rounded-full animate-pulse shadow-lg shadow-green-400/50" />}
+          </button>
+          {graphActions(graph)}
+        </div>
+        {expanded && graph.children.map(child => renderGraph(child, depth + 1))}
+      </div>
+    );
+  };
+
   // Show no graphs available if we have no available graphs at all
   if (graphHierarchy.length === 0 || !currentGraph) {
     return (
@@ -299,6 +372,8 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
         ref={buttonRef}
         onClick={toggleDropdown}
         data-testid={testId}
+        aria-expanded={isOpen}
+        aria-controls={isOpen ? dropdownId : undefined}
         className="project-switcher flex items-center gap-3 w-full p-3 text-left rounded-lg transition-colors border"
       >
         <div className="flex-shrink-0">
@@ -312,7 +387,7 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
             {currentGraph.name}
           </div>
           <div className="flex items-center gap-2 text-xs text-gray-400">
-            <span className="block truncate">{actualNodeCount} item{actualNodeCount !== 1 ? 's' : ''}, {actualEdgeCount} connection{actualEdgeCount !== 1 ? 's' : ''}</span>
+            <span className="block truncate">{plural(actualNodeCount, 'item')}, {plural(actualEdgeCount, 'connection')}</span>
           </div>
         </div>
         
@@ -322,7 +397,10 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
       {/* Dropdown menu with folder structure - Portal based for proper z-index */}
       {isOpen && buttonPosition && createPortal(
         <div
+          id={dropdownId}
           data-testid="graph-selector-dropdown"
+          role="region"
+          aria-label="Projects"
           className="project-menu flex flex-col bg-gray-800 border border-gray-600/50 rounded-xl shadow-2xl overflow-hidden"
           style={{
             position: 'fixed',
@@ -383,85 +461,13 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
                       <ChevronRight className={`h-3.5 w-3.5 text-gray-400 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
                       {getFolderIcon(folderId)}
                       <span className="text-sm font-medium text-gray-200 group-hover:text-white flex-1">{getFolderName(folderId)}</span>
-                      <span className="text-xs font-normal text-gray-500 bg-gray-700/50 px-2 py-0.5 rounded-full">{graphs.length}</span>
+                      <span className="text-xs font-normal text-gray-300 bg-gray-700/50 px-2 py-0.5 rounded-full">{graphs.length}</span>
                     </button>
 
                     {/* Folder Contents */}
                     {isExpanded && (
                       <div className="ml-5 mt-1 space-y-1">
-                        {graphs.map((graph) => (
-                          <div key={graph.id}>
-                          <div className="flex min-w-0 items-center group/item">
-                            {graph.children && graph.children.length > 0 && (
-                              <button
-                                onClick={(e) => { e.stopPropagation(); toggleGraphExpand(graph.id); }}
-                                className="p-1 mr-0.5 flex-shrink-0 text-gray-400 hover:text-white"
-                                title={`${graph.children.length} sub-graphs`}
-                              >
-                                <ChevronRight className={`h-3.5 w-3.5 transition-transform duration-200 ${expandedGraphs.has(graph.id) ? 'rotate-90' : ''}`} />
-                              </button>
-                            )}
-                            <button
-                              onClick={() => handleGraphSelect(graph.id)}
-                              className={`min-w-0 flex-1 flex items-center space-x-2.5 p-2.5 rounded-xl text-left transition-all duration-200 ${
-                                graph.id === currentGraph?.id
-                                  ? 'bg-gradient-to-r from-emerald-500/25 to-green-500/25 text-emerald-200 border-2 border-emerald-400/40 shadow-lg'
-                                  : 'hover:bg-gray-700/50 text-gray-300 border border-transparent hover:border-gray-600/30'
-                              }`}
-                            >
-                              <div className="flex-shrink-0">
-                                <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${getGraphTypeColor(graph.type)} shadow-sm`}>
-                                  {getGraphTypeIcon(graph.type)}
-                                </div>
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="text-sm font-medium truncate">{graph.name}</div>
-                                <div className="text-xs text-gray-400 flex flex-wrap items-center gap-x-1.5">
-                                  <span className="flex items-center">
-                                    <span className="font-normal">{graph.id === currentGraph?.id ? actualNodeCount : (graph.nodeCount || 0)}</span>
-                                    <span className="ml-0.5">items</span>
-                                  </span>
-                                  <span>•</span>
-                                  <span className="flex items-center">
-                                    <span className="font-normal">{graph.id === currentGraph?.id ? actualEdgeCount : (graph.edgeCount || 0)}</span>
-                                    <span className="ml-0.5">connections</span>
-                                  </span>
-                                </div>
-                              </div>
-                              {graph.id === currentGraph?.id && (
-                                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse shadow-lg shadow-green-400/50"></div>
-                              )}
-                            </button>
-                            
-                            {graphActions(graph)}
-                          </div>
-                          {graph.children && graph.children.length > 0 && expandedGraphs.has(graph.id) && (
-                            <div className="ml-6 mt-1 space-y-1 border-l border-gray-700/40 pl-2">
-                              {graph.children.map((child: any) => (
-                                <div key={child.id} className="flex min-w-0 items-center group/item">
-                                  <button
-                                    onClick={() => handleGraphSelect(child.id)}
-                                    className={`min-w-0 flex-1 flex items-center space-x-2 p-2 rounded-lg text-left transition-all duration-200 ${
-                                      child.id === currentGraph?.id
-                                        ? 'bg-emerald-500/20 text-emerald-200 border border-emerald-400/40'
-                                        : 'hover:bg-gray-700/50 text-gray-300 border border-transparent'
-                                    }`}
-                                  >
-                                    <div className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 ${getGraphTypeColor(child.type)}`}>
-                                      {getGraphTypeIcon(child.type)}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                      <div className="text-xs font-medium truncate">{child.name}</div>
-                                      <div className="text-xs text-gray-400">{child.nodeCount || 0} items • {child.edgeCount || 0} connections</div>
-                                    </div>
-                                  </button>
-                                  {graphActions(child)}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                          </div>
-                        ))}
+                        {graphs.map(graph => renderGraph(graph))}
                       </div>
                     )}
                   </div>
@@ -508,7 +514,7 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
           {graphHierarchy.length > 0 && (
             <div className="shrink-0 border-t border-gray-600 p-3 bg-gray-700/50">
               <div className="flex items-center justify-between text-xs font-normal text-gray-400">
-                <span>Total: {graphHierarchy.length} Graph{graphHierarchy.length !== 1 ? 's' : ''}</span>
+                <span>Total: {plural(availableGraphs.length, 'Graph')}</span>
               </div>
             </div>
           )}
@@ -519,7 +525,8 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
       {/* Tooltip Portal */}
       {hoveredTooltip && createPortal(
         <div
-          className="fixed px-2 py-1 bg-red-600 text-white text-xs rounded whitespace-nowrap pointer-events-none z-[9999999999] -translate-y-1/2"
+          role="tooltip"
+          className={`fixed px-2 py-1 bg-red-600 text-white text-xs rounded whitespace-nowrap pointer-events-none z-[9999999999] -translate-y-1/2 ${hoveredTooltip.left ? '-translate-x-full' : ''}`}
           style={{
             left: hoveredTooltip.x,
             top: hoveredTooltip.y

@@ -21,6 +21,9 @@ flowchart LR
 - `dbHealing.ts` — DB isolation + cleanup for heavy suites
 - `testEnv.ts` — `.env.test.local` loader (VLM endpoints, etc.)
 - `mobileAudit.ts`, `zorder.ts` — DOM auditors used by the mobile/z-order specs
+- `edgeLabelAudit.ts` — reads every drawn relationship label's box from the DOM
+  and says whether it is readable (shown, text at least 11 px, clear of cards
+  and labels, in its gap) and whether every card is on screen
 - `vlm.ts` — local-VLM client for the visual-evaluation sequence
 - `mock-oauth-server.ts` — OAuth mock for the admin/oauth-provider specs
 - `metrics/balance_metrics.py` — OpenCV graph-balance metrics (subprocess; also
