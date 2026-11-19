@@ -22,7 +22,7 @@ test name or file path. Lessons so far cover:
 
 | Topic | Example lessons |
 | --- | --- |
-| Graph rendering, LOD and layout | `2026-10-29-high-degree-detail-needs-local-lod.md`, `2026-11-07-fit-must-measure-presented-geometry.md` |
+| Graph rendering, LOD and layout | `2026-10-29-high-degree-detail-needs-local-lod.md`, `2026-11-07-fit-must-measure-presented-geometry.md`, `2026-11-10-layouts-must-leave-label-room.md` |
 | Interaction and focus | `2026-10-28-drag-mode-must-survive-modifier-release.md`, `2026-10-27-delayed-autofocus-must-preserve-chosen-focus.md` |
 | Auth and security | `2026-10-23-magic-link-consumption.md`, `2026-10-27-captcha-proof-must-be-server-issued.md` |
 | Releases, CI and dependencies | `2026-10-23-release-gates-must-fail-closed.md`, `2026-10-28-advisories-follow-installed-consumers.md` |
