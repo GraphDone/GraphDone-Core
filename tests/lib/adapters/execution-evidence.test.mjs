@@ -64,6 +64,53 @@ test('playwright: failed attempt followed by pass is not clean acceptance', asyn
   const report = playwrightReport([{ status: 'flaky', expectedStatus: 'passed', results: [{ status: 'failed' }, { status: 'passed' }] }]);
   assert.equal((await execute(t, 'playwright', report)).status, 'failed');
 });
+test('playwright: flaky retry retains first failure diagnostic and labels every attempt attachment', async t => {
+  const report = playwrightReport([{
+    status: 'flaky', expectedStatus: 'passed',
+    results: [
+      { status: 'failed', error: { message: 'Grow failed on first attempt' }, attachments: [
+        { name: 'first-screenshot', contentType: 'image/png', path: '/tmp/first.png' },
+      ] },
+      { status: 'passed', attachments: [
+        { name: 'retry-screenshot', contentType: 'image/png', path: '/tmp/retry.png' },
+      ] },
+    ],
+  }]);
+  const result = await execute(t, 'playwright', report);
+  assert.equal(result.status, 'failed');
+  assert.equal(result.cases[0].error, 'Grow failed on first attempt');
+  assert.deepEqual(result.cases[0].attachments.map(attachment => attachment.name), [
+    'first-screenshot (attempt 1)', 'retry-screenshot (attempt 2)',
+  ]);
+});
+test('playwright: terminal failed retry keeps its distinct final diagnostic', async t => {
+  const report = playwrightReport([{
+    status: 'unexpected', expectedStatus: 'passed',
+    results: [
+      { status: 'failed', error: { message: 'first failure' } },
+      { status: 'failed', error: { message: 'terminal failure' } },
+    ],
+  }]);
+  const result = await execute(t, 'playwright', report);
+  assert.equal(result.cases[0].error, 'terminal failure');
+});
+test('playwright: timed-out attempt remains diagnostic after a passing retry', async t => {
+  const report = playwrightReport([{
+    status: 'flaky', expectedStatus: 'passed',
+    results: [{ status: 'timedOut', timedOut: true }, { status: 'passed' }],
+  }]);
+  const result = await execute(t, 'playwright', report);
+  assert.equal(result.cases[0].error, 'Playwright attempt timed out.');
+});
+test('playwright: malformed attempt errors become evidence errors instead of throwing', async t => {
+  const report = playwrightReport([{
+    status: 'unexpected', expectedStatus: 'passed',
+    results: [{ status: 'failed', errors: { message: 'malformed' } }],
+  }]);
+  const result = await execute(t, 'playwright', report);
+  assert.equal(result.status, 'failed');
+  assert.equal(result.evidenceErrors.some(error => error.includes('Invalid Playwright result errors.')), true);
+});
 test('playwright: listed tests with no execution results fail', async t => {
   assert.equal((await execute(t, 'playwright', playwrightReport([{ expectedStatus: 'passed', results: [] }]))).status, 'failed');
 });

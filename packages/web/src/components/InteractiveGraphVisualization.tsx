@@ -73,6 +73,7 @@ import { DEFAULT_PHYSICS, collisionRadius, linkDistance, linkMaxDistance, linkSt
 import { computeCompactLayout, isHierarchicalLayout, parseLayoutMode, LAYOUT_MODE_STORAGE_KEY, type LayoutMode } from '../lib/layoutAlgorithms';
 import { edgeBorderEndpoints, minEdgeLength, clampToMinNeighbors } from '../lib/edgeGeometry';
 import { directionStrategy, arrowVisibility, perpendicularOffset } from '../lib/edgeLOD';
+import { edgeLabelHasCurrentPlacement, edgeNeedsPaintGeometry } from '../lib/edgePaintScope';
 import { assignParallelEdgeIndices } from '../lib/parallelEdges';
 import { isTap, touchHitSize, isCoarsePointer } from '../lib/touchInteraction';
 import { usePositionSaveQueue } from '../hooks/usePositionSaveQueue';
@@ -623,7 +624,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const [isFlippingEdge, setIsFlippingEdge] = useState(false);
   const [selectedNodes, setSelectedNodes] = useState<Set<string>>(new Set());
   // Inline rename: an input floats over the node — no modal (W2)
-  const [inlineEdit, setInlineEdit] = useState<{ nodeId: string; value: string; original: string; graphX: number; graphY: number } | null>(null);
+  const [inlineEdit, setInlineEdit] = useState<{ nodeId: string; value: string; original: string; graphX: number; graphY: number; scope: string | null } | null>(null);
   // PR #87: quick in-context node editor (double-click a node) — edits every
   // field without the heavy details modal. Holds the work item being edited.
   const [quickEditNode, setQuickEditNode] = useState<any | null>(null);
@@ -1709,8 +1710,14 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     y: number,
     options?: { type?: string; connectFrom?: { id: string; type?: string } }
   ) => {
-    // Create inline node function
-    if (!currentGraph?.id || (options?.connectFrom && !canEditCurrentGraphRef.current)) return;
+    const growFrom = options?.connectFrom;
+    const canEditScope = () => activeLayoutScopeRef.current === layoutScope && canEditCurrentGraphRef.current;
+    if (!currentGraph?.id || (growFrom && (!currentUser || !canEditScope()))) return;
+    const graphId = currentGraph.id;
+    const ownerId = currentUser?.id;
+    const generation = undoStack.generation;
+    const canFinishGrow = () => canEditScope() && undoStack.generation === generation;
+    const confirmedWrite = growFrom ? { awaitRefetchQueries: false, context: { expectedOwnerId: ownerId } } : {};
 
     try {
       // Generate a unique name that doesn't conflict with existing nodes
@@ -1755,51 +1762,75 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       };
 
       const result = await createNodeMutation({
+        ...confirmedWrite,
         variables: { input: [workItemInput] }
       });
+      const newNode = result.data?.createWorkItems?.workItems?.[0];
+      if (!newNode?.id || (growFrom && (result.errors?.length || newNode.graph?.id !== graphId))) {
+        throw new Error('The work item was not saved.');
+      }
+      setNodeCounter(prev => prev + 1);
 
-      if (result.data) {
-        setNodeCounter(prev => prev + 1);
-        const newNode = result.data.createWorkItems?.workItems?.[0];
-
-        // Grow mode: wire the new node to its source immediately
-        let grownEdgeId: string | undefined;
-        if (newNode?.id && options?.connectFrom && canEditCurrentGraphRef.current && activeLayoutScopeRef.current === layoutScope) {
+      let grownEdgeId: string | undefined;
+      if (growFrom && canFinishGrow()) {
+        try {
           const edgeResult = await createEdgeMutation({
+            ...confirmedWrite,
             variables: {
               input: [{
                 type: 'IS_PART_OF',
                 weight: 0.8,
-                source: { connect: { where: { node: { id: newNode.id } } } },
-                target: { connect: { where: { node: { id: options.connectFrom.id } } } }
+                source: { connect: { where: { node: { id: newNode.id, graph: { id: graphId } } } } },
+                target: { connect: { where: { node: { id: growFrom.id, graph: { id: graphId } } } } }
               }]
             }
-          }).catch(() => undefined); /* edge failure shouldn't kill the node */
-          grownEdgeId = edgeResult?.data?.createEdges?.edges?.[0]?.id;
-        }
-
-        if (newNode?.id) {
-          const createdId = newNode.id;
-          const edgeToRemove = grownEdgeId;
-          undoStack.push({
-            label: 'Create item',
-            undo: async () => {
-              // edges first — orphan edges break the whole edges query
-              if (edgeToRemove) {
-                await deleteEdgeMutation({ variables: { where: { id: edgeToRemove } } }).catch(() => {});
-              }
-              await deleteWorkItemMutation({ variables: { where: { id: createdId } } });
-            }
           });
+          const edge = edgeResult.data?.createEdges?.edges?.[0];
+          if (edgeResult.errors?.length || !edge?.id || edge.type !== 'IS_PART_OF' ||
+              edge.source?.id !== newNode.id || edge.target?.id !== growFrom.id) {
+            throw new Error('The connection was not saved.');
+          }
+          grownEdgeId = edge.id;
+        } catch {
+          if (canFinishGrow()) showError('Item created, but the connection was not saved');
         }
-
-        // The name is the next thing a person wants to set — put them
-        // straight into an inline rename, no modal (interaction-model W2/W3)
-        if (newNode?.id) {
-          setInlineEdit({ nodeId: newNode.id, value: newNode.title || nodeTitle, original: newNode.title || nodeTitle, graphX: x, graphY: y });
-        }
-        return newNode;
       }
+
+      if (!growFrom || canFinishGrow()) {
+        const createdId = newNode.id;
+        const edgeToRemove = grownEdgeId;
+        undoStack.push({
+          label: 'Create item',
+          undo: async () => {
+            if (growFrom && !canFinishGrow()) throw new Error('This work item can no longer be edited.');
+            if (edgeToRemove && growFrom) {
+              const result = await deleteEdgeMutation({
+                ...confirmedWrite,
+                variables: { where: { id: edgeToRemove, source: { id: createdId, graph: { id: graphId } }, target: { id: growFrom.id } } }
+              });
+              const deletion = result.data?.deleteEdges;
+              if (result.errors?.length || (!deletion?.nodesDeleted && !deletion?.relationshipsDeleted)) {
+                throw new Error('The connection could not be removed.');
+              }
+              if (!canFinishGrow()) throw new Error('This work item can no longer be edited.');
+            }
+            const result = await deleteWorkItemMutation({
+              ...confirmedWrite,
+              variables: { where: growFrom ? { id: createdId, graph: { id: graphId } } : { id: createdId } },
+            });
+            if (growFrom && (result.errors?.length || result.data?.deleteWorkItems?.nodesDeleted !== 1)) {
+              throw new Error('The work item could not be removed.');
+            }
+          }
+        });
+      }
+
+      // The name is the next thing a person wants to set — put them
+      // straight into an inline rename, no modal (interaction-model W2/W3)
+      if (growFrom ? canFinishGrow() : canEditScope()) {
+        setInlineEdit({ nodeId: newNode.id, value: newNode.title || nodeTitle, original: newNode.title || nodeTitle, graphX: x, graphY: y, scope: layoutScope });
+      }
+      return newNode;
     } catch (error) {
       console.error('[Create Work Item Error]', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to create work item';
@@ -3839,7 +3870,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         });
       }
       const liveK = svg.node() ? d3.zoomTransform(svg.node() as Element).k : 1;
-      linkElements.each(function(d: any) {
+      const routedLinks = linkElements.filter((d: any) => edgeNeedsPaintGeometry(d, cullActive));
+      routedLinks.each(function(d: any) {
         const ep = edgeBorderEndpoints(
           { x: d.source.x || 0, y: d.source.y || 0 }, getNodeDimensions(d.source),
           { x: d.target.x || 0, y: d.target.y || 0 }, getNodeDimensions(d.target)
@@ -3850,11 +3882,11 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           { id: d.target.id, x: ep.x2, y: ep.y2 }, offset
         );
       });
-      linkElements.attr('d', (d: any) => d._route?.path ?? null);
-      clickableEdges.attr('d', (d: any) => d._route?.path ?? null);
+      routedLinks.attr('d', (d: any) => d._route?.path ?? null);
+      clickableEdges.filter((d: any) => edgeNeedsPaintGeometry(d, cullActive)).attr('d', (d: any) => d._route?.path ?? null);
       applyEdgeDisplays();
       if (simplifiedRef.current && !forceAvoid) return;
-      arrowElements.attr('transform', (d: any) => {
+      arrowElements.filter((d: any) => edgeNeedsPaintGeometry(d, cullActive)).attr('transform', (d: any) => {
         const route = d._route as EdgeRouteGeometry | null;
         if (!route) return null;
         const target = route.target;
@@ -3877,12 +3909,17 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         return [{ x: (rect.x + rect.width / 2 - viewportRect.x - camera.x) / liveK, y: (rect.y + rect.height / 2 - viewportRect.y - camera.y) / liveK, width: rect.width / liveK, height: rect.height / liveK }];
       });
       const intersectsViewport = (box: ObstacleBox) => Math.abs(box.x - labelViewport!.x) <= (box.width + labelViewport!.width) / 2 + 8 && Math.abs(box.y - labelViewport!.y) <= (box.height + labelViewport!.height) / 2 + 8;
-      nodeLabelObstacles = (simulation.nodes() as any[]).map(n => ({ x: n.x || 0, y: n.y || 0, ...getNodeDimensions(n) })).filter(intersectsViewport);
+      const paintedNodes = (simulation.nodes() as any[])
+        .filter(n => !cullActive || !n._culled);
+      nodeLabelObstacles = paintedNodes
+        .map(n => ({ x: n.x || 0, y: n.y || 0, ...getNodeDimensions(n) }))
+        .filter(intersectsViewport);
       const drawnEdges = visibleEdges.filter((edge: any) => edgeDisplay(edge) !== 'none');
       routeSegments = drawnEdges.flatMap((edge: any) => edge._route?.segments ?? []).filter(segment => edgeSegmentHitsBox(segment, labelViewport!, 8));
       routeObstacles = drawnEdges.map((edge: any) => edgeRouteArrowBounds(edge._route, arrowVisibility(liveK, edge._pTotal || 1).scale)).filter(intersectsViewport);
       const chips = compactRelationshipLabel(container.clientWidth, isCoarsePointer(), liveK);
-      const candidates = edgeLabelGroups.data().map((d: any) => {
+      const paintedLabelGroups = edgeLabelGroups.filter((d: any) => edgeNeedsPaintGeometry(d, cullActive));
+      const candidates = paintedLabelGroups.data().map((d: any) => {
         d._labelScale = Math.max(1, 1 / liveK);
         const dimensions = chips ? PHONE_RELATIONSHIP_CHIP : d._labelDims;
         return {
@@ -3891,15 +3928,20 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           t: d.labelT ?? 0.5, offset: (d._routeLabel?.offset < 0 ? -1 : 1) * (26 * d._labelScale + 3), dragged: !!d.labelTUser,
         };
       });
+      const candidateIds = new Set(candidates.map(candidate => candidate.id));
+      for (const id of labelRects.keys()) if (!candidateIds.has(id)) labelRects.delete(id);
       const placeOptions = { viewport: labelViewport, obstacles: nodeLabelObstacles.concat(uiLabelObstacles.filter(intersectsViewport), routeObstacles), segments: routeSegments };
       const result = placeItemLabelsWithRetry(candidates, placeOptions);
-      edgeLabelGroups.each(function(d: any) {
+      paintedLabelGroups.each(function(d: any) {
         const placement = result.placements.get(d.id) ?? null;
         d._labelBlocked = !placement;
         applyLabel(this, d, placement, chips);
       });
       g.attr('data-label-attempts', result.attempts);
       g.attr('data-label-checks', result.checks);
+      g.attr('data-label-candidates', candidates.length);
+      g.attr('data-label-node-obstacles', nodeLabelObstacles.length);
+      g.attr('data-label-node-dimensions', paintedNodes.length);
       setItemLabelCount(result.placements.size);
     };
 
@@ -3994,7 +4036,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     let cullCounter = 0;
     let cullActive = false;
     const edgeDisplay = (d: any) => {
-      if (d._priorityVisible === false || !d._route || (cullActive && d.source?._culled && d.target?._culled)) return 'none';
+      if (!edgeNeedsPaintGeometry(d, cullActive) || !d._route) return 'none';
       if (localItemBoardRef.current) {
         const camera = d3.zoomTransform(svg.node()!);
         const visible = (node: any) => node.x * camera.k + camera.x >= 0 && node.x * camera.k + camera.x <= width && node.y * camera.k + camera.y >= 0 && node.y * camera.k + camera.y <= height;
@@ -4002,24 +4044,30 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       }
       return null;
     };
+    let edgeDisplayPasses = 0;
     const applyEdgeDisplays = () => {
+      g.attr('data-edge-display-passes', ++edgeDisplayPasses);
       linkElements.style('display', edgeDisplay);
       clickableEdges.style('display', edgeDisplay);
       arrowElements.style('display', edgeDisplay);
-      edgeLabelGroups.style('display', (d: any) => d._routeLabel ? edgeDisplay(d) : 'none');
+      // A culled label can retain its last route placement for the next
+      // avoidance pass, but labelRects is the authority that the placement is
+      // current. Never briefly reveal a discarded hit target during live pan.
+      edgeLabelGroups.style('display', (d: any) =>
+        edgeLabelHasCurrentPlacement(d._routeLabel, labelRects.has(d.id)) ? edgeDisplay(d) : 'none');
     };
-    const clearCull = () => {
+    const clearCull = (updateEdges = true) => {
       nodeElements.style('display', null);
       cullActive = false;
-      applyEdgeDisplays();
+      if (updateEdges) applyEdgeDisplays();
     };
-    const applyViewportCull = () => {
+    const applyViewportCull = (updateEdges = true) => {
       if (itemPresentation.isOverview()) return;
       const svgEl = svg.node();
       if (!svgEl) return;
       const t = d3.zoomTransform(svgEl);
       if (t.k < CULL_MIN_SCALE) {
-        if (cullActive) clearCull();
+        if (cullActive) clearCull(updateEdges);
         return;
       }
       cullActive = true;
@@ -4035,14 +4083,17 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         if (visible) updateNodePresentationFor(this, d);
         return visible ? null : 'none';
       });
-      applyEdgeDisplays();
+      if (updateEdges) applyEdgeDisplays();
     };
 
     simulation.on('tick', () => {
       if (simulationRef.current !== simulation) return;
       const tickStart = performance.now();
       cullCounter++;
-      if (cullEnabled && cullCounter % 5 === 0) applyViewportCull();
+      // A normal item tick immediately reconciles edge displays while routing.
+      // Dot mode skips that routing pass, so it must retain the cull-owned
+      // display update (and its hit-target visibility).
+      if (cullEnabled && cullCounter % 5 === 0) applyViewportCull(dotModeRef.current);
 
       // 1) Nodes first
       nodeElements
@@ -4293,13 +4344,15 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         if (resuming) nodePresentationScales = new WeakMap();
         const scale = d3.zoomTransform(svg.node()!).k;
         itemPresentationScaleRef.current = scale;
-        if (cullEnabled) applyViewportCull();
+        const displayPassesBefore = edgeDisplayPasses;
+        if (cullEnabled) applyViewportCull(false);
         updateNodePresentation();
         updateEdgePositions(true);
         updateZoomPresentation(scale);
         g.attr('data-presentation-kind', 'items');
         g.attr('data-item-presentation-scale', scale);
         g.attr('data-item-presentation-passes', ++itemPresentationPasses);
+        g.attr('data-item-edge-display-passes', edgeDisplayPasses - displayPassesBefore);
       },
       presentOverview: () => {
         itemPresentationScaleRef.current = d3.zoomTransform(svg.node()!).k;
@@ -5840,29 +5893,39 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       )}
 
       {/* Inline rename: the input floats over the node — no modal (W2) */}
-      {inlineEdit && (() => {
+      {inlineEdit && inlineEdit.scope === layoutScope && canEditCurrentGraph && (() => {
         const simNode = (simulationRef.current?.nodes() as any[])?.find((n: any) => n.id === inlineEdit.nodeId);
         const gx = simNode?.x ?? inlineEdit.graphX;
         const gy = simNode?.y ?? inlineEdit.graphY;
         const left = gx * currentTransform.scale + currentTransform.x;
         const top = gy * currentTransform.scale + currentTransform.y;
-        const commit = () => {
+        const saveTitle = async (title: string) => {
+          if (!currentUser || !currentGraph || activeLayoutScopeRef.current !== inlineEdit.scope || !canEditCurrentGraphRef.current) {
+            throw new Error('This work item can no longer be edited.');
+          }
+          const result = await updateWorkItemMutation({
+            context: { expectedOwnerId: currentUser.id },
+            variables: { where: { id: inlineEdit.nodeId, graph: { id: currentGraph.id } }, update: { title } },
+            awaitRefetchQueries: false,
+          });
+          const saved = result.data?.updateWorkItems?.workItems?.some((item: { id: string; title: string }) =>
+            item.id === inlineEdit.nodeId && item.title === title
+          );
+          if (result.errors?.length || !saved) throw new Error('The work item title was not saved.');
+        };
+        const commit = async () => {
           const title = inlineEdit.value.trim();
           const previous = inlineEdit.original;
           setInlineEdit(null);
-          if (title && title !== previous) {
-            updateWorkItemMutation({
-              variables: { where: { id: inlineEdit.nodeId }, update: { title } }
-            }).then(() => {
-              undoStack.push({
-                label: 'Rename item',
-                undo: async () => {
-                  await updateWorkItemMutation({
-                    variables: { where: { id: inlineEdit.nodeId }, update: { title: previous } }
-                  });
-                }
-              });
-            }).catch(() => showError('Could not rename item'));
+          if (!title || title === previous) return;
+          const generation = undoStack.generation;
+          try {
+            await saveTitle(title);
+            if (undoStack.generation === generation && activeLayoutScopeRef.current === inlineEdit.scope && canEditCurrentGraphRef.current) {
+              undoStack.push({ label: 'Rename item', undo: () => saveTitle(previous) });
+            }
+          } catch {
+            if (activeLayoutScopeRef.current === inlineEdit.scope) showError('Could not rename item');
           }
         };
         return (

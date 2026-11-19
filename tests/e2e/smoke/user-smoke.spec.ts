@@ -124,132 +124,90 @@ test.describe('user smoke: the app works from a user point of view @smoke', () =
   });
 
   test('grow flow stays healthy: + → empty space → connected named node @smoke', async ({ page }) => {
-    test.setTimeout(90_000); // fixture build + reload + settle + grow + undo exceed the 30s default
+    test.setTimeout(90_000);
     await login(page, TEST_USERS.ADMIN);
-    await page.waitForTimeout(1500);
+    const owner = (await gql(page, '{me{id}}')).me.id;
+    const graphId = (await gql(page, 'mutation($input:[GraphCreateInput!]!){createGraphs(input:$input){graphs{id}}}', {
+      input: [{ name: `Grow Smoke ${Date.now()}`, type: 'PROJECT', status: 'ACTIVE', createdBy: owner }],
+    })).createGraphs.graphs[0].id;
+    ownedGraphs.set(page, [...(ownedGraphs.get(page) || []), graphId]);
+    const seedId = (await gql(page, 'mutation($input:[WorkItemCreateInput!]!){createWorkItems(input:$input){workItems{id}}}', {
+      input: [{
+        type: 'TASK', title: 'Grow Seed', status: 'IN_PROGRESS', priority: 0.5,
+        positionX: 400, positionY: 300, positionZ: 0,
+        owner: { connect: { where: { node: { id: owner } } } },
+        graph: { connect: { where: { node: { id: graphId } } } },
+      }],
+    })).createWorkItems.workItems[0].id;
 
-    // Deterministic fixture: a fresh ADMIN-OWNED graph with ONE regular TASK
-    // node. The auto-selected default graph is non-deterministic and a known
-    // flake source — the seeded "Development Team" hierarchy uses sheet nodes
-    // whose first +-click doesn't enter grow mode, and a Welcome graph owned by
-    // a different user disables grow. Owning our own single-node graph removes
-    // both. (API truth is used for the +1/-1 deltas below; viewport culling can't
-    // skew them.)
-    const graphId = await page.evaluate(async () => {
-      const token = localStorage.getItem('authToken') ?? '';
-      const post = (query: string, variables?: unknown) =>
-        fetch('/api/graphql', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ query, variables }),
-        }).then((r) => r.json());
-      const me = await post('{ me { id } }');
-      const userId = me.data.me.id;
-      const g = await post(
-        `mutation($input: [GraphCreateInput!]!) { createGraphs(input: $input) { graphs { id } } }`,
-        { input: [{ name: `Grow Smoke ${Date.now()}`, type: 'PROJECT', status: 'ACTIVE', createdBy: userId, isShared: true }] }
-      );
-      const gid = g.data.createGraphs.graphs[0].id as string;
-      await post(
-        `mutation($input: [WorkItemCreateInput!]!) { createWorkItems(input: $input) { workItems { id } } }`,
-        { input: [{ type: 'TASK', title: 'Grow Seed', status: 'IN_PROGRESS', priority: 0.5, positionX: 0, positionY: 0, positionZ: 0, owner: { connect: { where: { node: { id: userId } } } }, graph: { connect: { where: { node: { id: gid } } } } }] }
-      );
-      return gid;
-    });
-    expect(graphId, 'fixture graph created').toBeTruthy();
-
-    await page.evaluate((gid) => localStorage.setItem('currentGraphId', gid), graphId);
+    await page.evaluate(id => {
+      localStorage.setItem('currentGraphId', id);
+      localStorage.setItem('graphdone:viewMode', 'graph');
+    }, graphId);
     await page.reload();
 
-    // Wait for the seed node to render, then for the force layout to SETTLE — the
-    // "+" grow icon rides on its node, so clicking while the sim is still moving
-    // is the historical source of flake. Poll the node's box until it stops.
-    await page.locator('.graph-container svg .node').first().waitFor({ timeout: 20000 });
-    {
-      let last: { x: number; y: number } | null = null;
-      let stable = 0;
-      for (let i = 0; i < 40 && stable < 2; i++) {
-        const pos = await page.evaluate(() => {
-          const n = document.querySelector('.graph-container svg .node');
-          if (!n) return null;
-          const r = n.getBoundingClientRect();
-          return { x: Math.round(r.x), y: Math.round(r.y) };
-        });
-        if (pos && last && Math.abs(pos.x - last.x) < 1 && Math.abs(pos.y - last.y) < 1) stable++;
-        else stable = 0;
-        last = pos;
-        await page.waitForTimeout(300);
-      }
-    }
+    const byId = (left: { id: string }, right: { id: string }) => left.id.localeCompare(right.id);
+    const saved = async () => {
+      const state = await gql(page, `query($id:ID!){
+        workItems(where:{graph:{id:$id}}){id title}
+        edges(where:{OR:[{source:{graph:{id:$id}}},{target:{graph:{id:$id}}}]}){
+          id type source{id} target{id}
+        }
+      }`, { id: graphId });
+      return { ...state, workItems: state.workItems.sort(byId) };
+    };
+    const initial = { workItems: [{ id: seedId, title: 'Grow Seed' }], edges: [] };
+    expect(await saved()).toEqual(initial);
 
-    // Count only THIS fixture graph so the +1 node / +1 edge delta is exact.
-    const countAll = () => page.evaluate(async (gid) => {
-      const token = localStorage.getItem('authToken') ?? '';
-      const res = await fetch('/api/graphql', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ query: `query($g: ID!) { workItems(where: { graph: { id: $g } }) { id } edges(where: { source: { graph: { id: $g } } }) { id } }`, variables: { g: gid } })
-      }).then((r) => r.json());
-      return { nodes: res.data?.workItems?.length ?? -1, edges: res.data?.edges?.length ?? -1 };
-    }, graphId);
-    const before = await countAll();
-    expect(before.nodes, 'fixture starts with exactly the seed node').toBe(1);
+    const graph = page.locator('.graph-container');
+    await expect(graph.locator('svg .node')).toHaveCount(1);
+    await expect.poll(() => page.evaluate(() => (window as any).__layoutMetrics?.()?.cameraReady)).toBe(true);
+    const add = graph.getByRole('button', { name: 'Add a connection from Grow Seed', exact: true });
+    await expect(add).toBeVisible();
+    await add.click();
+    await expect(page.getByText('Click empty space to grow', { exact: false })).toBeVisible();
 
-    // Enter grow mode. Retry the click→hint: a settled layout makes this reliable,
-    // but a stray overlap can still swallow one click, so re-click until grow mode
-    // activates instead of failing on the first miss.
-    await expect(async () => {
-      await page.locator('.node-relationship-icon').first().click({ force: true });
-      await expect(page.locator('text=Click empty space to grow')).toBeVisible({ timeout: 2000 });
-    }).toPass({ timeout: 20000 });
-
-    // Find a genuinely empty spot of canvas (viewport-relative, verified)
-    const spot = await page.evaluate(() => {
-      const candidates = [
-        [innerWidth / 2, innerHeight - 140],
-        [innerWidth - 350, innerHeight / 2],
-        [200, innerHeight - 160],
-        [innerWidth / 2, 160]
-      ];
-      for (const [x, y] of candidates) {
-        const el = document.elementFromPoint(x, y);
-        if (el && el.classList.contains('background')) return { x, y };
+    const spot = await graph.locator('svg .background').evaluate(element => {
+      const rect = element.closest('svg')!.getBoundingClientRect();
+      const visible = {
+        left: Math.max(rect.left, 0), top: Math.max(rect.top, 0),
+        right: Math.min(rect.right, innerWidth), bottom: Math.min(rect.bottom, innerHeight),
+      };
+      for (const [horizontal, vertical] of [[0.25, 0.75], [0.75, 0.75], [0.25, 0.35], [0.75, 0.35]]) {
+        const x = visible.left + (visible.right - visible.left) * horizontal;
+        const y = visible.top + (visible.bottom - visible.top) * vertical;
+        if (document.elementFromPoint(x, y) === element) return { x, y };
       }
       return null;
     });
     expect(spot, 'the graph must offer empty canvas for the grow flow').not.toBeNull();
     await page.mouse.click(spot!.x, spot!.y);
-    const rename = page.locator('[data-testid="inline-rename"]');
-    await expect(rename, 'inline rename must open after grow').toBeVisible({ timeout: 10000 });
+
+    const rename = page.getByTestId('inline-rename');
+    await expect(rename).toBeVisible();
+    const original = await rename.inputValue();
+    const created = await saved();
+    expect(created.workItems).toHaveLength(2);
+    const added = created.workItems.find((item: { id: string }) => item.id !== seedId);
+    expect(added).toEqual({ id: expect.any(String), title: original });
+    expect(created.edges).toEqual([{
+      id: expect.any(String), type: 'IS_PART_OF', source: { id: added.id }, target: { id: seedId },
+    }]);
+
     const name = `Smoke ${Date.now()}`;
-    await page.keyboard.type(name);
-    await page.keyboard.press('Enter');
-    await page.waitForTimeout(4000);
+    await rename.fill(name);
+    await rename.press('Enter');
+    const stateWithTitle = (title: string) => ({
+      workItems: [...initial.workItems, { id: added.id, title }].sort(byId),
+      edges: created.edges,
+    });
+    await expect.poll(saved).toEqual(stateWithTitle(name));
+    await expect(graph.locator('.node-title-text').filter({ hasText: new RegExp(`^${name}$`) })).toBeVisible();
 
-    const after = await countAll();
-    expect(after.nodes, 'a node must be created').toBe(before.nodes + 1);
-    expect(after.edges, 'a connecting edge must be created').toBe(before.edges + 1);
-    // ...and the user actually sees the newly named node on the canvas.
-    await expect(page.locator('.node-title-text').filter({ hasText: name }).first()).toBeVisible();
-
-    // Undo must walk it back: Ctrl+Z undoes the rename, then the creation.
     await page.keyboard.press('Control+z');
-    await page.waitForTimeout(2500);
+    await expect.poll(saved).toEqual(stateWithTitle(original));
     await page.keyboard.press('Control+z');
-    await page.waitForTimeout(5000);
-    await expect.poll(async () => (await countAll()).nodes, { timeout: 10000 }).toBe(before.nodes);
-    expect((await countAll()).edges, 'undo must remove the created edge').toBe(before.edges);
-
-    // Tear down the whole fixture graph (edges FIRST — orphan edges break the
-    // edges query), keeping the suite re-runnable and the DB clean.
-    await page.evaluate(async (gid) => {
-      const token = localStorage.getItem('authToken') ?? '';
-      const post = (query: string, variables: unknown) =>
-        fetch('/api/graphql', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ query, variables }) });
-      await post(`mutation($id: ID!) { deleteEdges(where: { source: { graph: { id: $id } } }) { nodesDeleted } }`, { id: gid });
-      await post(`mutation($id: ID!) { deleteWorkItems(where: { graph: { id: $id } }) { nodesDeleted } }`, { id: gid });
-      await post(`mutation($id: ID!) { deleteGraphs(where: { id: $id }) { nodesDeleted } }`, { id: gid });
-    }, graphId);
+    await expect.poll(saved).toEqual(initial);
   });
 
   // A brand-new EMPTY graph (the very first thing a user sees after "Create

@@ -1,7 +1,7 @@
 import { devices, expect, test } from '@playwright/test';
 import { resolve } from 'node:path';
 import { openGraphView } from '../../lib/journeys/workspace';
-import { touchGesture, visibleTileCenter, type TouchPoint } from '../../lib/journeys/touchContacts';
+import { bareCanvasPinchCenter, touchGesture, visibleTileCenter, splitSiblingContacts, type TouchPoint } from '../../lib/journeys/touchContacts';
 
 test.use({ ...devices['iPhone 14'], browserName: 'chromium' });
 
@@ -136,4 +136,62 @@ test('two graph contacts hit their painted targets when the phone page is alread
   ], async () => {
     await expect(page.locator('body')).toHaveAttribute('data-actual-hits', 'left-contact,right-contact');
   });
+});
+
+for (const offset of [0, 480]) {
+  test(`a cropped phone overview offers a split pinch ${offset ? 'after a canvas pan' : 'at its existing camera'} @mobile`, async ({ page }) => {
+    await page.setContent(`
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      <style>body { margin: 0 } .graph-container { position: absolute; inset: 153px 0 87px } svg { width: 100%; height: 100%; touch-action: none; }</style>
+      <div class="graph-container" data-zoom-level="2"><svg>
+        <g class="main-graph-group"><rect class="background" width="100%" height="100%" fill="#234"/></g>
+        <g id="tiles" transform="translate(${offset} 0)">
+        <g data-zoom-tile="welcome" role="button" aria-label="Welcome graph, 4 items"><rect class="zoom-tile-bg" x="62" y="130" width="151" height="95" rx="14"/></g>
+        <g data-zoom-tile="fix" role="button" aria-label="Fix bugs graph, 6 items"><rect class="zoom-tile-bg" x="259" y="130" width="151" height="95" rx="14"/></g>
+        <g data-zoom-tile="ideas" role="button" aria-label="Ideas graph, 5 items"><rect class="zoom-tile-bg" x="-135" y="130" width="151" height="95" rx="14"/></g>
+        <g data-zoom-tile="plan" role="button" aria-label="Plan a launch graph, 12 items"><rect class="zoom-tile-bg" x="62" y="253" width="151" height="95" rx="14"/></g>
+        </g>
+      </svg></div>
+    `);
+    await page.addScriptTag({ path: resolve('node_modules/d3/dist/d3.min.js') });
+    await page.evaluate(offset => {
+      const d3 = (window as any).d3;
+      d3.select('svg').call(d3.zoom().touchable(true).on('zoom', ({ transform }: any) => {
+        document.getElementById('tiles')!.setAttribute('transform', `translate(${offset + transform.x} ${transform.y})`);
+      }));
+      window.addEventListener('touchstart', event => {
+        if (event.touches.length === 1 && (event.target as Element).matches('rect.background')) document.body.dataset.panned = 'true';
+        if (event.touches.length === 2) document.body.dataset.targets = Array.from(event.touches, touch =>
+          (touch.target as Element).closest('[data-zoom-tile]')?.getAttribute('data-zoom-tile')).join(',');
+      }, true);
+    }, offset);
+    const pair = await splitSiblingContacts(page, 'welcome');
+    expect(await page.locator('body').getAttribute('data-panned')).toBe(offset ? 'true' : null);
+    expect(new Set(pair.ids).size).toBe(2);
+    expect(pair.ids).not.toContain('welcome');
+    expect(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.matches('rect.background'), pair.midpoint)).toBe(true);
+    await touchGesture(page, [pair.contacts, pair.spread]);
+    await expect(page.locator('body')).toHaveAttribute('data-targets', pair.ids.join(','));
+  });
+}
+
+test('camera calibration uses bare canvas when a sibling covers the middle of the phone @mobile', async ({ page }) => {
+  await page.setContent(`
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <style>body { margin: 0 } .graph-container { position: absolute; inset: 132px 0 87px } svg { width: 100%; height: 100%; touch-action: none }</style>
+    <div class="graph-container"><svg><g class="main-graph-group"><rect class="background" width="100%" height="100%" fill="#234"/></g>
+      <g data-zoom-tile="fix"><rect x="135" y="200" width="120" height="140"/></g>
+    </svg></div>
+  `);
+  await page.evaluate(() => {
+    window.addEventListener('touchstart', event => {
+      if (event.touches.length !== 2) return;
+      const [a, b] = Array.from(event.touches);
+      const mid = document.elementFromPoint((a.clientX + b.clientX) / 2, (a.clientY + b.clientY) / 2);
+      document.body.dataset.bare = String([a.target as Element, mid, b.target as Element].every(el => el?.matches('rect.background')));
+    }, true);
+  });
+  const center = await bareCanvasPinchCenter(page, 40, 60);
+  await touchGesture(page, [40, 60].map(gap => [{ x: center.x - gap, y: center.y }, { x: center.x + gap, y: center.y }]));
+  await expect(page.locator('body')).toHaveAttribute('data-bare', 'true');
 });
