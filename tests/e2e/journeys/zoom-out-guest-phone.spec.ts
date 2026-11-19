@@ -31,15 +31,16 @@ async function camera(page: Page) {
 
 type TouchPoint = { x: number; y: number };
 
-async function touchGesture(page: Page, frames: [TouchPoint, TouchPoint][]) {
+async function touchGesture(page: Page, frames: [TouchPoint, TouchPoint][], afterFirstMove?: () => Promise<void>) {
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
   const points = ([a, b]: [TouchPoint, TouchPoint]) => [a, b].map((point, index) =>
     ({ x: Math.round(point.x), y: Math.round(point.y), id: index + 1, radiusX: 2, radiusY: 2, force: 1 }));
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: points(frames[0]) });
-  for (const frame of frames.slice(1)) {
+  for (const [index, frame] of frames.slice(1).entries()) {
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: points(frame) });
     await page.waitForTimeout(30);
+    if (index === 0) await afterFirstMove?.();
   }
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await cdp.detach();
@@ -159,18 +160,38 @@ test('JOURNEY zoom-out: pinching into a sibling opens that graph on a phone', as
   await cancelledThreeFingerPinch(page, center);
   await welcomeStaysSelected();
 
-  await resetOverview();
+  const area = await resetOverview();
   const tile = fixTile();
-  center = await tileCenter(tile);
-  expect(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest('[data-zoom-tile]')?.getAttribute('data-zoom-tile'), center))
-    .toBe(await tile.getAttribute('data-zoom-tile'));
+  const tileBox = (await tile.boundingBox())!;
+  const shortSide = Math.min(area.width, area.height);
+  const tileSize = Math.max(tileBox.width, tileBox.height);
+  // Start just below the point at which the camera hides sibling tiles. The
+  // first small movement must cross that boundary before qualifying as a dive.
+  if (tileSize < 0.43 * shortSide) {
+    const canvasCenter = { x: area.x + area.width / 2, y: area.y + area.height / 2 };
+    await pinch(page, canvasCenter, 40, 40 * 0.47 * shortSide / tileSize);
+  }
+  await expect(page.locator('.graph-container')).toHaveAttribute('data-zoom-level', '2');
   const targetId = await tile.getAttribute('data-zoom-tile');
   const cameraBefore = await camera(page);
   const sourcePositions = await localSourcePositions(page);
+  const readyBox = (await tile.boundingBox())!;
+  expect(Math.max(readyBox.width, readyBox.height) * 51 / 40).toBeGreaterThan(0.5 * shortSide);
+  center = { x: Math.round(readyBox.x + readyBox.width / 2), y: Math.round(readyBox.y + readyBox.height / 2) };
+  expect(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest('[data-zoom-tile]')?.getAttribute('data-zoom-tile'), center))
+    .toBe(targetId);
 
-  // The reverse gesture dives into the tile under its fixed centroid, just as
-  // a wheel zoom or tap does. It is navigation only: source coordinates stay put.
-  await pinch(page, center, 20, 65);
+  // An 11px first expansion stays below the 12px navigation threshold. Both
+  // fingers stay down and keep spreading after the camera hides the tile.
+  await touchGesture(page, [
+    [{ x: center.x - 20, y: center.y }, { x: center.x + 20, y: center.y }],
+    [{ x: center.x - 25, y: center.y }, { x: center.x + 26, y: center.y }],
+    ...around([31, 37, 42, 48, 54, 59, 65]),
+  ], async () => {
+    await expect(page.locator('.graph-container')).toHaveAttribute('data-zoom-level', /^[01]$/);
+    await expect(tile).toBeHidden();
+    await welcomeStaysSelected();
+  });
   await expect(selector(page)).toContainText('Fix bugs', { timeout: 15_000 });
   expect(await page.evaluate(() => localStorage.getItem('currentGraphId'))).toBe(targetId);
   const afterPositions = await localSourcePositions(page);
